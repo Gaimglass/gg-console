@@ -18,7 +18,7 @@ async function initializeUsb() {
   let path = '';
 
   ports.forEach(_port => {
-    // Arudino Uno
+    // Arduino Uno
     _port.vendorId === "10C4" && _port.productId === "EA60"
     path = port.path;
   })

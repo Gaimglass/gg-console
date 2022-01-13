@@ -26,7 +26,7 @@
     "electron-rebuild": "^3.2.7",
     "usb": "^2.0.3"
   },
-  "main": "src/electron/start.js",
+  "main": "src/electron/index.js",
   "eslintConfig": {
     "extends": [
       "react-app",
