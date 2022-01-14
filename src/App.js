@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+
+import { SketchPicker } from 'react-color';
+
 import logo from './logo.svg';
 import './App.css';
 
@@ -9,6 +12,21 @@ const ipcRenderer  = electron.ipcRenderer;
 
 function App() {
   
+  const [color, setColor] = useState({});
+
+  function handleChangeComplete(c) {
+    ipcRenderer.sendSync('set-color', {red: c.rgb.r, green: c.rgb.g, blue: c.rgb.b})
+    setColor({
+      ...c
+    });
+  };
+
+  /*useEffect(()=>{
+    if(color) {
+      ipcRenderer.sendSync('set-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b})
+    }
+  }, [color]);*/
+
   useEffect(()=>{
     (async () => {
       console.log("synchronous-reply: ", ipcRenderer.sendSync('synchronous-message', "foo sync"));
@@ -23,30 +41,17 @@ function App() {
     console.log("asynchronous-reply: ", arg) // prints "pong"
   })
 
-
-  function changeColor() {
-    console.log("click");
-  }
-
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-        <button onClick={changeColor}>Red</button>
-        <button onClick={changeColor}>Green</button>
-        <button onClick={changeColor}>Blue</button>
-      </header>
+      {/* <img src={logo} className="App-logo" alt="logo" /> */}
+      <div>{color?.hex}</div>
+      <div>{color?.rgb?.r} {color?.rgb?.g} {color?.rgb?.b}</div>
+      <SketchPicker
+        width={550}
+        color={color.hex}
+        onChange={ handleChangeComplete }
+        //onChangeComplete={ handleChangeComplete }
+      />
     </div>
   );
 }

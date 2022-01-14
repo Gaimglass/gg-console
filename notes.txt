@@ -7,3 +7,7 @@ https://www.electronjs.org/docs/latest/tutorial/code-signing
 
   for html (react) to main.js communication
   https://stackoverflow.com/questions/59681069/how-to-communicate-between-react-and-electron
+
+
+Change color picker to this
+  https://github.com/omgovich/react-colorful

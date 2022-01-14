@@ -1,7 +1,8 @@
 const electron = require('electron');
 const usb = require('usb');
 
-//const SerialPort = require('@serialport/stream')
+const { connectUsb, setColor } = require('./usb');
+
 //const SerialPort = require('serialport')
 //const Readline = require('@serialport/parser-readline');
 
@@ -32,6 +33,7 @@ function createWindow() {
         }
     });
 
+    connectUsb();
     // and load the index.html of the app.
     const startUrl = process.env.ELECTRON_START_URL || url.format({
         pathname: path.join(__dirname, '/../build/index.html'),
@@ -83,6 +85,11 @@ electron.ipcMain.on('asynchronous-message', async (event, arg) => {
 electron.ipcMain.on('synchronous-message', async (event, arg) => {
     console.log("synchronous-message ", arg);
     event.returnValue = 'pong';
+});
+
+electron.ipcMain.on('set-color', async (event, color) => {
+    setColor(color.red, color.green, color.blue);
+    event.returnValue = 'okay';
 });
 
 // electron.ipcMain.on('get-exe', () => {
