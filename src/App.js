@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { SketchPicker } from 'react-color';
 
@@ -12,30 +12,39 @@ const ipcRenderer  = electron.ipcRenderer;
 
 function App() {
   
-  const [color, setColor] = useState({});
+  const [color, setColor] = useState({rgb:{r:200,g:200,b:255}});
 
   function handleChangeComplete(c) {
-    ipcRenderer.sendSync('set-color', {red: c.rgb.r, green: c.rgb.g, blue: c.rgb.b})
+    ipcRenderer.sendSync('set-color', c)
     setColor({
       ...c
     });
   };
 
-  /*useEffect(()=>{
-    if(color) {
-      ipcRenderer.sendSync('set-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b})
-    }
-  }, [color]);*/
+  function writeDefault() {
+    ipcRenderer.sendSync('set-default-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b}) 
+  }
+
+  function getColor() {
+    const c = ipcRenderer.sendSync('get-color');
+    console.log(c);
+  }
 
   useEffect(()=>{
-    (async () => {
-      console.log("synchronous-reply: ", ipcRenderer.sendSync('synchronous-message', "foo sync"));
-      ipcRenderer.send('asynchronous-message', "foo async");
-    })();
-    return () => {
-      
+    console.log("getting color..");
+    const c = ipcRenderer.sendSync('get-color');    
+    if (c) {
+      setColor({
+        ...c
+      });
+      // pass color to gaimglass
+      ipcRenderer.sendSync('set-color', c);
+    } else {
+      // set up default color perhaps?
     }
-  },[]);
+  }, []);
+
+
 
   ipcRenderer.on('asynchronous-reply', (event, arg) => {
     console.log("asynchronous-reply: ", arg) // prints "pong"
@@ -44,10 +53,16 @@ function App() {
   return (
     <div className="App">
       {/* <img src={logo} className="App-logo" alt="logo" /> */}
+      <button onClick={writeDefault}>Set Default Color</button>
+      {/* <button onClick={readDefault}>Get Default Color</button> */}
+
+      <button onClick={getColor}>Get Color</button>
+
       <div>{color?.hex}</div>
       <div>{color?.rgb?.r} {color?.rgb?.g} {color?.rgb?.b}</div>
+      
       <SketchPicker
-        width={550}
+        width={400}
         color={color.hex}
         onChange={ handleChangeComplete }
         //onChangeComplete={ handleChangeComplete }

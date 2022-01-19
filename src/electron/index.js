@@ -1,7 +1,8 @@
 const electron = require('electron');
 const usb = require('usb');
+const Store = require('electron-store');
 
-const { connectUsb, setColor } = require('./usb');
+const { connectUsb, setColor, waitForSerial } = require('./usb');
 
 //const SerialPort = require('serialport')
 //const Readline = require('@serialport/parser-readline');
@@ -16,16 +17,17 @@ const BrowserWindow = electron.BrowserWindow;
 
 const path = require('path');
 const url = require('url');
+const store = new Store();
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
 
-function createWindow() {
+async function createWindow() {
     // Create the browser window.
     mainWindow = new BrowserWindow({
-        width: 800, 
-        height: 600,
+        width: 1200, 
+        height: 900,
         webPreferences: {
             nodeIntegration: true,
             enableRemoteModule: true,
@@ -33,7 +35,10 @@ function createWindow() {
         }
     });
 
-    connectUsb();
+    await connectUsb();
+
+    await waitForSerial();
+
     // and load the index.html of the app.
     const startUrl = process.env.ELECTRON_START_URL || url.format({
         pathname: path.join(__dirname, '/../build/index.html'),
@@ -77,25 +82,32 @@ app.on('activate', function () {
     }
 });
 
+// Asynchronous
+
 electron.ipcMain.on('asynchronous-message', async (event, arg) => {
     console.log("asynchronous-message ", arg);
     event.reply('asynchronous-reply', 'pong')
 });
 
-electron.ipcMain.on('synchronous-message', async (event, arg) => {
-    console.log("synchronous-message ", arg);
-    event.returnValue = 'pong';
+
+// Synchronous
+
+electron.ipcMain.on('get-color', async (event) => {
+    const color = store.get('color');
+    event.returnValue = color;
 });
 
 electron.ipcMain.on('set-color', async (event, color) => {
-    setColor(color.red, color.green, color.blue);
+    console.log("COLOR");
+    store.set('color', color);
+    setColor(color.rgb.r, color.rgb.g, color.rgb.b);
     event.returnValue = 'okay';
 });
 
-// electron.ipcMain.on('get-exe', () => {
-//     console.log('reaciovg');
-//     mainWindow.webContents.send('return-exe', '');
-// });
+electron.ipcMain.on('set-default-color', async (event, color) => {
+    setColor(color.red, color.green, color.blue, true);
+    event.returnValue = 'okay';
+});
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
