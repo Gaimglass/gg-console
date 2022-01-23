@@ -92,6 +92,20 @@ function connectUsb() {
 }
 
 
+
+
+function setMute(value) {
+  const command = String.fromCharCode(SET_MAIN_LED_MUTE);
+  if(value) {
+    console.log(`${command}1\n`);
+    port.write(`${command}1\n`);
+  } else {
+    console.log(`${command}0\n`);
+    port.write(`${command}0\n`);
+  }
+}
+
+
 function setColor(red, green, blue, makeDefault=false) {
   if (port) {
     if (red < 0) {
@@ -113,12 +127,12 @@ function setColor(red, green, blue, makeDefault=false) {
     // scale values, use non-linear mapping to simulate more realistic color dim levels
 
     // a higher value means more accurate dim colors, but not as bright
-    /*const rExponent = 2.4;
+    const rExponent = 2.4;
     const gExponent = 2;
-    const bExponent = 2.6;*/
-    const rExponent = 1;
+    const bExponent = 2.6;
+    /*const rExponent = 1;
     const gExponent = 1;
-    const bExponent = 1;
+    const bExponent = 1;*/
     
     const rScale = 255/(Math.pow(255, rExponent)/255);
     const gScale = 255/(Math.pow(255, gExponent)/255);
@@ -156,17 +170,12 @@ function getColor(red, blue, green) {
   }
 }
 
-function setMute(mute) {
 
-}
-
-function getMute() {
-  return false;
-}
 
 module.exports = {
   waitForSerial,
   connectUsb,
   initializeUsb,
-  setColor
+  setColor,
+  setMute,
 }

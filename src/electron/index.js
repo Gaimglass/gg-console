@@ -2,7 +2,7 @@ const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
 
-const { connectUsb, setColor, waitForSerial } = require('./usb');
+const { connectUsb, setColor, waitForSerial, setMute } = require('./usb');
 
 //const SerialPort = require('serialport')
 //const Readline = require('@serialport/parser-readline');
@@ -91,6 +91,12 @@ electron.ipcMain.on('asynchronous-message', async (event, arg) => {
 
 
 // Synchronous
+
+electron.ipcMain.on('set-mute', async (event, value) => {
+    console.log(">>");
+    setMute(value);
+    event.returnValue = "okay";
+});
 
 electron.ipcMain.on('get-color', async (event) => {
     const color = store.get('color');

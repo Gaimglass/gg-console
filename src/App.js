@@ -13,6 +13,7 @@ const ipcRenderer  = electron.ipcRenderer;
 function App() {
   
   const [color, setColor] = useState({rgb:{r:200,g:200,b:255}});
+  const [mute, setMute] = useState(false);
 
   function handleChangeComplete(c) {
     ipcRenderer.sendSync('set-color', c)
@@ -28,6 +29,16 @@ function App() {
   function getColor() {
     const c = ipcRenderer.sendSync('get-color');
     console.log(c);
+  }
+
+  function toggleMute() {
+    if(mute) {
+      setMute(false);
+      ipcRenderer.sendSync('set-mute', false);
+    } else {
+      setMute(true);
+      ipcRenderer.sendSync('set-mute', true);
+    }
   }
 
   useEffect(()=>{
@@ -57,6 +68,7 @@ function App() {
       {/* <button onClick={readDefault}>Get Default Color</button> */}
 
       <button onClick={getColor}>Get Color</button>
+      <button onClick={toggleMute}>{mute ? "Turn Off" : "Turn On"}</button>
 
       <div>{color?.hex}</div>
       <div>{color?.rgb?.r} {color?.rgb?.g} {color?.rgb?.b}</div>
