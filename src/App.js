@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-
 import { SketchPicker } from 'react-color';
+import { useSelector, useDispatch } from 'react-redux'
+import { initializeStatus } from './store/status'
 
 import logo from './logo.svg';
 import './App.css';
@@ -12,8 +13,38 @@ const ipcRenderer  = electron.ipcRenderer;
 
 function App() {
   
+  const dispatch = useDispatch();
+
   const [color, setColor] = useState({rgb:{r:200,g:200,b:255}});
   const [mute, setMute] = useState(false);
+
+  // store
+  const count = useSelector(state => state)
+  
+  ipcRenderer.on('status', async (event, value) => {
+    console.log("status update: ", value) // prints "pong"
+  });
+
+
+  //
+  useEffect(()=>{
+    //debugger;
+    ipcRenderer.send('get-status');
+    //dispatch(initializeStatus());
+    /*
+    console.log("getting color..");
+    const c = ipcRenderer.sendSync('get-color');    
+    if (c) {
+      setColor({
+        ...c
+      });
+      // pass color to gaimglass
+      ipcRenderer.sendSync('set-color', c);
+    } else {
+      // set up default color perhaps?
+    }*/
+  }, []);
+
 
   function handleChangeComplete(c) {
     ipcRenderer.sendSync('set-color', c)
@@ -28,7 +59,12 @@ function App() {
 
   function getColor() {
     const c = ipcRenderer.sendSync('get-color');
-    console.log(c);
+    //console.log(c);
+  }
+
+  function getStatus() {
+    const c = ipcRenderer.send('get-status');
+    //console.log(c);
   }
 
   function toggleMute() {
@@ -41,26 +77,6 @@ function App() {
     }
   }
 
-  useEffect(()=>{
-    console.log("getting color..");
-    const c = ipcRenderer.sendSync('get-color');    
-    if (c) {
-      setColor({
-        ...c
-      });
-      // pass color to gaimglass
-      ipcRenderer.sendSync('set-color', c);
-    } else {
-      // set up default color perhaps?
-    }
-  }, []);
-
-
-
-  ipcRenderer.on('asynchronous-reply', (event, arg) => {
-    console.log("asynchronous-reply: ", arg) // prints "pong"
-  })
-
   return (
     <div className="App">
       {/* <img src={logo} className="App-logo" alt="logo" /> */}
@@ -69,6 +85,7 @@ function App() {
 
       <button onClick={getColor}>Get Color</button>
       <button onClick={toggleMute}>{mute ? "Turn Off" : "Turn On"}</button>
+      <button onClick={getStatus}>Get Status</button>
 
       <div>{color?.hex}</div>
       <div>{color?.rgb?.r} {color?.rgb?.g} {color?.rgb?.b}</div>

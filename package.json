@@ -12,6 +12,7 @@
     "postinstall": "./node_modules/.bin/electron-rebuild.cmd"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^1.7.1",
     "@testing-library/jest-dom": "^5.16.1",
     "@testing-library/react": "^12.1.2",
     "@testing-library/user-event": "^13.5.0",
@@ -19,6 +20,7 @@
     "react": "^17.0.2",
     "react-color": "^2.19.3",
     "react-dom": "^17.0.2",
+    "react-redux": "^7.2.6",
     "react-scripts": "5.0.0",
     "serialport": "^9.2.8",
     "web-vitals": "^2.1.2"
@@ -28,7 +30,7 @@
     "electron-rebuild": "^3.2.7",
     "usb": "^2.0.3"
   },
-  "main": "src/electron/index.js",
+  "main": "./src/electron/index.js",
   "eslintConfig": {
     "extends": [
       "react-app",
