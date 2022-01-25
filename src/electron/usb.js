@@ -1,5 +1,6 @@
 const SerialPort = require('serialport')
 const Readline = require('@serialport/parser-readline');
+const electron = require('electron');
 
 // Serial Commands
 const SET_MAIN_LED_COLOR = 0;
@@ -14,13 +15,16 @@ const GET_GAME_LINK_LED = 5;
 const WRITE_DEFAULT_LED_COLOR = 6;
 const READ_DEFAULT_LED_COLOR = 7;
 
+const GET_STATUS = 8;
+
 let port = null;
 let parser = null;
 
 // Hack to delay sending data until the arduino is ready. When connecting
 // to the serial port through the arduino's USB port, it causes a restart and 1 second delay.
 // https://forum.arduino.cc/t/how-do-use-rx-and-tx-pins/948694
-let serialReady = ()=>(console.error("Promise not created"));
+let serialReady = ()=>(console.error("Promise not created 1"));
+let serialData = null;
 
 // Connect to the serial port of the Arduino Uno USB device
 async function initializeUsb() {
@@ -43,8 +47,12 @@ async function initializeUsb() {
 
     parser = port.pipe(new Readline({ delimiter: '\n' }));
     parser.on('data', data => {
-      serialReady();
-      console.log('got word from arduino:', data);
+      serialReady(); // resolve the promise
+      console.log("data > ", data);
+      if (serialData) {
+        serialData(data);
+        serialData = null; // ensure its only called once.
+      }
     });
 
     // Read the port data
@@ -93,16 +101,18 @@ function connectUsb() {
 
 
 
+function processSerialData(data) {
+  console.log('got word from arduino:', data);
+  const [command, values] = data.split(":");
+  if (command === "status") {
+    electron.ipcMain.sendSync("status", values);
+  }
+}
 
 function setMute(value) {
   const command = String.fromCharCode(SET_MAIN_LED_MUTE);
-  if(value) {
-    console.log(`${command}1\n`);
-    port.write(`${command}1\n`);
-  } else {
-    console.log(`${command}0\n`);
-    port.write(`${command}0\n`);
-  }
+  //console.log(`setMute: ${command}${Number(value)}`);
+  port.write(`${command}${Number(value)}\n`);
 }
 
 
@@ -161,6 +171,14 @@ function setColor(red, green, blue, makeDefault=false) {
   }
 }
 
+function getStatus() {
+  const command = String.fromCharCode(GET_STATUS);
+  return new Promise((resolve, reject)=>{
+    serialData = resolve;
+    port.write(`${command}\n`);
+  });
+}
+
 function getColor(red, blue, green) {
   // TODO...
   return {
@@ -178,4 +196,5 @@ module.exports = {
   initializeUsb,
   setColor,
   setMute,
+  getStatus,
 }
