@@ -32,9 +32,14 @@ async function initializeUsb() {
   //console.log(ports);
   let path = '';
 
+  console.log({ports});
   ports.forEach(portCandidate => {
-    // Arduino Uno
-    if (portCandidate.vendorId === "10C4" && portCandidate.productId === "EA60") {
+      
+    if (
+      // Arduino Metro Uno
+      (portCandidate.vendorId === "10C4" && portCandidate.productId === "EA60") ||
+      // Arduino Leonardo
+      (portCandidate.vendorId === "2341" && portCandidate.productId === "8036")) {
     // Aux Serial USB, TX, RX (only), this won't force reset when connecting
     //if (portCandidate.vendorId === "10C4" && portCandidate.productId === "EA60" && portCandidate.serialNumber === "0001") {
       path = portCandidate.path;
@@ -47,16 +52,20 @@ async function initializeUsb() {
 
     parser = port.pipe(new Readline({ delimiter: '\n' }));
     parser.on('data', data => {
-      serialReady(); // resolve the promise
+      //serialReady(); // resolve the promise
       console.log("data > ", data);
       if (serialData) {
-        serialData(data);
+        //serialData(data);
         serialData = null; // ensure its only called once.
       }
     });
 
     // Read the port data
     port.on("open", () => {
+      // Leonardo won't send a data event if the app reconnects but the Leonard has not restarted.
+      // just resolve the serialReady().
+      // TODO: is this okay to leave here, rather than inside on `data`? Figure out a better, best practice way to do this
+      serialReady(); // resolve the promise
       console.log('serial port open');
     });
 
@@ -78,6 +87,7 @@ async function initializeUsb() {
 // the serial port
 function waitForSerial() {
   return new Promise((resolve, reject)=>{
+    console.log("serialReady = resolve");
     serialReady = resolve;
   });
 }
@@ -156,6 +166,7 @@ function setColor(red, green, blue, makeDefault=false) {
    if (makeDefault) {
      command = String.fromCharCode(WRITE_DEFAULT_LED_COLOR);
    } else {
+     console.log("SET_MAIN_LED_COLOR");
      command = String.fromCharCode(SET_MAIN_LED_COLOR);
    }
 
@@ -164,7 +175,11 @@ function setColor(red, green, blue, makeDefault=false) {
     const sBlue = `${blue}`.padStart(3, 0)
     
     console.log(`${command}${sRed}${sGreen}${sBlue}\n`);
-    port.write(`${command}${sRed}${sGreen}${sBlue}\n`);
+    try {
+      port.write(`${command}${sRed}${sGreen}${sBlue}\n`);
+    }catch(e) {
+      console.log("e",e);
+    }
   }
   else {
     throw new Error("USB port not initialized");
