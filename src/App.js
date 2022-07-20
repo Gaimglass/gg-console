@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SketchPicker } from 'react-color';
+import { RgbColorPicker, HslColorPicker } from 'react-colorful';
 import { useSelector, useDispatch } from 'react-redux'
 import { initializeStatus } from './store/status'
 
@@ -90,12 +91,15 @@ function App() {
       <div>{color?.hex}</div>
       <div>{color?.rgb?.r} {color?.rgb?.g} {color?.rgb?.b}</div>
       
-      <SketchPicker
+      <RgbColorPicker
+        onChange={ handleChangeComplete }
+      ></RgbColorPicker>
+      {/* <SketchPicker
         width={400}
         color={color.hex}
         onChange={ handleChangeComplete }
         //onChangeComplete={ handleChangeComplete }
-      />
+      /> */}
     </div>
   );
 }

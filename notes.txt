@@ -10,4 +10,9 @@ https://www.electronjs.org/docs/latest/tutorial/code-signing
 
 
 Change color picker to this
-  https://github.com/omgovich/react-colorful
+  https://github.com/omgovich/react-colorfulπpa
+
+
+
+  electron-rebuild issues
+  https://github.com/serialport/node-serialport/issues/1891

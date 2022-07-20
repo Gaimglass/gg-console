@@ -42,11 +42,11 @@ async function createWindow() {
 
     // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
-      pathname: path.join(__dirname, '/../build/index.html'),
+      pathname: path.join(__dirname, '../../build/index.html'),
       protocol: 'file:',
       slashes: true
   });
-  console.log(startUrl);
+  console.log("startUrl:", startUrl);
   mainWindow.loadURL(startUrl);
 
   // Open the DevTools.
@@ -89,7 +89,6 @@ app.on('activate', function () {
 //
 
 electron.ipcMain.on('set-mute', async (event, value) => {
-  //console.log(">>");
   setMute(value);
   event.returnValue = "okay";
 });
@@ -100,9 +99,9 @@ electron.ipcMain.on('get-color', async (event) => {
 });
 
 electron.ipcMain.on('set-color', async (event, color) => {
-  console.log("COLOR");
-  store.set('color', color);
-  setColor(color.rgb.r, color.rgb.g, color.rgb.b);
+  console.log("COLOR", color);
+  //store.set('color', color);
+  //setColor(color.rgb.r, color.rgb.g, color.rgb.b);
   event.returnValue = 'okay';
 });
 

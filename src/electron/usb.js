@@ -1,5 +1,5 @@
-const SerialPort = require('serialport')
-const Readline = require('@serialport/parser-readline');
+const { SerialPort } = require('serialport')
+const { ReadlineParser } = require('@serialport/parser-readline');
 const electron = require('electron');
 
 // Serial Commands
@@ -28,18 +28,19 @@ let serialData = null;
 
 // Connect to the serial port of the Arduino Uno USB device
 async function initializeUsb() {
-  const ports = await SerialPort.list();
-  //console.log(ports);
+  const ports =  await SerialPort.list();
   let path = '';
 
-  console.log({ports});
-  ports.forEach(portCandidate => {
+  ports.forEach((portCandidate, index) => {
       
+    // Mac and Windows have difference casing, because of course they do, sigh.
+    const productId = portCandidate.productId?.toLowerCase();
+    const vendorId = portCandidate.vendorId?.toLowerCase();
     if (
       // Arduino Metro Uno
-      (portCandidate.vendorId === "10C4" && portCandidate.productId === "EA60") ||
+      (vendorId === "10c4" && productId === "ea60") ||
       // Arduino Leonardo
-      (portCandidate.vendorId === "2341" && portCandidate.productId === "8036")) {
+      (vendorId === "2341" && productId === "8036")) {
     // Aux Serial USB, TX, RX (only), this won't force reset when connecting
     //if (portCandidate.vendorId === "10C4" && portCandidate.productId === "EA60" && portCandidate.serialNumber === "0001") {
       path = portCandidate.path;
@@ -47,10 +48,15 @@ async function initializeUsb() {
   })
 
   if (path) {
-    console.log("path", path);
-    port = new SerialPort(path, { baudRate: 115200 });
+    
+    port = new SerialPort({
+      path,
+      baudRate: 115200,
+    })
 
-    parser = port.pipe(new Readline({ delimiter: '\n' }));
+    console.log({port});
+
+    parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
     parser.on('data', data => {
       //serialReady(); // resolve the promise
       console.log("data > ", data);
