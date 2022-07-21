@@ -80,9 +80,12 @@ async function initializeUsb() {
       console.log('serial port open');
     });
 
-    port.on("close", () => {
+    port.on("close", (options) => {
       console.log('serial port closed');
-      connectUsb();
+      if (options.reconnect !== false) {
+        // if the port was not closed by the gg app, then attempt to reconnect
+        connectUsb(); 
+      }
     });
 
     return true;
@@ -118,6 +121,14 @@ function connectUsb() {
       }
     }, 1500) 
   })
+}
+
+function disconnectUsb() {
+  if (port) {
+    port.close(function (err) {
+      port = null;
+    }, {reconnect: false});
+  }
 }
 
 
@@ -232,6 +243,7 @@ function writeCommand(commandStr, messageName) {
 module.exports = {
   waitForSerial,
   connectUsb,
+  disconnectUsb,
   initializeUsb,
   setColor,
   setMute,

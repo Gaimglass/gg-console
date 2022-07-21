@@ -2,7 +2,7 @@ const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
 
-const { connectUsb, setColor, waitForSerial, setMute, getStatus } = require('./usb');
+const { connectUsb, setColor, waitForSerial, setMute, getStatus, disconnectUsb } = require('./usb');
 
 //const SerialPort = require('serialport')
 //const Readline = require('@serialport/parser-readline');
@@ -25,17 +25,19 @@ const store = new Store();
 let mainWindow;
 
 async function createWindow() {
+  console.log("create win...");
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1200, 
-    height: 900,
+    width: 900, 
+    height: 560,
+    backgroundColor: '#282c34',
     webPreferences: {
       nodeIntegration: true,
       enableRemoteModule: true,
       contextIsolation: false,
     }
-  }); 
-    
+  });
+
   await connectUsb();
 
   await waitForSerial();
@@ -70,6 +72,8 @@ app.on('ready', createWindow);
 app.on('window-all-closed', function () {
   // On OS X it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
+  console.log("on window-all-close");
+  disconnectUsb();
   if (process.platform !== 'darwin') { 
     app.quit()
   }
@@ -78,6 +82,7 @@ app.on('window-all-closed', function () {
 app.on('activate', function () {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
+  console.log("on activate");
   if (mainWindow === null) {
      createWindow()
   }
