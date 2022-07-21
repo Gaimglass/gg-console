@@ -6,16 +6,13 @@ const ipcRenderer  = electron.ipcRenderer;
 export const status = createSlice({
   name: 'status',
   initialState: {
-    red: 0,
-    green: 0,
-    blue: 0,
-    defaultRed: 0,
-    defaultGreen: 0,
-    defaultBlue: 0,
-    mute: true
+    color: {},
+    defaultColor: [],
+    ledOn: true // 
+    //gameLink: true // 
   },
   reducers: {
-    initializeStatus: (state, action) => {
+    /*initializeStatus: (state, action) => {
       const c = ipcRenderer.sendSync('get-status');    
       debugger;
       // if (c) {
@@ -24,7 +21,7 @@ export const status = createSlice({
       // } else {
       //   // set up default color perhaps?
       // }
-    },
+    },*/
     setColor: (state, action) => { 
       state.red = action.payload.red;
       state.green = action.payload.green; 
