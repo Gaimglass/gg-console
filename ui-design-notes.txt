@@ -1,0 +1,25 @@
+
+
+events
+
+GG -> console
+  `update-color`
+    bool ledOn
+    int r,g,b
+    int brightness (rounded)
+
+
+console -> GG
+  `set-link`
+    bool link
+  
+  `set-color`
+    bool ledOn
+    int brightness
+    int r,b,g
+
+  `set-defaults`
+    [rgb1,...rgb8]
+
+  `get-status` (no params)
+    returns, all values and defaults
