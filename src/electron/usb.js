@@ -24,7 +24,12 @@ let parser = null;
 // to the serial port through the arduino's USB port, it causes a restart and 1 second delay.
 // https://forum.arduino.cc/t/how-do-use-rx-and-tx-pins/948694
 let serialReady = ()=>(console.error("Promise not created 1"));
-let serialData = null;
+
+// Serial result messages. Each message begins with a unit name followed by colon.
+const serialDataResults = {
+  'status': null,
+  'color': null,
+};
 
 // Connect to the serial port of the Arduino Uno USB device
 async function initializeUsb() {
@@ -54,15 +59,15 @@ async function initializeUsb() {
       baudRate: 115200,
     })
 
-    console.log({port});
-
     parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+
     parser.on('data', data => {
-      //serialReady(); // resolve the promise
-      console.log("data > ", data);
-      if (serialData) {
-        //serialData(data);
-        serialData = null; // ensure its only called once.
+      console.log("Gaimglass:", data);
+      const parts = data.split(':');
+      const messageName = parts[0];
+      if (serialDataResults[messageName]) {
+        serialDataResults[messageName].resolve(data);
+        serialDataResults[messageName] = null; // ensure its only called once.
       }
     });
 
@@ -194,10 +199,7 @@ function setColor(red, green, blue, makeDefault=false) {
 
 function getStatus() {
   const command = String.fromCharCode(GET_STATUS);
-  return new Promise((resolve, reject)=>{
-    serialData = resolve;
-    port.write(`${command}\n`);
-  });
+  return writeCommand(command, 'status');
 }
 
 function getColor(red, blue, green) {
@@ -209,6 +211,22 @@ function getColor(red, blue, green) {
   }
 }
 
+function writeCommand(commandStr, messageName) {
+  if (serialDataResults[messageName]) {
+    // A previous request has not finished or will never finish
+    // ignore for now?
+    console.error("duplicate promise detected")
+  }
+  
+  const promise = new Promise((resolve, reject)=>{
+    serialDataResults[messageName] = {
+      resolve,
+      reject
+    }
+    port.write(`${commandStr}\n`);
+  });
+  return promise;
+}
 
 
 module.exports = {

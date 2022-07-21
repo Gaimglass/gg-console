@@ -16,25 +16,24 @@ function App() {
   
   const dispatch = useDispatch();
 
-  const [color, setColor] = useState({rgb:{r:200,g:200,b:255}});
+  const [color, setColor] = useState({rgb:{r:200,g:20,b:255}});
   const [mute, setMute] = useState(false);
 
   // store
   const count = useSelector(state => state)
-  
-  ipcRenderer.on('status', async (event, value) => {
-    console.log("status update: ", value) // prints "pong"
-  });
-
 
   //
-  useEffect(()=>{
+  useEffect(() => {
     //debugger;
-    ipcRenderer.send('get-status');
+    // TODO add some delay here because GG is not normally ready to accept serial input
+    (async () => {
+      const c = await ipcRenderer.send('get-status');
+    })();
+    
     //dispatch(initializeStatus());
     /*
     console.log("getting color..");
-    const c = ipcRenderer.sendSync('get-color');    
+    const c = ipcRenderer.sendSync('get-color');
     if (c) {
       setColor({
         ...c
@@ -63,9 +62,11 @@ function App() {
     //console.log(c);
   }
 
-  function getStatus() {
-    const c = ipcRenderer.send('get-status');
-    //console.log(c);
+  async function getStatus() {
+    console.log("ok stat...");
+    const c = await ipcRenderer.sendSync('get-status');
+    // todo, update state with new values
+    console.log("ok stat",c);
   }
 
   function toggleMute() {
@@ -92,6 +93,7 @@ function App() {
       <div>{color?.rgb?.r} {color?.rgb?.g} {color?.rgb?.b}</div>
       
       <RgbColorPicker
+        color={color}
         onChange={ handleChangeComplete }
       ></RgbColorPicker>
       {/* <SketchPicker

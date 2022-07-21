@@ -115,8 +115,8 @@ electron.ipcMain.on('set-default-color', async (event, color) => {
 //
 
 electron.ipcMain.on('get-status', async (event) => {
-  const data = await getStatus();
-  event.reply('status', data);
+  console.log(".......");
+  event.returnValue = await getStatus();
 });
 
 
