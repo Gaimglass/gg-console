@@ -228,15 +228,26 @@ function writeCommand(commandStr, messageName) {
     // ignore for now?
     console.error("duplicate promise detected")
   }
-  
-  const promise = new Promise((resolve, reject)=>{
+
+  if (!port || !port.port.fd) {
+     return Promise.reject(new Error('Port has closed'));
+  }
+
+  const serialTimeout = new Promise((_, reject) => {
+    setTimeout(()=>{
+      reject(new Error('Serial port timed out'));
+    } ,150)
+  });
+
+  const serialResponse = new Promise((resolve, reject)=>{
     serialDataResults[messageName] = {
       resolve,
       reject
     }
     port.write(`${commandStr}\n`);
   });
-  return promise;
+
+  return Promise.race([serialResponse, serialTimeout]);
 }
 
 

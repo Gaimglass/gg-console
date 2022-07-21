@@ -115,13 +115,12 @@ electron.ipcMain.on('set-default-color', async (event, color) => {
   event.returnValue = 'okay';
 });
 
-//
-// Asynchronous
-//
-
 electron.ipcMain.on('get-status', async (event) => {
-  console.log(".......");
-  event.returnValue = await getStatus();
+  try {
+    event.returnValue = await getStatus();
+  } catch(err) {
+    event.returnValue = err.message;
+  }
 });
 
 
