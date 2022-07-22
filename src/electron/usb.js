@@ -26,7 +26,7 @@ let parser = null;
 let serialReady = ()=>(console.error("Promise not created 1"));
 
 // Serial result messages. Each message begins with a unit name followed by colon.
-const serialDataResults = {
+const serialMessageResults = {
   'status': null,
   'color': null,
 };
@@ -65,9 +65,9 @@ async function initializeUsb() {
       console.log("Gaimglass:", data);
       const parts = data.split(':');
       const messageName = parts[0];
-      if (serialDataResults[messageName]) {
-        serialDataResults[messageName].resolve(data);
-        serialDataResults[messageName] = null; // ensure its only called once.
+      if (serialMessageResults[messageName]) {
+        serialMessageResults[messageName].resolve(data);
+        serialMessageResults[messageName] = null; // ensure its only called once.
       }
     });
 
@@ -222,8 +222,11 @@ function getColor(red, blue, green) {
   }
 }
 
+/**
+ * Write a command string to Gaimglass over the serial port.
+ */
 function writeCommand(commandStr, messageName) {
-  if (serialDataResults[messageName]) {
+  if (serialMessageResults[messageName]) {
     // A previous request has not finished or will never finish
     // ignore for now?
     console.error("duplicate promise detected")
@@ -240,7 +243,7 @@ function writeCommand(commandStr, messageName) {
   });
 
   const serialResponse = new Promise((resolve, reject)=>{
-    serialDataResults[messageName] = {
+    serialMessageResults[messageName] = {
       resolve,
       reject
     }
