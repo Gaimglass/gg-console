@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { SketchPicker } from 'react-color';
-import { RgbColorPicker, HslColorPicker } from 'react-colorful';
+import { RgbaColorPicker, HslColorPicker } from 'react-colorful';
 import { useSelector, useDispatch } from 'react-redux'
-import { initializeStatus } from './store/status'
+import { status, setBrightness } from './store/status'
 
 import logo from './logo.svg';
 import './App.css';
@@ -14,20 +14,27 @@ const ipcRenderer  = electron.ipcRenderer;
 
 function App() {
   
+  
   const dispatch = useDispatch();
 
-  const [color, setColor] = useState({rgb:{r:200,g:20,b:255}});
-  const [mute, setMute] = useState(false);
+  let syncGG = true;//useRef(true);
+
+  const [color, setColor] = useState({r:200,g:20,b:255,a:0.123456});
+  const [ledOn, setLEDOn] = useState(true);
 
   // store
-  const count = useSelector(state => state)
+  //const ledOn = useSelector(state => state.status.ledOn);
 
-  //
+  useEffect(() => {
+    //
+    
+  }, [color, ledOn]);
+  
   useEffect(() => {
     //debugger;
     // TODO add some delay here because GG is not normally ready to accept serial input
     (async () => {
-      const c = await ipcRenderer.send('get-status');
+      //const c = await ipcRenderer.send('get-status');
     })();
     
     //dispatch(initializeStatus());
@@ -39,44 +46,73 @@ function App() {
         ...c
       });
       // pass color to gaimglass
-      ipcRenderer.sendSync('set-color', c);
+      ipcRenderer.sendSync('set-led-state', c);
     } else {
       // set up default color perhaps?
     }*/
   }, []);
 
+  function sendMainLEDStatus(color, ledOn) {
+    getMessageResult(ipcRenderer.sendSync('set-led-state', {
+      color,
+      brightness: color.a,
+      ledOn
+    }));
+  }
 
-  function handleChangeComplete(c) {
-    ipcRenderer.sendSync('set-color', c)
-    setColor({
-      ...c
-    });
+  async function getMessageResult(promise, cb) {
+    const result = await promise;
+     if (result instanceof Error) {
+      console.error(result);
+    } else {
+      // todo, update state with new values
+      console.log("result:", result);
+      if (cb) {
+        cb(result);
+      };
+    }
+  }
+
+  function handleColorChange(color) {
+    setColor(color);
+    sendMainLEDStatus(color, ledOn);
   };
+
+  function toggleLEDOn() {
+    const on = !ledOn;
+    setLEDOn(on);
+    sendMainLEDStatus(color, on);
+  }
 
   function writeDefault() {
     ipcRenderer.sendSync('set-default-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b}) 
   }
 
-  function getColor() {
-    const c = ipcRenderer.sendSync('get-color');
-    //console.log(c);
-  }
 
-  async function getStatus() {
-    console.log("ok stat...");
-    const c = await ipcRenderer.sendSync('get-status');
-    // todo, update state with new values
-    console.log("ok stat",c);
-  }
-
-  function toggleMute() {
-    if(mute) {
-      setMute(false);
-      ipcRenderer.sendSync('set-mute', false);
-    } else {
-      setMute(true);
-      ipcRenderer.sendSync('set-mute', true);
-    }
+  async function getMainLEDStatus() {
+    //syncGG = false;
+    await getMessageResult(ipcRenderer.sendSync('get-led-state'), (result)=>{
+      const params = result.split('&');
+      let r,g,b,a,ledOn;
+      params.forEach(param => {
+        const [key, value] = param.split('=');
+        // eslint-disable-next-line default-case
+        switch(key) {
+          case 'color':
+            [r,g,b] = value.split(',');
+            break;
+          case 'ledOn':
+            ledOn = Boolean(Number(value));
+            break;
+          case 'brightness':
+            a = value;
+            break;
+        }
+      });
+      setColor({r,g,b,a});
+      console.log("LEDON:", ledOn);
+      setLEDOn(ledOn);
+    });
   }
 
   return (
@@ -85,23 +121,16 @@ function App() {
       <button onClick={writeDefault}>Set Default Color</button>
       {/* <button onClick={readDefault}>Get Default Color</button> */}
 
-      <button onClick={getColor}>Get Color</button>
-      <button onClick={toggleMute}>{mute ? "Turn Off" : "Turn On"}</button>
-      <button onClick={getStatus}>Get Status</button>
+      <button onClick={toggleLEDOn}>{ledOn ? "Turn Off" : "Turn On"}</button>
+      <button onClick={getMainLEDStatus}>Get Status</button>
 
-      <div>{color?.hex}</div>
-      <div>{color?.rgb?.r} {color?.rgb?.g} {color?.rgb?.b}</div>
+      <div>{ledOn.toString()}</div>
+      <div>{color.r},{color.g},{color.b},{color.a}</div>
       
-      <RgbColorPicker
+      <RgbaColorPicker
         color={color}
-        onChange={ handleChangeComplete }
-      ></RgbColorPicker>
-      {/* <SketchPicker
-        width={400}
-        color={color.hex}
-        onChange={ handleChangeComplete }
-        //onChangeComplete={ handleChangeComplete }
-      /> */}
+        onChange={ handleColorChange }
+      ></RgbaColorPicker>
     </div>
   );
 }

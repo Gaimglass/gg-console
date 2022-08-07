@@ -2,7 +2,7 @@ const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
 
-const { connectUsb, setColor, waitForSerial, setMute, getStatus, disconnectUsb } = require('./usb');
+const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, setMainLED, disconnectUsb } = require('./usb');
 
 //const SerialPort = require('serialport')
 //const Readline = require('@serialport/parser-readline');
@@ -18,6 +18,8 @@ const BrowserWindow = electron.BrowserWindow;
 
 const path = require('path');
 const url = require('url');
+
+// use electron store for persistent data after app closes
 const store = new Store();
 
 // Keep a global reference of the window object, if you don't, the window will
@@ -93,22 +95,25 @@ app.on('activate', function () {
 // Synchronous
 //
 
-electron.ipcMain.on('set-mute', async (event, value) => {
-  setMute(value);
-  event.returnValue = "okay";
+electron.ipcMain.on('get-led-state', async (event) => {
+  try {
+    const result = await getMainLED();
+    console.log("okay result", result);
+    event.returnValue = result;
+  } catch(err) {
+    event.returnValue = err;
+  }
 });
 
-electron.ipcMain.on('get-color', async (event) => {
-  const color = store.get('color');
-  event.returnValue = color;
+electron.ipcMain.on('set-led-state', async (event, ledState) => {
+  try {
+    const result = await setMainLED(ledState.color, ledState.brightness, ledState.ledOn);
+    event.returnValue = result;
+  } catch(err) {
+    event.returnValue = err;
+  }
 });
 
-electron.ipcMain.on('set-color', async (event, color) => {
-  console.log("COLOR", color);
-  //store.set('color', color);
-  //setColor(color.rgb.r, color.rgb.g, color.rgb.b);
-  event.returnValue = 'okay';
-});
 
 electron.ipcMain.on('set-default-color', async (event, color) => {
   setColor(color.red, color.green, color.blue, true);
@@ -117,9 +122,12 @@ electron.ipcMain.on('set-default-color', async (event, color) => {
 
 electron.ipcMain.on('get-status', async (event) => {
   try {
-    event.returnValue = await getStatus();
+    const ledStateStr = await getMainLED();
+    event.returnValue = ledStateStr;
+    //getDefaultLEDs()
+    //event.returnValue = await getStatus();
   } catch(err) {
-    event.returnValue = err.message;
+    event.returnValue = err;
   }
 });
 

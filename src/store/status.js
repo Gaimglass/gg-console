@@ -6,9 +6,20 @@ const ipcRenderer  = electron.ipcRenderer;
 export const status = createSlice({
   name: 'status',
   initialState: {
-    color: {},
-    defaultColor: [],
-    ledOn: true // 
+    brightness: 0,
+    color: {
+      red: 0,
+      green: 0,
+      blue: 0,
+    },
+    auxColor: {
+      red: 0,
+      green: 0,
+      blue: 0,
+    },
+    defaultColors: [],
+    ledOn: true, // 
+    gaimglassConnected: false,
     //gameLink: true // 
   },
   reducers: {
@@ -23,20 +34,23 @@ export const status = createSlice({
       // }
     },*/
     setColor: (state, action) => { 
-      state.red = action.payload.red;
-      state.green = action.payload.green; 
-      state.blue = action.payload.blue;
+      state.color.red = action.payload.color.red;
+      state.color.green = action.payload.color.green; 
+      state.color.blue = action.payload.color.blue;
     },
     setDefaultColor: (state, action) => {
-      state.defaultRed = action.payload.red;
-      state.defaultGreen = action.payload.green;
-      state.defaultBlue = action.payload.blue;
+      // state.defaultRed = action.payload.red;
+      // state.defaultGreen = action.payload.green;
+      // state.defaultBlue = action.payload.blue;
     },
     muteLed(state) {
       state.mute = true;
     },
     unMuteLed(state) {
       state.mute = false;
+    },
+    setBrightness(state, action) {
+      state.brightness = action.brightness;
     }
   },
 })

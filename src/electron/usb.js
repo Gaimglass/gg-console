@@ -1,21 +1,28 @@
 const { SerialPort } = require('serialport')
 const { ReadlineParser } = require('@serialport/parser-readline');
-const electron = require('electron');
 
 // Serial Commands
-const SET_MAIN_LED_COLOR = 0;
-const GET_MAIN_LED_COLOR = 1;
+const SET_MAIN_LED = '000';
+const SET_AUX_LED = '001';
+const SET_DEFAULT_LEDS = '002';
 
-const SET_MAIN_LED_MUTE = 2;
-const GET_MAIN_LED_MUTE = 3;
+const GET_MAIN_LED = '128';
+const GET_DEFAULT_LEDS = '129';
 
-const SET_GAME_LINK_LED = 4;
-const GET_GAME_LINK_LED = 5;
 
-const WRITE_DEFAULT_LED_COLOR = 6;
-const READ_DEFAULT_LED_COLOR = 7;
+// Serial result promise resolvers
+//  <message ID> : {
+//    resolve,
+//    reject
+//  }, ...
+const serialMessageResults = {
+  [SET_MAIN_LED]: null,
+  [SET_AUX_LED]: null,
+  [SET_DEFAULT_LEDS]: null,
+  [GET_MAIN_LED]: null,
+  [GET_DEFAULT_LEDS]: null
+};
 
-const GET_STATUS = 8;
 
 let port = null;
 let parser = null;
@@ -23,13 +30,8 @@ let parser = null;
 // Hack to delay sending data until the arduino is ready. When connecting
 // to the serial port through the arduino's USB port, it causes a restart and 1 second delay.
 // https://forum.arduino.cc/t/how-do-use-rx-and-tx-pins/948694
-let serialReady = ()=>(console.error("Promise not created 1"));
+let serialReady = ()=>(console.error("Promise not created"));
 
-// Serial result messages. Each message begins with a unit name followed by colon.
-const serialMessageResults = {
-  'status': null,
-  'color': null,
-};
 
 // Connect to the serial port of the Arduino Uno USB device
 async function initializeUsb() {
@@ -37,7 +39,7 @@ async function initializeUsb() {
   let path = '';
 
   ports.forEach((portCandidate, index) => {
-      
+      console.log(portCandidate);
     // Mac and Windows have difference casing, because of course they do, sigh.
     const productId = portCandidate.productId?.toLowerCase();
     const vendorId = portCandidate.vendorId?.toLowerCase();
@@ -59,15 +61,21 @@ async function initializeUsb() {
       baudRate: 115200,
     })
 
-    parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+    // todo, is this \n or \r\n ?
+    parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
     parser.on('data', data => {
-      console.log("Gaimglass:", data);
       const parts = data.split(':');
-      const messageName = parts[0];
-      if (serialMessageResults[messageName]) {
-        serialMessageResults[messageName].resolve(data);
-        serialMessageResults[messageName] = null; // ensure its only called once.
+      const messageId = parts[0].padStart(3,0);
+      const ggResponse = parts[1];
+      //console.log({ggResponse});
+      console.log("Gaimglass:", data);
+      
+
+      if (serialMessageResults[messageId]) {
+        //console.log(">>>>>>>>>here", messageId, ggResponse);
+        serialMessageResults[messageId].resolve(ggResponse);
+        serialMessageResults[messageId] = null; // ensure its only called once.
       }
     });
 
@@ -77,11 +85,11 @@ async function initializeUsb() {
       // just resolve the serialReady().
       // TODO: is this okay to leave here, rather than inside on `data`? Figure out a better, best practice way to do this
       serialReady(); // resolve the promise
-      console.log('serial port open');
+      console.log('Serial port open');
     });
 
     port.on("close", (options) => {
-      console.log('serial port closed');
+      console.log('Serial port closed');
       if (options.reconnect !== false) {
         // if the port was not closed by the gg app, then attempt to reconnect
         connectUsb(); 
@@ -132,23 +140,10 @@ function disconnectUsb() {
 }
 
 
-
-function processSerialData(data) {
-  console.log('got word from arduino:', data);
-  const [command, values] = data.split(":");
-  if (command === "status") {
-    electron.ipcMain.sendSync("status", values);
-  }
-}
-
-function setMute(value) {
-  const command = String.fromCharCode(SET_MAIN_LED_MUTE);
-  //console.log(`setMute: ${command}${Number(value)}`);
-  port.write(`${command}${Number(value)}\n`);
-}
-
-
-function setColor(red, green, blue, makeDefault=false) {
+/**
+ * @deprecated
+ */
+function _setColor(red, green, blue, makeDefault=false) {
   if (port) {
     if (red < 0) {
       red = 0;
@@ -208,29 +203,13 @@ function setColor(red, green, blue, makeDefault=false) {
   }
 }
 
-function getStatus() {
-  const command = String.fromCharCode(GET_STATUS);
-  return writeCommand(command, 'status');
-}
-
-function getColor(red, blue, green) {
-  // TODO...
-  return {
-    r:0,
-    g:0,
-    b:0,
-  }
-}
 
 /**
- * Write a command string to Gaimglass over the serial port.
+ * Write a command string to Gaimglass over the serial port and return a promise
+ * that will contain the response from Gaimglass. The response may contain data when
+ * requested or it simply may be an "okay" status when new state has been received.
  */
-function writeCommand(commandStr, messageName) {
-  if (serialMessageResults[messageName]) {
-    // A previous request has not finished or will never finish
-    // ignore for now?
-    console.error("duplicate promise detected")
-  }
+ function writeCommand(command, commandStr='') {
 
   if (!port || !port.port.fd) {
      return Promise.reject(new Error('Port has closed'));
@@ -243,23 +222,61 @@ function writeCommand(commandStr, messageName) {
   });
 
   const serialResponse = new Promise((resolve, reject)=>{
-    serialMessageResults[messageName] = {
+    serialMessageResults[command] = {
       resolve,
       reject
     }
-    port.write(`${commandStr}\n`);
+    console.log(">>>write command", command, commandStr);
+    port.write(`${command}${commandStr}\n`);
   });
 
   return Promise.race([serialResponse, serialTimeout]);
 }
 
 
+// Commands
+
+function setMainLED(color, brightness, ledOn) {  
+  const commandStr = 
+    `${color.r}`.padStart(3, 0) + 
+    `${color.g}`.padStart(3, 0) +
+    `${color.b}`.padStart(3, 0) +
+    `${brightness}`.padStart(4, 0) +
+    Number(ledOn);
+
+    return writeCommand(SET_MAIN_LED, commandStr);
+}
+
+function setAuxLED(color, ledOn) {
+  // todo...
+  return writeCommand(SET_AUX_LED);
+}
+
+function setDefaultLEDs() {
+  // todo...
+  return writeCommand(SET_DEFAULT_LEDS);
+}
+
+function getMainLED() {
+  return writeCommand(GET_MAIN_LED);
+}
+
+function getDefaultLEDs() {
+  return writeCommand(GET_DEFAULT_LEDS);
+}
+
 module.exports = {
   waitForSerial,
   connectUsb,
+
   disconnectUsb,
   initializeUsb,
-  setColor,
-  setMute,
-  getStatus,
+
+  // commands
+  getMainLED,
+  getDefaultLEDs,
+
+  setMainLED,
+  setDefaultLEDs,
+  setAuxLED,
 }

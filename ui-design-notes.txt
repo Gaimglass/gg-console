@@ -13,7 +13,7 @@ console -> GG
   `set-link`
     bool link
   
-  `set-color`
+  `set-led-state`
     bool ledOn
     int brightness
     int r,b,g
@@ -23,3 +23,17 @@ console -> GG
 
   `get-status` (no params)
     returns, all values and defaults
+
+  `get-color` (no params)
+    
+
+  `get-defaults` (no params)
+    
+
+
+    USB
+        data on
+    messages.js
+        export serialMessageResults
+        writeCommand
+        ..msgs
