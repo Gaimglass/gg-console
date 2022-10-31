@@ -10,7 +10,7 @@
     "electron": "electron .",
     "electron-dev": "cross-env ELECTRON_START_URL=http://localhost:3000 electron .",
     "electron-dev:win": "set ELECTRON_START_URL=http://localhost:3000 && electron .",
-    "postinstall": "./node_modules/.bin/electron-rebuild --force-abi=89"
+    "postinstall": "./node_modules/.bin/electron-rebuild"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.7.1",
