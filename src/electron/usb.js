@@ -71,9 +71,7 @@ async function initializeUsb() {
       //console.log({ggResponse});
       console.log("Gaimglass:", data);
       
-
       if (serialMessageResults[messageId]) {
-        //console.log(">>>>>>>>>here", messageId, ggResponse);
         serialMessageResults[messageId].resolve(ggResponse);
         serialMessageResults[messageId] = null; // ensure its only called once.
       }
@@ -90,6 +88,7 @@ async function initializeUsb() {
 
     port.on("close", (options) => {
       console.log('Serial port closed');
+      port = null;
       if (options.reconnect !== false) {
         // if the port was not closed by the gg app, then attempt to reconnect
         connectUsb(); 
@@ -161,7 +160,7 @@ function _setColor(red, green, blue, makeDefault=false) {
       green = 255;
     }
 
-    // scale values, use non-linear mapping to simulate more realistic color dim levels
+    // scale values, use non-linear mapping to simulate more realistic c olor dim levels
 
     // a higher value means more accurate dim colors, but not as bright
     const rExponent = 2.4;

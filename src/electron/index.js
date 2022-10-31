@@ -2,17 +2,11 @@ const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
 
-const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, setMainLED, disconnectUsb } = require('./usb');
-
-//const SerialPort = require('serialport')
-//const Readline = require('@serialport/parser-readline');
-
-//const set = require('serialport')
-//const Readline = require('@serialport/parser-readline');
+const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, setMainLED, disconnectUsb, serialDisconnected } = require('./usb');
 
 // Module to control application life.
-
 const app = electron.app;
+
 // Module to create native browser window.
 const BrowserWindow = electron.BrowserWindow;
 
@@ -25,13 +19,22 @@ const store = new Store();
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
+let ggConnected = false;
 
 async function createWindow() {
   console.log("create win...");
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 900, 
-    height: 560,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: true,
+    titleBarOverlay: {
+      color: '#2f3241',
+      symbolColor: '#74b1be',
+      height: 40
+    },
+    width: 900,
+    frame: true,
+    height: 1000,//560,
     backgroundColor: '#282c34',
     webPreferences: {
       nodeIntegration: true,
@@ -40,9 +43,7 @@ async function createWindow() {
     }
   });
 
-  await connectUsb();
-
-  await waitForSerial();
+  connectUsb();
 
     // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
