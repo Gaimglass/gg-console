@@ -9,7 +9,7 @@ import DefaultColors from './DefaultColors'
 import styles from './css/App.module.css'
 
 import logo from './logo.svg';
-import './App.css';
+import './css/globalStyles.css';
 
 const electron = window.require('electron');
 const ipcRenderer  = electron.ipcRenderer;
