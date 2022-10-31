@@ -1,0 +1,32 @@
+.foo {
+  color: red;
+}
+
+.App {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: left;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.main {
+  flex-grow: 7;
+  display: flex;
+  flex-direction: column;
+  color: white;
+  align-items: center;
+}
+
+.colors {
+  flex-grow: 3;
+  
+}
+
+.drag {
+  -webkit-user-select: none;
+  -webkit-app-region: drag;
+}

@@ -4,6 +4,10 @@ import { RgbaColorPicker, HslColorPicker } from 'react-colorful';
 import { useSelector, useDispatch } from 'react-redux'
 import { status, setBrightness } from './store/status'
 
+import DefaultColors from './DefaultColors'
+
+import styles from './css/App.module.css'
+
 import logo from './logo.svg';
 import './App.css';
 
@@ -33,9 +37,11 @@ function App() {
   useEffect(() => {
     //debugger;
     // TODO add some delay here because GG is not normally ready to accept serial input
-    (async () => {
+    //(async () => {
+      
       //const c = await ipcRenderer.send('get-status');
-    })();
+      
+    //})();
     
     //dispatch(initializeStatus());
     /*
@@ -74,6 +80,8 @@ function App() {
   }
 
   function handleColorChange(color) {
+    // todo setColor only after a debounce time, we should not update state as frequently as adjusting color.
+    // OR perhaps the current color's source of truth can simply be the component?
     setColor(color);
     sendMainLEDStatus(color, ledOn);
   };
@@ -116,21 +124,30 @@ function App() {
   }
 
   return (
-    <div className="App">
-      {/* <img src={logo} className="App-logo" alt="logo" /> */}
-      <button onClick={writeDefault}>Set Default Color</button>
-      {/* <button onClick={readDefault}>Get Default Color</button> */}
+    <div className={styles.App}>
+      <div className={styles.drag}>ttttttt</div>
+      <div>
+        <div className={styles.main}>
+    
+          {/* <img src={logo} className="App-logo" alt="logo" /> */}
+          <button onClick={writeDefault}>Set Default Color</button>
+          {/* <button onClick={readDefault}>Get Default Color</button> */}
 
-      <button onClick={toggleLEDOn}>{ledOn ? "Turn Off" : "Turn On"}</button>
-      <button onClick={getMainLEDStatus}>Get Status</button>
+          <button className={styles.foo} onClick={toggleLEDOn}>{ledOn ? "Turn Off" : "Turn On"}</button>
+          <button onClick={getMainLEDStatus}>Get Status</button>
 
-      <div>{ledOn.toString()}</div>
-      <div>{color.r},{color.g},{color.b},{color.a}</div>
-      
-      <RgbaColorPicker
-        color={color}
-        onChange={ handleColorChange }
-      ></RgbaColorPicker>
+          <div>{ledOn.toString()}</div>
+          <div>{color.r},{color.g},{color.b},{color.a}</div>
+          
+          <RgbaColorPicker
+            color={color}
+            onChange={ handleColorChange }
+          ></RgbaColorPicker>
+        </div>
+        <div className={styles.colors}>
+          <DefaultColors></DefaultColors>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,15 @@
+.swatch {
+  color: red;
+  width: 80px;
+  height: 50px;
+  background-color: green;
+  margin: 0.5em 0;
+}
+
+
+.defaultColors {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+}
