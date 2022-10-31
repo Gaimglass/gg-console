@@ -37,3 +37,52 @@ console -> GG
         export serialMessageResults
         writeCommand
         ..msgs
+
+
+
+
+
+UI layout ===================
+   
+Game link (auto / off)
+link status: inactive / active (Apex legends) 
+
+
+MAin tab (disconnected mode)
+---------------------
+disabled main color picker with disconnected messages
+default colors can not be edited either
+
+MAin tab (active mode)
+---------------------
+Game title
+textarea with log of recent events for the current Game
+
+
+MAin tab (inactive mode / manual mode)
+---------------------
+
+Current Color, brightness and on/off status
+
+<<drag/drop click to select>>
+
+Main
+Favorits:
+= Color 1 
+[<color swatch>] ---------------- color picker
+= [Color 2]
+= [Color...8]
+
+
+
+Event tabs
+--------------
+
+list of events (left side)
+
+event JSON editor (right size) 
+    text area to edit. 
+    help link for docs
+    
+
+
