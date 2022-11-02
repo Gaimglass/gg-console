@@ -5,19 +5,20 @@ import { useSelector, useDispatch } from 'react-redux'
 import { status, setBrightness } from './store/status'
 
 import DefaultColors from './DefaultColors'
+import WindowControls from './WindowsControls'
 
 import styles from './css/App.module.css'
 
-import logo from './logo.svg';
+import logo from './assets/logo.png';
 import './css/globalStyles.css';
 
 const electron = window.require('electron');
 const ipcRenderer  = electron.ipcRenderer;
-//const fs = electron.remote.require('fs');
 
+let timer;
+let latestFunc;
 
 function App() {
-  
   
   const dispatch = useDispatch();
 
@@ -58,6 +59,29 @@ function App() {
     }*/
   }, []);
 
+  
+  function throttle(func, timeout = 50){
+    return (...args) => {
+      if (!timer) {
+        func.apply(this, args);
+        timer = setTimeout(() => {
+          timer = undefined;
+          if(latestFunc) {
+            // ensures the last one always proceeds
+            latestFunc.apply(this, args);
+            latestFunc = undefined;
+            console.log("apply LAST!");
+          }
+        }, timeout);
+      } else {
+        latestFunc = () => {
+          func.apply(this, args);
+        }
+      }
+    };
+  }
+
+
   function sendMainLEDStatus(color, ledOn) {
     getMessageResult(ipcRenderer.sendSync('set-led-state', {
       color,
@@ -79,6 +103,7 @@ function App() {
     }
   }
 
+  
   function handleColorChange(color) {
     // todo setColor only after a debounce time, we should not update state as frequently as adjusting color.
     // OR perhaps the current color's source of truth can simply be the component?
@@ -93,7 +118,7 @@ function App() {
   }
 
   function writeDefault() {
-    ipcRenderer.sendSync('set-default-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b}) 
+    ipcRenderer.sendSync('set-default-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b})
   }
 
 
@@ -125,11 +150,18 @@ function App() {
 
   return (
     <div className={styles.App}>
-      <div className={styles.drag}>ttttttt</div>
-      <div>
+      <header className={styles.header}>
+        <div className={styles.drag}>
+          <div className={styles.title}>
+            g<span className={styles.green}>aim</span>glass
+            {/* <img src={logo} className="App-logo" alt="gaimglass" /> */}
+          </div>
+          <WindowControls></WindowControls>
+        </div>
+      </header>
+      <div className={styles.mainContainer}>
         <div className={styles.main}>
     
-          {/* <img src={logo} className="App-logo" alt="logo" /> */}
           <button onClick={writeDefault}>Set Default Color</button>
           {/* <button onClick={readDefault}>Get Default Color</button> */}
 
@@ -141,7 +173,7 @@ function App() {
           
           <RgbaColorPicker
             color={color}
-            onChange={ handleColorChange }
+            onChange={ throttle(handleColorChange, 50) }
           ></RgbaColorPicker>
         </div>
         <div className={styles.colors}>

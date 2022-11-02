@@ -1,0 +1,59 @@
+.controls {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.button {
+  grid-row: 1 / span 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+}
+
+.button:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.button:active {
+  background: rgba(255,255,255,0.2);
+}
+
+.min {
+  grid-column: 1;
+}
+
+.max, .restore {
+  grid-column: 2;
+}
+
+.close {
+  grid-column: 3;
+}
+
+.close:hover {
+  background: #E81123 !important;
+}
+
+.close:active {
+  background: #F1707A !important;
+}
+
+@media (-webkit-device-pixel-ratio: 1.5), (device-pixel-ratio: 1.5),
+(-webkit-device-pixel-ratio: 2), (device-pixel-ratio: 2),
+(-webkit-device-pixel-ratio: 3), (device-pixel-ratio: 3) {
+  .icon {
+    width: 10px;
+    height: 10px;
+  }
+}

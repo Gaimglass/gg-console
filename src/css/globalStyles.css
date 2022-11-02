@@ -1,8 +1,14 @@
 
 body {
 
-  font-size: 14px;
-  
+  font-size: 16px;
+  border: 1px solid #48545c;
+  overflow-y: hidden;
+  height: 100vh;  
+  width: calc(100% - 1px);  /* the border is off on the right, no clue why */
+  box-sizing: border-box;
+  overflow-y: hidden;
+
 }
 ::-webkit-scrollbar {
   width: 9px;

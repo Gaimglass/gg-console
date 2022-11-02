@@ -22,19 +22,11 @@ let mainWindow;
 let ggConnected = false;
 
 async function createWindow() {
-  console.log("create win...");
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    titleBarStyle: 'hidden',
-    titleBarOverlay: true,
-    titleBarOverlay: {
-      color: '#2f3241',
-      symbolColor: '#74b1be',
-      height: 40
-    },
     width: 900,
-    frame: true,
-    height: 1000,//560,
+    frame: false,
+    minHeight:500,
     backgroundColor: '#282c34',
     webPreferences: {
       nodeIntegration: true,
@@ -130,6 +122,38 @@ electron.ipcMain.on('get-status', async (event) => {
   } catch(err) {
     event.returnValue = err;
   }
+});
+
+// Windows commands
+
+electron.ipcMain.on('get-app-state', async (event) => {
+  
+  event.returnValue = {
+    isMaximized: mainWindow.isMaximized(),
+    // add others... 
+    // TODO these should be pulled from the electron store at boot time and saved there on close
+  };
+});
+
+
+electron.ipcMain.on('window-maximize', async (event) => {
+  mainWindow.maximize();
+  event.returnValue = 'okay';
+});
+
+electron.ipcMain.on('window-restore', async (event) => {
+  mainWindow.restore();
+  event.returnValue = 'okay';
+});
+
+electron.ipcMain.on('window-minimize', async (event) => {
+  mainWindow.minimize();
+  event.returnValue = 'okay';
+});
+
+electron.ipcMain.on('window-close', async (event) => {
+  mainWindow.close();
+  event.returnValue = 'okay';
 });
 
 
