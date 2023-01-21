@@ -86,3 +86,23 @@ event JSON editor (right size)
     
 
 
+===========================
+
+Colors design
+
+there is no state for current selected default color. There is only 1 color state for the LED, then there are 8 default colors that are distinct. Buttons on the LED can set the currently color from one of the defaults as well as adjust the global opacity. 
+
+Using buttons on LED:
+We will also need to keep track of which was the last color picked from default. 8 total, so we need to store the index in memory. Software pushes to change LED color should not reset or affect which last selected default color was picked. Example. Color 1 is red, color 2 is blue and color 3 is green. The device starts up and color is red (1). Button left is pushed and color changes to blue (2). Software changes the color to something else. Button left change the color to green (3) now. however,  selecting a default color from software should advance the default index too
+
+
+selecting and setting defaults in software
+Array of swatches (8). clicking on a swatch sets the active color to swatch color. Changing the active color changes the active LED color, but not the swatch. 
+
+editing default swatch
+Each swatch has an edit icon, clicking this establishes a link (curved line) to color picker. Changing the color sets the active LED color and adjusts swatch color too. Two button appear in place of the edit icon. Save and Cancel. Save completes the edit and pushes state to LED and EPROM. Cancel reverts the color to previous and nothing saved to EPROM.
+
+
+
+
+
