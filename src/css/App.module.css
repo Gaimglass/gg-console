@@ -59,9 +59,12 @@
   font-size: 1.2em;
   line-height: 0.7em;
   font-family: "Gruppo";
-  display: flex;
-  align-items: center;
 }
+
+.alignRight {
+  text-align: right;
+}
+
 
 .title img {
   height: 22px;

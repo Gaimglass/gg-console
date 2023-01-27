@@ -22,12 +22,16 @@ let mainWindow;
 let ggConnected = false;
 
 async function createWindow() {
+  const isMac = process.platform === 'darwin';
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 900,
     frame: false,
     minHeight:500,
+    minWidth:400,
     backgroundColor: '#282c34',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: true,
     webPreferences: {
       nodeIntegration: true,
       enableRemoteModule: true,
@@ -130,6 +134,7 @@ electron.ipcMain.on('get-app-state', async (event) => {
   
   event.returnValue = {
     isMaximized: mainWindow.isMaximized(),
+    isMac: process.platform === 'darwin'
     // add others... 
     // TODO these should be pulled from the electron store at boot time and saved there on close
   };

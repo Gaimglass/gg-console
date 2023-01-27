@@ -3,6 +3,7 @@ import { SketchPicker } from 'react-color';
 import { RgbaColorPicker, HslColorPicker } from 'react-colorful';
 import { useSelector, useDispatch } from 'react-redux'
 import { status, setBrightness } from './store/status'
+import classNames from 'classnames';
 
 import DefaultColors from './DefaultColors'
 import WindowControls from './WindowsControls'
@@ -26,14 +27,22 @@ function App() {
 
   const [color, setColor] = useState({r:200,g:20,b:255,a:0.123456});
   const [ledOn, setLEDOn] = useState(true);
+  const [isMaximized, setMaximized] = useState(false);
+  const [isMac, setMac] = useState(false);
 
   // store
   //const ledOn = useSelector(state => state.status.ledOn);
 
   useEffect(() => {
     //
-    
   }, [color, ledOn]);
+
+
+  useEffect(()=>{
+    const appState = ipcRenderer.sendSync('get-app-state');
+    setMaximized(appState.isMaximized);
+    setMac(appState.isMac);
+  }, [])
   
   useEffect(() => {
     //debugger;
@@ -152,11 +161,16 @@ function App() {
     <div className={styles.App}>
       <header className={styles.header}>
         <div className={styles.drag}>
-          <div className={styles.title}>
+          <div className={
+              classNames({
+                [styles.title]: true,
+                [styles.alignRight]: isMac,
+              })
+            }>
             g<span className={styles.green}>aim</span>glass
             {/* <img src={logo} className="App-logo" alt="gaimglass" /> */}
           </div>
-          <WindowControls></WindowControls>
+          <WindowControls maximized={isMaximized} showControls={!isMac}></WindowControls>
         </div>
       </header>
       <div className={styles.mainContainer}>
