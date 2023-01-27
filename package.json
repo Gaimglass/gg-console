@@ -23,7 +23,6 @@
     "prop-types": "^15.8.1",
     "purecss": "^2.1.0",
     "react": "^18.0.2",
-    "react-color": "^2.19.3",
     "react-colorful": "^5.5.1",
     "react-dom": "^18.0.2",
     "react-redux": "^7.2.6",

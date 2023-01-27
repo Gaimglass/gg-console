@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { SketchPicker } from 'react-color';
 import { RgbaColorPicker, HslColorPicker } from 'react-colorful';
 import { useSelector, useDispatch } from 'react-redux'
 import { status, setBrightness } from './store/status'
