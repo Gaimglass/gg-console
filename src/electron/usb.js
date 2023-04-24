@@ -39,7 +39,7 @@ async function initializeUsb() {
   let path = '';
 
   ports.forEach((portCandidate, index) => {
-      console.log(portCandidate);
+     // console.log(portCandidate);
     // Mac and Windows have difference casing, because of course they do, sigh.
     const productId = portCandidate.productId?.toLowerCase();
     const vendorId = portCandidate.vendorId?.toLowerCase();

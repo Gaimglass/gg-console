@@ -2,7 +2,7 @@ const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
 
-const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, setMainLED, disconnectUsb, serialDisconnected } = require('./usb');
+const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, disconnectUsb, serialDisconnected } = require('./usb');
 
 // Module to control application life.
 const app = electron.app;
@@ -25,9 +25,9 @@ async function createWindow() {
   const isMac = process.platform === 'darwin';
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 900,
+    width: 1100,
     frame: false,
-    minHeight:500,
+    minHeight:600,
     minWidth:400,
     backgroundColor: '#282c34',
     titleBarStyle: 'hidden',
@@ -111,16 +111,25 @@ electron.ipcMain.on('set-led-state', async (event, ledState) => {
   }
 });
 
-
-electron.ipcMain.on('set-default-color', async (event, color) => {
-  setColor(color.red, color.green, color.blue, true);
-  event.returnValue = 'okay';
+electron.ipcMain.on('get-default-colors', async (event, color) => {
+  try {
+    const ledStateStr = await getDefaultLEDs();
+    event.returnValue = ledStateStr;
+  } catch(err) {
+    event.returnValue = err;
+  }
 });
 
-electron.ipcMain.on('get-status', async (event) => {
+electron.ipcMain.on('set-default-color', async (event, color) => {
+  //setColor(color.red, color.green, color.blue, true);
+  //event.returnValue = 'okay';
+});
+
+electron.ipcMain.on('get-gg-state', async (event) => {
   try {
-    const ledStateStr = await getMainLED();
-    event.returnValue = ledStateStr;
+    const ledStateStr = ''//await getMainLED();
+    const defaultColors = ''//await getDefaultLEDs();
+    event.returnValue = `${ledStateStr}&${defaultColors}`;
     //getDefaultLEDs()
     //event.returnValue = await getStatus();
   } catch(err) {

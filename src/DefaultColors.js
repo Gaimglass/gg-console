@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { PropTypes } from "prop-types";
 import styles from './css/DefaultColors.module.css'
 
 
@@ -9,10 +10,7 @@ const ipcRenderer  = electron.ipcRenderer;
 
 function DefaultColors(props) {
   
-  const [color, setColor] = useState({r:200,g:20,b:255,a:0.123456});
-  const [ledOn, setLEDOn] = useState(true);
   const canvasRef = useRef(null);
-
   const swatchRefs = useRef([]);
 
   /*for(let i = 0; i < 8;i++) {
@@ -29,34 +27,41 @@ function DefaultColors(props) {
     //c.width = c.clientWidth;
     //c.height = c.clientHeight;
     for (let i = 0; i < 8;i++) {
-     
       var s = swatchRefs.current[i];
-      debugger;
-      const yc = s.offsetTop - (s.clientHeight/2);
+      //debugger;
+      const yc = s.offsetTop + (s.clientHeight/2);
       console.log(yc);
       const x = s.offsetWidth
 
       ctx.beginPath()
       ctx.strokeStyle = 'rgba(0,255,0,1)';
       ctx.moveTo(0, 200);
-      debugger;
+      
       ctx.bezierCurveTo(100/2, 200, 100/2, yc, 100, yc);
       ctx.stroke();
     }
-    
-    
-    //ctx.bezierCurveTo(100, 50, 25, 0.5, 200, 0);
-    
-   
-    
-
-
   }, []);
+
+  function changeColor(i) {
+    console.log(">>>>>>",props.colors);
+    props.onChangeColor(props.colors[i]);
+  }
+
+  function colorToCss(color) {
+    if(color) {
+      return `rgb(${color.r},${color.g},${color.b})`;
+    }
+    return '';
+  }
 
   const Swatches = []
   for(let i = 0; i < 8; i++) {
     Swatches.push(
-      <div key={i} ref={el => swatchRefs.current[i] = el} className={styles.swatch}></div>
+      <div
+        style={{
+          backgroundColor: colorToCss(props.colors[i])
+        }} 
+        onClick={()=>{changeColor(i);}} key={i} ref={el => swatchRefs.current[i] = el} className={styles.swatch}></div>
     )
   }
    
@@ -71,6 +76,11 @@ function DefaultColors(props) {
       </div>
     </div>
   );
+}
+
+DefaultColors.propTypes = {
+  onChangeColor: PropTypes.func.isRequired,
+  colors: PropTypes.array.isRequired
 }
 
 

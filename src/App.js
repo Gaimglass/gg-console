@@ -24,7 +24,8 @@ function App() {
 
   let syncGG = true;//useRef(true);
 
-  const [color, setColor] = useState({r:200,g:20,b:255,a:0.123456});
+  const [color, setColor] = useState({});
+  const [defaultColors, setDefaultColors] = useState([]);
   const [ledOn, setLEDOn] = useState(true);
   const [isMaximized, setMaximized] = useState(false);
   const [isMac, setMac] = useState(false);
@@ -38,9 +39,13 @@ function App() {
 
 
   useEffect(()=>{
+    console.log(1)
     const appState = ipcRenderer.sendSync('get-app-state');
+    console.log(2)
     setMaximized(appState.isMaximized);
     setMac(appState.isMac);
+    getGGState();
+    console.log(3)
   }, [])
   
   useEffect(() => {
@@ -112,11 +117,20 @@ function App() {
   }
 
   
-  function handleColorChange(color) {
+  function handleColorChange(newColor) {
     // todo setColor only after a debounce time, we should not update state as frequently as adjusting color.
     // OR perhaps the current color's source of truth can simply be the component?
-    setColor(color);
-    sendMainLEDStatus(color, ledOn);
+    /*const newColor = newColor;
+    console.log(newColor);
+    if (!newColor.a) {
+      newColor.a = color.a
+    }*/
+    //console.log(color.a, newColor.a);
+    setColor({
+      ...newColor,
+      a: newColor.a ?? color.a
+    });
+    sendMainLEDStatus(newColor, ledOn);
   };
 
   function toggleLEDOn() {
@@ -130,11 +144,47 @@ function App() {
   }
 
 
-  async function getMainLEDStatus() {
+  // async function getDefaultLEDColors() {
+  //   await getMessageResult(ipcRenderer.sendSync('get-default-colors'), (result)=>{
+  //     // rrr,ggg,bbb,a.aa;...
+  //     setDefaultColors([
+  //       {r:40,g:255, b:0, a:1.0}, // GG green
+  //       {r:0, g:255, b:255, a:1.0}, // teal
+  //       {r:0, g:0, b:255, a:1.0}, // blue
+  //       {r:255, g:0, b:255, a:1.0}, // purple
+  //       {r:255, g:0, b:0, a:1.0}, // red
+  //       {r:255, g:150, b:0, a:1.0}, // orange
+  //       {r:255, g:200, b:0, a:1.0}, // gold
+  //       {r:255, g:200, b:200, a:1.0}, // pink
+  //     ])
+  //     //const params = result.split('&');
+  //   });
+  // }
+
+  async function getGGState() {
     //syncGG = false;
-    await getMessageResult(ipcRenderer.sendSync('get-led-state'), (result)=>{
+    await getMessageResult(ipcRenderer.sendSync('get-gg-state'), (result)=>{
       const params = result.split('&');
       let r,g,b,a,ledOn;
+      // defaults, TODO move to another place
+      r=200;
+      g=20;
+      b=255;
+      a=0.123456;
+      ledOn = true;
+
+      // temp
+      const defaultColors = [
+         {r:40, g:255, b:0}, // GG green
+         {r:0, g:255, b:255}, // teal
+         {r:0, g:0, b:255}, // blue
+         {r:200, g:0, b:255}, // purple
+         {r:255, g:0, b:0}, // red
+         {r:255, g:100, b:0}, // orange
+         {r:255, g:200, b:0}, // gold
+         {r:255, g:200, b:200}, // pink
+       ];
+       console.log(4.5);
       params.forEach(param => {
         const [key, value] = param.split('=');
         // eslint-disable-next-line default-case
@@ -148,8 +198,14 @@ function App() {
           case 'brightness':
             a = value;
             break;
+          case 'defaultColors':
+            // todo read from buffer and assign to state
+            break;
+
         }
       });
+      setDefaultColors(defaultColors);
+      console.log({defaultColors});
       setColor({r,g,b,a});
       console.log("LEDON:", ledOn);
       setLEDOn(ledOn);
@@ -179,7 +235,7 @@ function App() {
           {/* <button onClick={readDefault}>Get Default Color</button> */}
 
           <button className={styles.foo} onClick={toggleLEDOn}>{ledOn ? "Turn Off" : "Turn On"}</button>
-          <button onClick={getMainLEDStatus}>Get Status</button>
+          
 
           <div>{ledOn.toString()}</div>
           <div>{color.r},{color.g},{color.b},{color.a}</div>
@@ -190,7 +246,10 @@ function App() {
           ></RgbaColorPicker>
         </div>
         <div className={styles.colors}>
-          <DefaultColors></DefaultColors>
+          <DefaultColors
+            colors={defaultColors}
+            onChangeColor={handleColorChange}
+          ></DefaultColors>
         </div>
       </div>
     </div>
