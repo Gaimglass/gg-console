@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PropTypes } from "prop-types";
 import styles from './css/DefaultColors.module.css'
+import {ReactComponent as Edit} from './assets/pen-to-square-solid.svg';
+
 
 
 const electron = window.require('electron');
@@ -13,17 +15,24 @@ function DefaultColors(props) {
   const canvasRef = useRef(null);
   const swatchRefs = useRef([]);
 
+  const [editSwatch, setEditSwatch] = useState(null);
+
   /*for(let i = 0; i < 8;i++) {
     swatchRefs.push(useRef(null));
   }*/
 
 
+  function render() {
+    
+  }
   
   useEffect(() => {
     var c = canvasRef.current;
     var ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
 
-    ctx.lineWidth = 1;
+
+    
     //c.width = c.clientWidth;
     //c.height = c.clientHeight;
     for (let i = 0; i < 8;i++) {
@@ -34,13 +43,20 @@ function DefaultColors(props) {
       const x = s.offsetWidth
 
       ctx.beginPath()
-      ctx.strokeStyle = 'rgba(0,255,0,1)';
+      console.log({editSwatch})
+      if(editSwatch===i) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255,255,255,1)';  
+      } else {
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      }
       ctx.moveTo(0, 200);
       
       ctx.bezierCurveTo(100/2, 200, 100/2, yc, 100, yc);
       ctx.stroke();
     }
-  }, []);
+  }, [editSwatch]);
 
   function changeColor(i) {
     console.log(">>>>>>",props.colors);
@@ -54,14 +70,24 @@ function DefaultColors(props) {
     return '';
   }
 
+  function edit(swatch) {
+    setEditSwatch(swatch)
+    render();
+  }
+
   const Swatches = []
   for(let i = 0; i < 8; i++) {
     Swatches.push(
+      <div className={styles.swatchWrapper}>
       <div
         style={{
           backgroundColor: colorToCss(props.colors[i])
         }} 
         onClick={()=>{changeColor(i);}} key={i} ref={el => swatchRefs.current[i] = el} className={styles.swatch}></div>
+        <button onClick={()=>{
+          edit(i);
+        }} className={styles.editButton}><Edit className={styles.editIcon}></Edit></button>
+      </div>
     )
   }
    

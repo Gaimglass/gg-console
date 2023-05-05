@@ -31,7 +31,7 @@ async function createWindow() {
     minWidth:400,
     backgroundColor: '#282c34',
     titleBarStyle: 'hidden',
-    titleBarOverlay: true,
+    titleBarOverlay: process.platform === 'darwin' ? true : false,
     webPreferences: {
       nodeIntegration: true,
       enableRemoteModule: true,
