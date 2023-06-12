@@ -26,7 +26,7 @@ function App() {
 
   const [color, setColor] = useState({r:255,g:255,b:255,a:0});
   const [defaultColors, setDefaultColors] = useState([]);
-  const [defaultColorIndex, setDefaultColorIndex] = useState(0);
+  const [defaultColorIndex, setDefaultColorIndex] = useState(-1); // -1 for a custom color
   const [ledOn, setLEDOn] = useState(true);
   const [isMaximized, setMaximized] = useState(false);
   const [isMac, setMac] = useState(false);
@@ -93,6 +93,10 @@ function App() {
   }
 
 
+  function sendDefaultIndex(index) {
+    getMessageResult(ipcRenderer.sendSync('set-default-index', index));
+  }
+
   function sendMainLEDStatus(color, ledOn) {
     console.log("sendMainLEDStatus", {
       color,
@@ -122,7 +126,8 @@ function App() {
   }
 
   
-  function handleColorChange(_newColor) {
+  function handleColorChange(_newColor, defaultIndex = -1) {
+    
     // todo setColor only after a debounce time, we should not update state as frequently as adjusting color.
     // OR perhaps the current color's source of truth can simply be the component?
     /*const newColor = newColor;
@@ -131,13 +136,23 @@ function App() {
       newColor.a = color.a
     }*/
     //console.log(color.a, newColor.a);
+
+    // defaults don't have an alpha so use the current value
+    let alpha = _newColor.a ?? color.a;
+    /* if (alpha < 0.075) {
+      alpha = 0.075 // min alpha
+    } */
     const newColor = {
       ..._newColor,
-      a: _newColor.a ?? color.a // defaults don't have an alpha so use the current value
+      a: alpha
     }
     console.log("calling handleColorChange", newColor)
     setColor(newColor);
-    sendMainLEDStatus(newColor, ledOn); 
+    sendMainLEDStatus(newColor, ledOn);
+    if (defaultIndex > -1)  {
+      sendDefaultIndex(defaultIndex); 
+    }
+    
   };
 
   function toggleLEDOn() {
@@ -168,14 +183,13 @@ function App() {
   //   });
   // }
   function parseDefaultColors(message) {
-    console.log("parseDefaultColors")
     let vars = message.split('&');
     const defaults = []; 
     let index;
     for (let v of vars) {
       let [key, value] = v.split('=')
       if (key == 'color') {
-        let [r,b,g, enabled] = value.split(',');
+        let [r,g,b,enabled] = value.split(',');
         defaults.push({
           color: {
             r: Number(r), 
@@ -318,6 +332,7 @@ function App() {
       </header>
       { isConnected &&
         <div className={styles.mainContainer}>
+          {defaultColorIndex}
           <div className={styles.main}>
       
             <button onClick={writeDefault}>Set Default Color</button>
@@ -336,6 +351,7 @@ function App() {
           </div>
           <div className={styles.colors}>
             <DefaultColors
+              //activeIndex={defaultColorIndex}
               colors={defaultColors}
               onChangeColor={handleColorChange}
             ></DefaultColors>

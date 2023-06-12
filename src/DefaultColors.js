@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PropTypes } from "prop-types";
 import styles from './css/DefaultColors.module.css'
 import {ReactComponent as Edit} from './assets/pen-to-square-solid.svg';
-
+import classNames from 'classnames';
 
 
 const electron = window.require('electron');
@@ -21,10 +21,6 @@ function DefaultColors(props) {
     swatchRefs.push(useRef(null));
   }*/
 
-
-  function render() {
-    
-  }
   
   useEffect(() => {
     var c = canvasRef.current;
@@ -57,7 +53,7 @@ function DefaultColors(props) {
   }, [editSwatch]);
 
   function changeColor(i) {
-    props.onChangeColor(props.colors[i].color);
+    props.onChangeColor(props.colors[i].color, i);
   }
 
   function colorToCss(color) {
@@ -69,7 +65,6 @@ function DefaultColors(props) {
 
   function edit(swatch) {
     setEditSwatch(swatch)
-    render();
   }
 
   const Swatches = []
@@ -104,7 +99,7 @@ function DefaultColors(props) {
 
 DefaultColors.propTypes = {
   onChangeColor: PropTypes.func.isRequired,
-  colors: PropTypes.array.isRequired
+  colors: PropTypes.array.isRequired,
 }
 
 

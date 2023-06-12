@@ -5,6 +5,7 @@ const { ReadlineParser } = require('@serialport/parser-readline');
 const SET_MAIN_LED = '000';
 const SET_AUX_LED = '001';
 const SET_DEFAULT_LEDS = '002';
+const SET_DEFAULT_INDEX = '003';
 
 const GET_MAIN_LED = '128';
 const GET_DEFAULT_LEDS = '129';
@@ -265,6 +266,16 @@ function setMainLED(color, brightness, ledOn) {
     return writeCommand(SET_MAIN_LED, commandStr);
 }
 
+
+
+function setDefaultIndex(index) {
+  
+  const q = index.toString().padStart(2);
+  console.log(index, index.toString())
+  return writeCommand(SET_DEFAULT_INDEX, index.toString().padStart(2));
+}
+
+
 function setAuxLED(color, ledOn) {
   // todo...
   return writeCommand(SET_AUX_LED);
@@ -274,6 +285,7 @@ function setDefaultLEDs() {
   // todo...
   return writeCommand(SET_DEFAULT_LEDS);
 }
+
 
 function getMainLED() {
   return writeCommand(GET_MAIN_LED);
@@ -298,4 +310,5 @@ module.exports = {
   setMainLED,
   setDefaultLEDs,
   setAuxLED,
+  setDefaultIndex,
 }
