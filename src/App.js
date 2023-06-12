@@ -30,13 +30,7 @@ function App() {
   const [ledOn, setLEDOn] = useState(true);
   const [isMaximized, setMaximized] = useState(false);
   const [isMac, setMac] = useState(false);
-
-  // store
-  //const ledOn = useSelector(state => state.status.ledOn);
-
-  useEffect(() => {
-    //
-  }, [color, ledOn]);
+  const [isConnected, setIsConnected] = useState(false);
 
 
   useEffect(()=>{
@@ -45,16 +39,11 @@ function App() {
     
     setMaximized(appState.isMaximized);
     setMac(appState.isMac);
-    // TODO remove timeout
-    // TODO call a function that blocks until port is open, then do the loading, these dont work the first load
-    //setTimeout(()=>{
-      
-      loadMainLedFromGG();
-      loadDefaultColorsFromGG();  
-      
-    //},1000)
     
-    //getGGState();
+    // TODO do we really need these here too?
+    loadMainLedFromGG();
+    loadDefaultColorsFromGG();
+    // 
     
     ipcRenderer.on('update-main-led-state-from-gg', function (evt, message) {
       (throttle(()=>{
@@ -63,13 +52,26 @@ function App() {
     });
 
     ipcRenderer.on('update-default-colors-from-gg', function (evt, message) {
-      debugger;
       parseDefaultColors(message);
     });
+
+    ipcRenderer.on('usb-connected', function (evt, message) {
+      // initialize values
+      loadMainLedFromGG();
+      loadDefaultColorsFromGG();
+    });
+
+    ipcRenderer.on('usb-disconnected', function (evt, message) {
+      // todo, show a better disconnected UI
+      setIsConnected(false);
+    });
+
+    
+
   }, [])
   
   
-  function throttle(func, timeout = 50){
+  function throttle(func, timeout = 50){ 
     return (...args) => {
       if (!timer) {
         func.apply(this, args);
@@ -106,11 +108,10 @@ function App() {
   }
 
 
-  async function getMessageResult(promise, cb, onError) {
+  async function getMessageResult(promise, cb) {
     const result = await promise;
      if (result instanceof Error) {
-      console.error(result);
-      onError(result);
+      console.warn(result?.message);
     } else {
       // todo, update state with new values 
       console.log("result:", result);
@@ -241,6 +242,7 @@ function App() {
     console.log("loadDefaultColorsFromGG")
     await getMessageResult(ipcRenderer.sendSync('get-default-colors'), (result)=>{
       parseDefaultColors(result);
+      setIsConnected(true);
     });
   }
 
@@ -314,30 +316,32 @@ function App() {
           <WindowControls maximized={isMaximized} showControls={!isMac}></WindowControls>
         </div>
       </header>
-      <div className={styles.mainContainer}>
-        <div className={styles.main}>
-    
-          <button onClick={writeDefault}>Set Default Color</button>
-          {/* <button onClick={readDefault}>Get Default Color</button> */}
+      { isConnected &&
+        <div className={styles.mainContainer}>
+          <div className={styles.main}>
+      
+            <button onClick={writeDefault}>Set Default Color</button>
+            {/* <button onClick={readDefault}>Get Default Color</button> */}
 
-          <button className={styles.foo} onClick={toggleLEDOn}>{ledOn ? "Turn Off" : "Turn On"}</button>
-          
+            <button className={styles.foo} onClick={toggleLEDOn}>{ledOn ? "Turn Off" : "Turn On"}</button>
+            
 
-          <div>{ledOn.toString()}</div>
-          <div>{color.r},{color.g},{color.b},{color.a}</div>
-          
-          <RgbaColorPicker
-            color={color}
-            onChange={ throttle(handleColorChange, 50) }
-          ></RgbaColorPicker>
+            <div>{ledOn.toString()}</div>
+            <div>{color.r},{color.g},{color.b},{color.a}</div>
+            
+            <RgbaColorPicker
+              color={color}
+              onChange={ throttle(handleColorChange, 50) }
+            ></RgbaColorPicker>
+          </div>
+          <div className={styles.colors}>
+            <DefaultColors
+              colors={defaultColors}
+              onChangeColor={handleColorChange}
+            ></DefaultColors>
+          </div>
         </div>
-        <div className={styles.colors}>
-          <DefaultColors
-            colors={defaultColors}
-            onChangeColor={handleColorChange}
-          ></DefaultColors>
-        </div>
-      </div>
+      }
     </div>
   );
 }

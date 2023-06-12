@@ -40,7 +40,6 @@ let serialReady = ()=>(console.error("Promise not created"));
 
 // Connect to the serial port of the Arduino Uno USB device
 async function initializeUsb(mainWindow) {
-  console.log({mainWindow, 'here': 1})
   const ports =  await SerialPort.list();
   let path = '';
 
@@ -92,11 +91,13 @@ async function initializeUsb(mainWindow) {
       // just resolve the serialReady().
       // TODO: is this okay to leave here, rather than inside on `data`? Figure out a better, best practice way to do this
       serialReady(); // resolve the promise
+      mainWindow.webContents.send('usb-connected');
       console.log('Serial port open');
     });
 
     port.on("close", (options) => {
       console.log('Serial port closed');
+      mainWindow.webContents.send('usb-disconnected');
       port = null;
       if (options.reconnect !== false) {
         // if the port was not closed by the gg app, then attempt to reconnect
@@ -129,23 +130,18 @@ function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
 // the serial port
 function waitForSerial() {
   return new Promise((resolve, reject)=>{
-    console.log("serialReady = resolve");
     serialReady = resolve;
   });
 }
 
 // Attempt to connect to the USB device and if not successful, retry every 1500ms.
 function connectUsb(mainWindow) {
-  console.log({mainWindow})
   return new Promise((resolve, reject)=>{
-    console.log("connectUsb");
     const intervalID  = setInterval(async () => {
-      console.log("setInterval");
       const isConnected = await initializeUsb(mainWindow);
-      console.log({isConnected});
       if (isConnected) {
         console.log("clear Interval");
-        clearInterval(intervalID);      
+        clearInterval(intervalID);
         resolve();
       }
     }, 1500) 
@@ -232,7 +228,7 @@ function _setColor(red, green, blue, makeDefault=false) {
  */
  function writeCommand(command, commandStr='') {
 
-  if (!port || !port.port.fd) {
+  if (!port || !port.port?.fd) {
      return Promise.reject(new Error('Port has closed'));
   }
 
