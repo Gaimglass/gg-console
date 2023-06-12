@@ -39,11 +39,9 @@ function DefaultColors(props) {
       var s = swatchRefs.current[i];
       //debugger;
       const yc = s.offsetTop + (s.clientHeight/2);
-      console.log(yc);
       const x = s.offsetWidth
 
       ctx.beginPath()
-      console.log({editSwatch})
       if(editSwatch===i) {
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgba(255,255,255,1)';  
@@ -59,8 +57,7 @@ function DefaultColors(props) {
   }, [editSwatch]);
 
   function changeColor(i) {
-    console.log(">>>>>>",props.colors);
-    props.onChangeColor(props.colors[i]);
+    props.onChangeColor(props.colors[i].color);
   }
 
   function colorToCss(color) {
@@ -76,12 +73,13 @@ function DefaultColors(props) {
   }
 
   const Swatches = []
+
   for(let i = 0; i < 8; i++) {
     Swatches.push(
-      <div className={styles.swatchWrapper}>
+      <div className={styles.swatchWrapper} key={i}>
       <div
         style={{
-          backgroundColor: colorToCss(props.colors[i])
+          backgroundColor: colorToCss(props.colors[i]?.color)
         }} 
         onClick={()=>{changeColor(i);}} key={i} ref={el => swatchRefs.current[i] = el} className={styles.swatch}></div>
         <button onClick={()=>{

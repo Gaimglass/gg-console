@@ -9,6 +9,11 @@ const SET_DEFAULT_LEDS = '002';
 const GET_MAIN_LED = '128';
 const GET_DEFAULT_LEDS = '129';
 
+// when a button is pushed on the GG
+const UPDATE_MAIN_LED = '130';
+const UPDATE_DEFAULT_LEDS = '131'
+
+
 
 // Serial result promise resolvers
 //  <message ID> : {
@@ -34,7 +39,8 @@ let serialReady = ()=>(console.error("Promise not created"));
 
 
 // Connect to the serial port of the Arduino Uno USB device
-async function initializeUsb() {
+async function initializeUsb(mainWindow) {
+  console.log({mainWindow, 'here': 1})
   const ports =  await SerialPort.list();
   let path = '';
 
@@ -74,6 +80,9 @@ async function initializeUsb() {
       if (serialMessageResults[messageId]) {
         serialMessageResults[messageId].resolve(ggResponse);
         serialMessageResults[messageId] = null; // ensure its only called once.
+      } else {
+        // Uninitiated messages. When a user presses a button on the device
+        handleUnprovokedMessages(mainWindow, messageId, ggResponse);
       }
     });
 
@@ -91,7 +100,7 @@ async function initializeUsb() {
       port = null;
       if (options.reconnect !== false) {
         // if the port was not closed by the gg app, then attempt to reconnect
-        connectUsb(); 
+        connectUsb(mainWindow); 
       }
     });
 
@@ -103,6 +112,18 @@ async function initializeUsb() {
   }
 }
 
+// Messages directly from GG that are not provoked from the console. This could be a button
+// press for example
+function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
+  // Uninitiated messages. When a user presses a button on the device
+  if ( UPDATE_MAIN_LED === messageId) {
+    mainWindow.webContents.send('update-main-led-state-from-gg', ggResponse);
+  }
+  if ( UPDATE_DEFAULT_LEDS === messageId) {
+    debugger;
+    mainWindow.webContents.send('update-default-colors-from-gg', ggResponse);
+  }
+}
 
 // Hack to delay the arduino until setup() is finished after connecting
 // the serial port
@@ -114,12 +135,13 @@ function waitForSerial() {
 }
 
 // Attempt to connect to the USB device and if not successful, retry every 1500ms.
-function connectUsb() {
+function connectUsb(mainWindow) {
+  console.log({mainWindow})
   return new Promise((resolve, reject)=>{
     console.log("connectUsb");
     const intervalID  = setInterval(async () => {
       console.log("setInterval");
-      const isConnected = await initializeUsb();
+      const isConnected = await initializeUsb(mainWindow);
       console.log({isConnected});
       if (isConnected) {
         console.log("clear Interval");
@@ -165,7 +187,7 @@ function _setColor(red, green, blue, makeDefault=false) {
     // a higher value means more accurate dim colors, but not as bright
     const rExponent = 2.4;
     const gExponent = 2;
-    const bExponent = 2.6;
+    const bExponent = 2.6; 
     /*const rExponent = 1;
     const gExponent = 1;
     const bExponent = 1;*/
@@ -236,11 +258,12 @@ function _setColor(red, green, blue, makeDefault=false) {
 // Commands
 
 function setMainLED(color, brightness, ledOn) {  
+  console.log(`${brightness}`)
   const commandStr = 
     `${color.r}`.padStart(3, 0) + 
     `${color.g}`.padStart(3, 0) +
     `${color.b}`.padStart(3, 0) +
-    `${brightness}`.padStart(4, 0) +
+    `${brightness.toFixed(2)}` +
     Number(ledOn);
 
     return writeCommand(SET_MAIN_LED, commandStr);
@@ -263,6 +286,7 @@ function getMainLED() {
 function getDefaultLEDs() {
   return writeCommand(GET_DEFAULT_LEDS);
 }
+
 
 module.exports = {
   waitForSerial,

@@ -25,7 +25,7 @@ async function createWindow() {
   const isMac = process.platform === 'darwin';
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1100,
+    width: 1800,
     frame: false,
     minHeight:600,
     minWidth:400,
@@ -39,7 +39,10 @@ async function createWindow() {
     }
   });
 
-  connectUsb();
+
+  // TODO remove the await and allow the UI to load before port is ready, this is buggy at present.
+  // UI also needs to load if USB is unplugged
+  await connectUsb(mainWindow);
 
     // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
@@ -94,8 +97,9 @@ app.on('activate', function () {
 
 electron.ipcMain.on('get-led-state', async (event) => {
   try {
+    console.log(">>>>>> get-led-state");
     const result = await getMainLED();
-    console.log("okay result", result);
+    console.log("get-led-state okay result", result);  
     event.returnValue = result;
   } catch(err) {
     event.returnValue = err;
@@ -104,6 +108,7 @@ electron.ipcMain.on('get-led-state', async (event) => {
 
 electron.ipcMain.on('set-led-state', async (event, ledState) => {
   try {
+    console.log(ledState.brightness + "<<<<<<<")
     const result = await setMainLED(ledState.color, ledState.brightness, ledState.ledOn);
     event.returnValue = result;
   } catch(err) {
@@ -111,8 +116,9 @@ electron.ipcMain.on('set-led-state', async (event, ledState) => {
   }
 });
 
-electron.ipcMain.on('get-default-colors', async (event, color) => {
+electron.ipcMain.on('get-default-colors', async (event) => { 
   try {
+    console.log(">>>>>> get-default-colors");
     const ledStateStr = await getDefaultLEDs();
     event.returnValue = ledStateStr;
   } catch(err) {
@@ -125,7 +131,7 @@ electron.ipcMain.on('set-default-color', async (event, color) => {
   //event.returnValue = 'okay';
 });
 
-electron.ipcMain.on('get-gg-state', async (event) => {
+/*electron.ipcMain.on('get-gg-state', async (event) => {
   try {
     const ledStateStr = ''//await getMainLED();
     const defaultColors = ''//await getDefaultLEDs();
@@ -135,7 +141,7 @@ electron.ipcMain.on('get-gg-state', async (event) => {
   } catch(err) {
     event.returnValue = err;
   }
-});
+});*/
 
 // Windows commands
 

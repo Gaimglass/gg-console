@@ -24,8 +24,9 @@ function App() {
 
   let syncGG = true;//useRef(true);
 
-  const [color, setColor] = useState({});
+  const [color, setColor] = useState({r:255,g:255,b:255,a:0});
   const [defaultColors, setDefaultColors] = useState([]);
+  const [defaultColorIndex, setDefaultColorIndex] = useState(0);
   const [ledOn, setLEDOn] = useState(true);
   const [isMaximized, setMaximized] = useState(false);
   const [isMac, setMac] = useState(false);
@@ -39,39 +40,34 @@ function App() {
 
 
   useEffect(()=>{
-    console.log(1)
+    
     const appState = ipcRenderer.sendSync('get-app-state');
-    console.log(2)
+    
     setMaximized(appState.isMaximized);
     setMac(appState.isMac);
-    getGGState();
-    console.log(3)
+    // TODO remove timeout
+    // TODO call a function that blocks until port is open, then do the loading, these dont work the first load
+    //setTimeout(()=>{
+      
+      loadMainLedFromGG();
+      loadDefaultColorsFromGG();  
+      
+    //},1000)
+    
+    //getGGState();
+    
+    ipcRenderer.on('update-main-led-state-from-gg', function (evt, message) {
+      (throttle(()=>{
+        parseMainLedFromGG(message) 
+      }, 100))();
+    });
+
+    ipcRenderer.on('update-default-colors-from-gg', function (evt, message) {
+      debugger;
+      parseDefaultColors(message);
+    });
   }, [])
   
-  useEffect(() => {
-    //debugger;
-    // TODO add some delay here because GG is not normally ready to accept serial input
-    //(async () => {
-      
-      //const c = await ipcRenderer.send('get-status');
-      
-    //})();
-    
-    //dispatch(initializeStatus());
-    /*
-    console.log("getting color..");
-    const c = ipcRenderer.sendSync('get-color');
-    if (c) {
-      setColor({
-        ...c
-      });
-      // pass color to gaimglass
-      ipcRenderer.sendSync('set-led-state', c);
-    } else {
-      // set up default color perhaps?
-    }*/
-  }, []);
-
   
   function throttle(func, timeout = 50){
     return (...args) => {
@@ -96,6 +92,12 @@ function App() {
 
 
   function sendMainLEDStatus(color, ledOn) {
+    console.log("sendMainLEDStatus", {
+      color,
+      brightness: color.a,
+      ledOn
+    });
+
     getMessageResult(ipcRenderer.sendSync('set-led-state', {
       color,
       brightness: color.a,
@@ -103,12 +105,14 @@ function App() {
     }));
   }
 
-  async function getMessageResult(promise, cb) {
+
+  async function getMessageResult(promise, cb, onError) {
     const result = await promise;
      if (result instanceof Error) {
       console.error(result);
+      onError(result);
     } else {
-      // todo, update state with new values
+      // todo, update state with new values 
       console.log("result:", result);
       if (cb) {
         cb(result);
@@ -117,7 +121,7 @@ function App() {
   }
 
   
-  function handleColorChange(newColor) {
+  function handleColorChange(_newColor) {
     // todo setColor only after a debounce time, we should not update state as frequently as adjusting color.
     // OR perhaps the current color's source of truth can simply be the component?
     /*const newColor = newColor;
@@ -126,11 +130,13 @@ function App() {
       newColor.a = color.a
     }*/
     //console.log(color.a, newColor.a);
-    setColor({
-      ...newColor,
-      a: newColor.a ?? color.a
-    });
-    sendMainLEDStatus(newColor, ledOn);
+    const newColor = {
+      ..._newColor,
+      a: _newColor.a ?? color.a // defaults don't have an alpha so use the current value
+    }
+    console.log("calling handleColorChange", newColor)
+    setColor(newColor);
+    sendMainLEDStatus(newColor, ledOn); 
   };
 
   function toggleLEDOn() {
@@ -140,7 +146,7 @@ function App() {
   }
 
   function writeDefault() {
-    ipcRenderer.sendSync('set-default-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b})
+    ipcRenderer.sendSync('set-default-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b}) 
   }
 
 
@@ -160,10 +166,90 @@ function App() {
   //     //const params = result.split('&');
   //   });
   // }
+  function parseDefaultColors(message) {
+    console.log("parseDefaultColors")
+    let vars = message.split('&');
+    const defaults = []; 
+    let index;
+    for (let v of vars) {
+      let [key, value] = v.split('=')
+      if (key == 'color') {
+        let [r,b,g, enabled] = value.split(',');
+        defaults.push({
+          color: {
+            r: Number(r), 
+            g: Number(g), 
+            b: Number(b)
+          },
+          enabled
+        });
+      } else if (key == 'index') {
+        index = Number(value);
+      }
+      
+    }
+    setDefaultColors(defaults);
+    setDefaultColorIndex(index);
 
-  async function getGGState() {
+    console.log("DEFAULT", message); // Returns: {'SAVED': 'File Saved'}
+  }
+
+  function parseMainLedFromGG(message) { 
+    console.log("parseMainLedFromGG", message);
+    const params = message.split('&');
+    let c = {};
+    let led;
+    let index;
+    params.forEach(param => {
+      const [key, value] = param.split('=');
+      // eslint-disable-next-line default-case
+      switch(key) {
+        case 'color':
+          const [r,g,b] = value.split(',');
+          c.r = Number(r);
+          c.g = Number(g);
+          c.b = Number(b);
+          break;
+        case 'ledOn':
+          led = Boolean(Number(value));
+          break;
+        case 'brightness':
+          c.a = Number(value);
+          break;
+        case 'index':
+          index = value;
+          break;
+      }
+    });
+    setColor(c);
+    setLEDOn(led);
+    setDefaultColorIndex(index);
+  }
+  
+
+  async function loadMainLedFromGG() { 
+    await getMessageResult(ipcRenderer.sendSync('get-led-state'), (result)=>{ 
+      parseMainLedFromGG(result);
+    });
+    /* await getMessageResult(ipcRenderer.sendSync('get-led-state', (result)=>{
+      debugger;
+    })); */
+  }
+
+  
+  async function loadDefaultColorsFromGG() { 
+    console.log("loadDefaultColorsFromGG")
+    await getMessageResult(ipcRenderer.sendSync('get-default-colors'), (result)=>{
+      parseDefaultColors(result);
+    });
+  }
+
+  // @deprecated
+  async function _getGGState() {
     //syncGG = false;
     await getMessageResult(ipcRenderer.sendSync('get-gg-state'), (result)=>{
+      debugger;
+      console.log('getGGState')
       const params = result.split('&');
       let r,g,b,a,ledOn;
       // defaults, TODO move to another place
