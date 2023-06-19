@@ -22,31 +22,66 @@ body {
   border: transparent;
 }
 
-/* .App {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 2px 2px #4e72ff
 }
 
-.App-link {
-  color: #61dafb;
+
+button {
+  user-select: none;
+  display: inline-block;
+  border: none;
+  padding: 1em;
+  margin: 0;
+  text-decoration: none;
+  color: #ccc;
+  fill: #ccc;
+  font-size: 1rem;
+  cursor: pointer;
+  text-align: center;
+  transition: background 100ms ease-in-out;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  
+  background-color: #222;
+  border: none;
+/*   box-shadow: 0 0 5px 0 #00000070; */
+  border-radius: 0.25em;
+  padding: 0.5em;
 }
 
-.App .react-colorful {
-  height: 250px;
-  width: 250px;
+button:hover {
+  /* transition: background 50ms ease-in-out;
+  background: rgb(30 80 155);
+ */
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-} */
+button:focus {
+  /* outline: 1px solid #fff;  
+  outline-offset: -4px;    */
+}
+
+button:active {
+ /* background: #6078d8; */
+}
+
+#root .react-colorful {
+  height: 200px;
+  width: 300px;
+}
+
+
+.react-colorful__interactive:focus {
+  box-shadow: none;
+}
+
+a {
+  text-decoration: none;
+  color: #7ab4ff;
+}
+
+a:hover {
+  text-decoration: underline
+}
