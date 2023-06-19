@@ -264,6 +264,7 @@ function App() {
     });
     setColor(c);
     setLEDOn(led);
+    setInputColorKey({...c});
     setDefaultColorIndex(index);
   }
   
