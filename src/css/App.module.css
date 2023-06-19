@@ -84,17 +84,26 @@
   width: 30px;
   position: relative;
   top: 2px;
+  fill: #888;
+
 }
 .power {
   margin: 0;
   margin-bottom: 1em;
   background-color: #222;
   width: 100%;
+  color: #888;
   
 }
 
 .enabled {
   background-color: #2948c4;
+  box-shadow: 0 0 25px 10px #456aff24;
+  color: #fff;
+}
+
+.enabled .powerIcon {
+  fill: #fff;
 }
 
 .ledText {
@@ -102,6 +111,8 @@
   display: inline-block;
   position: relative;
   top: -5px;
+  text-align: left;
+  margin-left: 1em;
 }
 .powerButtonRow {
 
