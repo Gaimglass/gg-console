@@ -9,6 +9,7 @@ import WindowControls from './WindowsControls'
 
 import styles from './css/App.module.css'
 
+import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
 import logo from './assets/logo.png';
 import './css/globalStyles.css';
 
@@ -26,20 +27,19 @@ function App() {
 
   const [color, setColor] = useState({r:255,g:255,b:255,a:0});
   const [defaultColors, setDefaultColors] = useState([]);
-  const [defaultColorIndex, setDefaultColorIndex] = useState(-1); // -1 for a custom color
+  const [defaultColorIndex, setDefaultColorIndex] = useState(0); // -1 for a custom color
   const [ledOn, setLEDOn] = useState(true);
   const [isMaximized, setMaximized] = useState(false);
   const [isMac, setMac] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [editSwatch, setEditSwatch] = useState(null);
+
+  const [inputColorKey, setInputColorKey] = useState({});
 
 
   useEffect(()=>{
-    
-    const appState = ipcRenderer.sendSync('get-app-state');
-    
-    setMaximized(appState.isMaximized);
-    setMac(appState.isMac);
-    
+    ipcRenderer.sendSync('get-app-state'); // non-blocking
+    initialDefaults();
     // TODO do we really need these here too?
     loadMainLedFromGG();
     loadDefaultColorsFromGG();
@@ -70,6 +70,27 @@ function App() {
 
   }, [])
   
+  function initialDefaults() {
+    const defaults = [];
+    const initialDefaultColors = [
+      {r:0,g:255, b:0},
+      {r:255, g:240, b:0}, 
+      {r:255, g:110, b:0}, 
+      {r:255, g:0, b:0}, 
+      {r:255, g:0, b:160}, 
+      {r:0, g:40, b:255}, 
+      {r:100, g:180, b:255}, 
+      {r:0, g:255, b:100}, 
+    ];
+    for (let i = 0; i < 8;i++) {
+      defaults.push({
+        color: initialDefaultColors[i],
+        enabled: true
+      });
+    }
+    // these are the colors that will be rendered if no GG is connected
+    setDefaultColors(defaults);
+  }
   
   function throttle(func, timeout = 50){ 
     return (...args) => {
@@ -95,7 +116,9 @@ function App() {
 
   function sendDefaultIndex(index) {
     getMessageResult(ipcRenderer.sendSync('set-default-index', index));
-  }
+  } 
+
+  
 
   function sendMainLEDStatus(color, ledOn) {
     console.log("sendMainLEDStatus", {
@@ -125,32 +148,52 @@ function App() {
     }
   }
 
-  
-  function handleColorChange(_newColor, defaultIndex = -1) {
-    
-    // todo setColor only after a debounce time, we should not update state as frequently as adjusting color.
-    // OR perhaps the current color's source of truth can simply be the component?
-    /*const newColor = newColor;
-    console.log(newColor);
-    if (!newColor.a) {
-      newColor.a = color.a
-    }*/
-    //console.log(color.a, newColor.a);
+  function handleEditSwatch(swatch) {
+    setEditSwatch(swatch);
+  }
 
+  function handleSaveDefaultColor(color, index) {
+    // send to device
+    //writeDefault();
+  }
+
+  function handelRestoreDefaults() {
+    initialDefaults();
+    //writeDefault();
+  }
+  
+
+
+  function handleColorChange(_newColor, defaultIndex = -1,) {
+  
     // defaults don't have an alpha so use the current value
     let alpha = _newColor.a ?? color.a;
-    /* if (alpha < 0.075) {
-      alpha = 0.075 // min alpha
-    } */
+
     const newColor = {
       ..._newColor,
       a: alpha
     }
-    console.log("calling handleColorChange", newColor)
     setColor(newColor);
-    sendMainLEDStatus(newColor, ledOn);
+    setLEDOn(true);
+    sendMainLEDStatus(newColor, true);
     if (defaultIndex > -1)  {
+      // update the index position on the device so that the left and right color 
+      // button on the device start from where this default color is.
       sendDefaultIndex(defaultIndex); 
+    }
+    console.log({editSwatch})
+    setInputColorKey(newColor);
+     
+    if (editSwatch !== null) {
+      // when editing a default color, update that color in real time
+      const c = {
+        color: {r: newColor.r, g: newColor.g, b: newColor.b},
+        enabled: true
+      }
+      const dc = [...defaultColors];
+      dc[editSwatch] = c;
+      console.log(dc)
+      setDefaultColors(dc);
     }
     
   };
@@ -165,23 +208,6 @@ function App() {
     ipcRenderer.sendSync('set-default-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b}) 
   }
 
-
-  // async function getDefaultLEDColors() {
-  //   await getMessageResult(ipcRenderer.sendSync('get-default-colors'), (result)=>{
-  //     // rrr,ggg,bbb,a.aa;...
-  //     setDefaultColors([
-  //       {r:40,g:255, b:0, a:1.0}, // GG green
-  //       {r:0, g:255, b:255, a:1.0}, // teal
-  //       {r:0, g:0, b:255, a:1.0}, // blue
-  //       {r:255, g:0, b:255, a:1.0}, // purple
-  //       {r:255, g:0, b:0, a:1.0}, // red
-  //       {r:255, g:150, b:0, a:1.0}, // orange
-  //       {r:255, g:200, b:0, a:1.0}, // gold
-  //       {r:255, g:200, b:200, a:1.0}, // pink
-  //     ])
-  //     //const params = result.split('&');
-  //   });
-  // }
   function parseDefaultColors(message) {
     let vars = message.split('&');
     const defaults = []; 
@@ -260,58 +286,68 @@ function App() {
     });
   }
 
-  // @deprecated
-  async function _getGGState() {
-    //syncGG = false;
-    await getMessageResult(ipcRenderer.sendSync('get-gg-state'), (result)=>{
-      debugger;
-      console.log('getGGState')
-      const params = result.split('&');
-      let r,g,b,a,ledOn;
-      // defaults, TODO move to another place
-      r=200;
-      g=20;
-      b=255;
-      a=0.123456;
-      ledOn = true;
-
-      // temp
-      const defaultColors = [
-         {r:40, g:255, b:0}, // GG green
-         {r:0, g:255, b:255}, // teal
-         {r:0, g:0, b:255}, // blue
-         {r:200, g:0, b:255}, // purple
-         {r:255, g:0, b:0}, // red
-         {r:255, g:100, b:0}, // orange
-         {r:255, g:200, b:0}, // gold
-         {r:255, g:200, b:200}, // pink
-       ];
-       console.log(4.5);
-      params.forEach(param => {
-        const [key, value] = param.split('=');
-        // eslint-disable-next-line default-case
-        switch(key) {
-          case 'color':
-            [r,g,b] = value.split(',');
-            break;
-          case 'ledOn':
-            ledOn = Boolean(Number(value));
-            break;
-          case 'brightness':
-            a = value;
-            break;
-          case 'defaultColors':
-            // todo read from buffer and assign to state
-            break;
-
-        }
-      });
-      setDefaultColors(defaultColors);
-      console.log({defaultColors});
-      setColor({r,g,b,a});
-      console.log("LEDON:", ledOn);
-      setLEDOn(ledOn);
-    });
+  function changeRgb(e, colorComponent) {
+    const rawString = e.target.value.trim();
+    let updateKey = false; // force an update on the input field too
+    let newColorComponent = parseInt(rawString);
+    if (isNaN(newColorComponent)) {
+      return;
+    } else if(newColorComponent > 255) {
+      newColorComponent = 255;
+      updateKey = true;
+    } else if(newColorComponent < 0) {
+      newColorComponent = 0;
+      updateKey = true;
+    }
+    const c = {
+      ...color,
+      [colorComponent]: newColorComponent
+    }
+    setColor(c);
+    if(updateKey) {
+      e.target.value = newColorComponent
+    }
+  }
+  function changeAlpha(e) {
+    const rawString = e.target.value.trim();
+    let updateKey = false; // force an update on the input field too
+    
+    
+    let newColorComponent = parseFloat(rawString).toFixed(2);
+    
+    
+    if (isNaN(newColorComponent)) {
+      return;
+    } else if(newColorComponent > 1) {
+      newColorComponent = 1;
+      updateKey = true;
+    } else if(newColorComponent < 0) {
+      newColorComponent = 0;
+      updateKey = true;
+    }
+    const c = {
+      ...color,
+      a: newColorComponent
+    }
+    setColor(c);
+    if(updateKey) {
+      e.target.value = newColorComponent;
+    }
+    
+    var arr = [...e.target.value];
+    if (arr[0] === '.') {
+      e.target.value = ['0', ...e.target.value].splice(0).join('');      
+    }
+    if (e.target.value.length > 4) {
+      debugger
+      e.target.value = [...e.target.value].splice(0,4).join('');  
+    }
+      /* if (e.target.value.length > 3) {
+        e.target.value = ['0', ...e.target.value].splice(0,4).join('');      
+      }
+    } else {
+      e.target.value = [...e.target.value].splice(0,4).join('');  
+    } */
   }
 
   return (
@@ -332,31 +368,52 @@ function App() {
       </header>
       { isConnected &&
         <div className={styles.mainContainer}>
-          {defaultColorIndex}
           <div className={styles.main}>
-      
-            <button onClick={writeDefault}>Set Default Color</button>
-            {/* <button onClick={readDefault}>Get Default Color</button> */}
-
-            <button className={styles.foo} onClick={toggleLEDOn}>{ledOn ? "Turn Off" : "Turn On"}</button>
-            
-
-            <div>{ledOn.toString()}</div>
-            <div>{color.r},{color.g},{color.b},{color.a}</div>
+            <div className={styles.mainControls}>
+              {/* <button onClick={readDefault}>Get Default Color</button> */}
+              
+                <button className={classNames({
+                    [styles.power]: true,
+                    [styles.enabled]: ledOn
+                })} onClick={toggleLEDOn}>
+                  <PowerSwitch className={styles.powerIcon}></PowerSwitch>
+                  <span className={styles.ledText}>LED: {ledOn ? " ON " : "OFF"}</span>
+                </button>
+              
+              
+            </div>
             
             <RgbaColorPicker
               color={color}
               onChange={ throttle(handleColorChange, 50) }
             ></RgbaColorPicker>
+            <div className={styles.rgbInputs}>
+                <label>R</label><input key={'red_' + inputColorKey.r} onChange={(e)=>(changeRgb(e, 'r'))} defaultValue={color.r} type="text"></input>
+                <label>G</label><input key={'green_' + inputColorKey.g} onChange={(e)=>(changeRgb(e, 'g'))} defaultValue={color.g} type="text"></input>
+                <label>B</label><input key={'blue_' + inputColorKey.b} onChange={(e)=>(changeRgb(e, 'b'))} defaultValue={color.b} type="text"></input>
+                <label>A</label><input key={'alpha_' + inputColorKey.a} onChange={changeAlpha} defaultValue={color.a} type="text"></input>
+              </div>
           </div>
           <div className={styles.colors}>
             <DefaultColors
               //activeIndex={defaultColorIndex}
               colors={defaultColors}
               onChangeColor={handleColorChange}
+              onSetEditSwatch={handleEditSwatch}
+              editSwatch={editSwatch}
+              onSaveDefaultColor={handleSaveDefaultColor}
+              onRestoreDefaults={handelRestoreDefaults}
             ></DefaultColors>
           </div>
+          <div className={styles.restoreDefaults}> 
+            <button onClick={handelRestoreDefaults}>Restore Defaults</button>
+            <a href="">Get Support</a>
+          </div>
+
         </div>
+      }
+      { !isConnected &&
+        <div className={styles.disconnected}><span>Gaimglass not connected.</span></div>
       }
     </div>
   );

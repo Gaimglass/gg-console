@@ -1,6 +1,9 @@
 const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
+//yarn add global-mouse-events --save
+//const mouseEvents = require("global-mouse-events");
+
 
 const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultIndex, disconnectUsb, serialDisconnected } = require('./usb');
 
@@ -25,10 +28,14 @@ async function createWindow() {
   const isMac = process.platform === 'darwin';
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1800,
+    width: 1400,
+    width: 720,
+    height: 500,
     frame: false,
-    minHeight:600,
-    minWidth:400,
+    /* minHeight:600,
+    minWidth:700, */
+    maximizable: false, // BUG: F11 still works for some reason
+    resizable: false,
     backgroundColor: '#282c34',
     titleBarStyle: 'hidden',
     titleBarOverlay: process.platform === 'darwin' ? true : false,
@@ -39,12 +46,30 @@ async function createWindow() {
     }
   });
 
+  
+  // Open the DevTools.
+  mainWindow.webContents.openDevTools();
+
+  [{
+    color: []
+    
+  }]
+
 
   // TODO remove the await and allow the UI to load before port is ready, this is buggy at present.
   // UI also needs to load if USB is unplugged
   connectUsb(mainWindow);
 
-    // and load the index.html of the app.
+  /* mouseEvents.on("mouseup", event => {
+    //console.log(event); // { x: 2962, y: 483, button: 1 }
+  });
+  
+  mouseEvents.on("mousedown", event => {
+    //console.log(event); // { x: 2962, y: 483, button: 1 }
+  }); */
+  
+  
+  // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
       pathname: path.join(__dirname, '../../build/index.html'),
       protocol: 'file:',
@@ -53,8 +78,6 @@ async function createWindow() {
   console.log("startUrl:", startUrl);
   mainWindow.loadURL(startUrl);
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
 
   // Emitted when the window is closed.
   mainWindow.on('closed', function () {

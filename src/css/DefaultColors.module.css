@@ -6,7 +6,9 @@
   height: 100%;
   margin-right: 1em;
 }
-
+.swatchEdit {
+  box-shadow: 0 0 0 1px white;
+}
 .swatchWrapper {
   
   display: flex;
@@ -15,22 +17,31 @@
 }
 
 .editIcon {
-  fill: #aaa;
+  /* fill: white; */
 }
 
-.editButton {
-  border: 0;
-  background: none;
-  box-shadow: none;
-  border-radius: 0px;
+.button {
   width: 2em;
   height: 2em;  
   background-color: #222;
   border: 1px solid black;
-  border-radius: 0.25em;
   box-shadow: 0 0 15px 0 #00000070;
   border-radius: 0.25em;
+  margin-right: 0.5em;
+  padding: 0.5em;
+}
+
+.editButton {
+  
   border-bottom-color: aqua;
+}
+
+.cancelButton {
+  border-bottom-color: red;
+}
+
+.checkButton {
+  border-bottom-color: #0f0;
 }
 
 .defaultColors {
@@ -39,7 +50,7 @@
   justify-content: center;
   flex-direction: row;
   align-items: center; 
-  height: 400px;
+  height: 320px;
 
 }
 
@@ -55,6 +66,6 @@
   display: grid;
   grid-template-rows: repeat(8, 1fr);
   height: 100%;
-  grid-gap: 1px;
-  width: 165px;
+  grid-gap: 3px;
+  width: 145px;
 }

@@ -1,6 +1,7 @@
 .controls {
   display: grid;
-  grid-template-columns: repeat(3, 40px);
+  /* grid-template-columns: repeat(3, 40px); */
+  grid-template-columns: repeat(2, 40px);
   position: absolute;
   top: 0;
   right: 0;
@@ -18,7 +19,24 @@
   user-select: none;
   -webkit-appearance: none;
   background: transparent;
+  box-shadow: none;
+  border-radius: 0;
   border: none;
+
+  
+  padding: 0;
+  margin: 0;
+  text-decoration: none;
+  
+
+  font-size: 1em;
+  
+  
+  transition: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  
 }
 
 .button:hover {
@@ -38,7 +56,8 @@
 }
 
 .close {
-  grid-column: 3;
+  /* grid-column: 3; */
+  grid-column: 2;
 }
 
 .close:hover {

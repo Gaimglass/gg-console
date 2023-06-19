@@ -15,6 +15,7 @@
   align-items: center;
   height: 100vh;
   overflow-y: auto;
+  padding: 0 2em;
 }
 
 .main {
@@ -24,7 +25,6 @@
   flex-direction: column;
   color: white;
   align-items: center;
-  
 }
 
 .colors {
@@ -71,4 +71,68 @@
 
 .green {
   color: rgba(40,255,0,1);
+}
+
+.disconnected {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  color: #ccc
+}
+
+.powerIcon {
+  width: 30px;
+  position: relative;
+  top: 2px;
+}
+.power {
+  margin: 0;
+  margin-bottom: 1em;
+  background-color: #222;
+  width: 100%;
+  
+}
+
+.enabled {
+  background-color: #2948c4;
+}
+
+.ledText {
+  width: 100px;
+  display: inline-block;
+  position: relative;
+  top: -5px;
+}
+.powerButtonRow {
+
+}
+.mainControls {
+  width: 100%;
+}
+
+.rgbInputs {
+  margin-top: 1em;
+}
+.rgbInputs label {
+  margin-right: 3px;
+  color: #777;
+}
+.rgbInputs input {
+  width: 2.0em;
+  border: none;
+  background-color: #222;
+  margin-right: 5px;
+  padding: 0.5em;
+  color: #ccc;
+  font-size: 1.1em;
+}
+
+.restoreDefaults {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.restoreDefaults button {
+  margin-bottom: 1em;
 }
