@@ -1,6 +1,7 @@
 const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
+
 //yarn add global-mouse-events --save
 //const mouseEvents = require("global-mouse-events");
 
@@ -21,8 +22,38 @@ const store = new Store();
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
-let mainWindow;
-let ggConnected = false;
+var mainWindow;
+var tray;
+
+
+//const appIcon = new electron.Tray('./assets/gg_icon.png')
+
+// Windows task try icon and menu
+function createTray() {
+  let appIcon = new electron.Tray(path.join(__dirname, '../assets/gg_icon.ico'));
+  const contextMenu = electron.Menu.buildFromTemplate([{
+          label: 'Show', click: function () {
+              mainWindow.show();
+          }
+      }, {
+          label: 'Exit', click: function () {
+              app.isQuiting = true;
+              app.quit();
+          }
+      }
+  ]);
+
+  appIcon.on('double-click', function (event) {
+      mainWindow.show();
+      mainWindow.setSkipTaskbar(false);
+  });
+  appIcon.setToolTip('Gaimglass Console');
+  appIcon.setContextMenu(contextMenu);
+  return appIcon;
+}
+
+
+
 
 async function createWindow() {
   const isMac = process.platform === 'darwin';
@@ -32,6 +63,7 @@ async function createWindow() {
     width: 720,
     height: 500,
     frame: false,
+    icon: path.join(__dirname, '../assets/gg_icon.png'),
     /* minHeight:600,
     minWidth:700, */
     maximizable: false, // BUG: F11 still works for some reason
@@ -46,27 +78,24 @@ async function createWindow() {
     }
   });
 
+  //const appIcon = new electron.Tray('./assets/gg_icon.png')
   
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
 
-  [{
-    color: []
-    
-  }]
-
-
+  
   // TODO remove the await and allow the UI to load before port is ready, this is buggy at present.
   // UI also needs to load if USB is unplugged
   connectUsb(mainWindow);
 
   /* mouseEvents.on("mouseup", event => {
     //console.log(event); // { x: 2962, y: 483, button: 1 }
+    //setMainLED()
   });
   
   mouseEvents.on("mousedown", event => {
     //console.log(event); // { x: 2962, y: 483, button: 1 }
-  }); */
+  });  */
   
   
   // and load the index.html of the app.
@@ -75,17 +104,27 @@ async function createWindow() {
       protocol: 'file:',
       slashes: true
   });
-  console.log("startUrl:", startUrl);
+
   mainWindow.loadURL(startUrl);
 
+  // create the try in Windows
+  tray = createTray();
 
   // Emitted when the window is closed.
   mainWindow.on('closed', function () {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
+    // when you should delete the corresponding element
     mainWindow = null
   })
+
+  mainWindow.on('minimize', function (event) {
+    //
+  });
+
+  mainWindow.on('restore', function (event) {
+    //
+  });
 }
 
 // This method will be called when Electron has finished
@@ -97,7 +136,6 @@ app.on('ready', createWindow);
 app.on('window-all-closed', function () {
   // On OS X it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
-  console.log("on window-all-close");
   disconnectUsb();
   if (process.platform !== 'darwin') { 
     app.quit()
@@ -107,7 +145,6 @@ app.on('window-all-closed', function () {
 app.on('activate', function () {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
-  console.log("on activate");
   if (mainWindow === null) {
      createWindow()
   }
@@ -115,7 +152,7 @@ app.on('activate', function () {
 
 
 //
-// Synchronous
+// Synchronous events from UI
 //
 
 electron.ipcMain.on('get-led-state', async (event) => {
@@ -144,7 +181,6 @@ electron.ipcMain.on('set-default-index', async (event, index) => {
     event.returnValue = err;
   }
 });
-
 
 
 electron.ipcMain.on('get-default-colors', async (event) => { 
@@ -192,7 +228,6 @@ electron.ipcMain.on('window-maximize', async (event) => {
 });
 
 electron.ipcMain.on('window-restore', async (event) => {
-  mainWindow.restore();
   event.returnValue = 'okay';
 });
 
@@ -202,7 +237,9 @@ electron.ipcMain.on('window-minimize', async (event) => {
 });
 
 electron.ipcMain.on('window-close', async (event) => {
-  mainWindow.close();
+  // hide to try, not exit
+  mainWindow.setSkipTaskbar(true);
+  mainWindow.hide();
   event.returnValue = 'okay';
 });
 
