@@ -25,6 +25,7 @@ const store = new Store();
 var mainWindow;
 var tray;
 
+
 var mouseState = {
   down: false
 }
@@ -34,7 +35,7 @@ var mouseState = {
 
 // Windows task try icon and menu
 function createTray() {
-  let appIcon = new electron.Tray(path.join(__dirname, '../assets/gg_icon.ico'));
+  let appIcon = new electron.Tray(path.join(__dirname, '../assets/gg_icon32.ico'));
   const contextMenu = electron.Menu.buildFromTemplate([{
           label: 'Show', click: function () {
               mainWindow.show();
@@ -57,7 +58,44 @@ function createTray() {
 }
 
 
+// single lock (required on Windows to prevent multiple instances)
+const additionalData = {}
+const gotTheLock = app.requestSingleInstanceLock(additionalData)
+if (!gotTheLock) {
+  app.quit()
+} else {
+  // This method will be called when Electron has finished
+  // initialization and is ready to create browser windows.
+  // Some APIs can only be used after this event occurs.
+  app.on('ready', createWindow);
 
+  // Quit when all windows are closed.
+  app.on('window-all-closed', function () {
+    // On OS X it is common for applications and their menu bar
+    // to stay active until the user quits explicitly with Cmd + Q
+    disconnectUsb();
+    if (process.platform !== 'darwin') { 
+      app.quit()
+    }
+  });
+
+  app.on('activate', function () {
+    // On OS X it's common to re-create a window in the app when the
+    // dock icon is clicked and there are no other windows open.
+    if (mainWindow === null) {
+      createWindow()
+    }
+  });
+
+  app.on('second-instance', (event, commandLine, workingDirectory, additionalData) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.setSkipTaskbar(false);
+      mainWindow.focus()
+    }
+  })
+}
 
 async function createWindow() {
   const isMac = process.platform === 'darwin';
@@ -152,28 +190,6 @@ async function createWindow() {
   });
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
-
-// Quit when all windows are closed.
-app.on('window-all-closed', function () {
-  // On OS X it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  disconnectUsb();
-  if (process.platform !== 'darwin') { 
-    app.quit()
-  }
-});
-
-app.on('activate', function () {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (mainWindow === null) {
-     createWindow()
-  }
-});
 
 
 //
