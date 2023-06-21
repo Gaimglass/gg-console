@@ -122,7 +122,6 @@ function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
     mainWindow.webContents.send('update-main-led-state-from-gg', ggResponse);
   }
   if ( UPDATE_DEFAULT_LEDS === messageId) {
-    debugger;
     mainWindow.webContents.send('update-default-colors-from-gg', ggResponse);
   }
 }
@@ -262,14 +261,12 @@ function setMainLED(color, brightness, ledOn) {
     `${color.b}`.padStart(3, 0) +
     `${brightness.toFixed(2)}` +
     Number(ledOn);
-
     return writeCommand(SET_MAIN_LED, commandStr);
 }
 
 
 
 function setDefaultIndex(index) {
-  
   const q = index.toString().padStart(2);
   console.log(index, index.toString())
   return writeCommand(SET_DEFAULT_INDEX, index.toString().padStart(2));
@@ -281,9 +278,20 @@ function setAuxLED(color, ledOn) {
   return writeCommand(SET_AUX_LED);
 }
 
-function setDefaultLEDs() {
-  // todo...
-  return writeCommand(SET_DEFAULT_LEDS);
+function setDefaultColors(colors) {
+  const defaultColorStrs = [];
+  colors.forEach((defaultColor, index) => {
+    const color = defaultColor.color;
+    const enabled = Number(defaultColor.enabled);
+    defaultColorStrs.push(
+    `${color.r}`.padStart(3, 0) + 
+    `${color.g}`.padStart(3, 0) +
+    `${color.b}`.padStart(3, 0) +
+    `${enabled}`)
+  })
+  const commandStr = defaultColorStrs.join(',')
+  console.log(commandStr);
+  return writeCommand(SET_DEFAULT_LEDS, commandStr);
 }
 
 
@@ -308,7 +316,7 @@ module.exports = {
   getDefaultLEDs,
 
   setMainLED,
-  setDefaultLEDs,
+  setDefaultColors,
   setAuxLED,
   setDefaultIndex,
 }

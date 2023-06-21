@@ -82,7 +82,6 @@ function DefaultColors(props) {
 
   function changeDefaultColor(color) {
     //setEditSwatch(null);
-    debugger;
   }
 
   function cancel() {

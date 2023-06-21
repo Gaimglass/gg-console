@@ -35,7 +35,9 @@ function App() {
   const [editSwatch, setEditSwatch] = useState(null);
 
   const [inputColorKey, setInputColorKey] = useState({});
+  const [adsActive, setAdsActive] = useState(false);
 
+ 
 
   useEffect(()=>{
     ipcRenderer.sendSync('get-app-state'); // non-blocking
@@ -55,6 +57,26 @@ function App() {
       parseDefaultColors(message);
     });
 
+    /* // mouse 2 events
+    ipcRenderer.on('update-mouse-down', function (evt, message) {
+      setAdsActive(true);
+     });
+
+     ipcRenderer.on('update-mouse-up', function (evt, message) {
+      setAdsActive(false);
+    }); */
+
+    ipcRenderer.on('update-mouse-up', function (evt, message) {
+      console.log("COLOR!", color.r)
+      console.log("up", message, {adsActive})
+      if (adsActive && message.button === 2) {
+        console.log("Light on")
+        setAdsActive(false);
+        
+        sendMainLEDStatus(color, true);
+      }
+    });
+
     ipcRenderer.on('usb-connected', function (evt, message) {
       // initialize values
       loadMainLedFromGG();
@@ -65,10 +87,14 @@ function App() {
       // todo, show a better disconnected UI
       setIsConnected(false);
     });
-
-    
-
   }, [])
+  
+
+  useEffect(()=>{
+    if (ledOn) {
+      sendMainLEDStatus(color, !adsActive);
+    }
+  }, [adsActive, ledOn])
   
   function initialDefaults() {
     const defaults = [];
@@ -118,20 +144,17 @@ function App() {
     getMessageResult(ipcRenderer.sendSync('set-default-index', index));
   } 
 
-  
-
   function sendMainLEDStatus(color, ledOn) {
-    console.log("sendMainLEDStatus", {
-      color,
-      brightness: color.a,
-      ledOn
-    });
-
     getMessageResult(ipcRenderer.sendSync('set-led-state', {
       color,
       brightness: color.a,
       ledOn
     }));
+  }
+
+  function sendDefaultColors() {
+    ipcRenderer.sendSync('set-default-colors', 
+    defaultColors) 
   }
 
 
@@ -154,12 +177,12 @@ function App() {
 
   function handleSaveDefaultColor(color, index) {
     // send to device
-    //writeDefault();
+    sendDefaultColors();
   }
 
   function handelRestoreDefaults() {
     initialDefaults();
-    //writeDefault();
+    //sendDefaultColors();
   }
   
 
@@ -202,10 +225,6 @@ function App() {
     const on = !ledOn;
     setLEDOn(on);
     sendMainLEDStatus(color, on);
-  }
-
-  function writeDefault() {
-    ipcRenderer.sendSync('set-default-color', {red: color.rgb.r, green: color.rgb.g, blue: color.rgb.b}) 
   }
 
   function parseDefaultColors(message) {
@@ -312,11 +331,9 @@ function App() {
   function changeAlpha(e) {
     const rawString = e.target.value.trim();
     let updateKey = false; // force an update on the input field too
-    
-    
     let newColorComponent = parseFloat(rawString).toFixed(2);
     
-    
+
     if (isNaN(newColorComponent)) {
       return;
     } else if(newColorComponent > 1) {
@@ -343,12 +360,6 @@ function App() {
       debugger
       e.target.value = [...e.target.value].splice(0,4).join('');  
     }
-      /* if (e.target.value.length > 3) {
-        e.target.value = ['0', ...e.target.value].splice(0,4).join('');      
-      }
-    } else {
-      e.target.value = [...e.target.value].splice(0,4).join('');  
-    } */
   }
 
   return (
@@ -367,6 +378,7 @@ function App() {
           <WindowControls maximized={isMaximized} showControls={!isMac}></WindowControls>
         </div>
       </header>
+
       { isConnected &&
         <div className={styles.mainContainer}>
           <div className={styles.main}>

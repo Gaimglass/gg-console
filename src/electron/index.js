@@ -3,10 +3,10 @@ const usb = require('usb');
 const Store = require('electron-store');
 
 //yarn add global-mouse-events --save
-//const mouseEvents = require("global-mouse-events");
+const mouseEvents = require("global-mouse-events");
 
 
-const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultIndex, disconnectUsb, serialDisconnected } = require('./usb');
+const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, disconnectUsb, serialDisconnected } = require('./usb');
 
 // Module to control application life.
 const app = electron.app;
@@ -25,6 +25,10 @@ const store = new Store();
 var mainWindow;
 var tray;
 
+var mouseState = {
+  down: false
+}
+
 
 //const appIcon = new electron.Tray('./assets/gg_icon.png')
 
@@ -37,7 +41,7 @@ function createTray() {
           }
       }, {
           label: 'Exit', click: function () {
-              app.isQuiting = true;
+              app.isQuitting = true;
               app.quit();
           }
       }
@@ -88,14 +92,26 @@ async function createWindow() {
   // UI also needs to load if USB is unplugged
   connectUsb(mainWindow);
 
-  /* mouseEvents.on("mouseup", event => {
-    //console.log(event); // { x: 2962, y: 483, button: 1 }
-    //setMainLED()
+  mouseEvents.on("mouseup", event => {
+    if (event.button === 2) {
+      if (mouseState.down) {
+        console.log("Up")
+        mainWindow.webContents.send('update-mouse-up', event);
+        mouseState.down = false;
+      }
+    }
   });
   
   mouseEvents.on("mousedown", event => {
     //console.log(event); // { x: 2962, y: 483, button: 1 }
-  });  */
+    if (event.button === 2) {
+      if (!mouseState.down) {
+        console.log("Down")
+        mainWindow.webContents.send('update-mouse-down', event);
+        mouseState.down = true;
+      }
+    }
+  });
   
   
   // and load the index.html of the app.
@@ -111,11 +127,20 @@ async function createWindow() {
   tray = createTray();
 
   // Emitted when the window is closed.
+  mainWindow.on('close', function (e) {
+    if (!app.isQuitting) {
+      // just hide the app, don't close it
+      e.preventDefault();
+      mainWindow.setSkipTaskbar(true);
+      mainWindow.hide();
+    }
+  });
+  
   mainWindow.on('closed', function () {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element
-    mainWindow = null
+      mainWindow = null
   })
 
   mainWindow.on('minimize', function (event) {
@@ -192,9 +217,13 @@ electron.ipcMain.on('get-default-colors', async (event) => {
   }
 });
 
-electron.ipcMain.on('set-default-color', async (event, color) => {
-  //setColor(color.red, color.green, color.blue, true);
-  //event.returnValue = 'okay';
+electron.ipcMain.on('set-default-colors', async (event, colors) => {
+  try {
+    const result = await setDefaultColors(colors);
+    event.returnValue = result;
+  } catch(err) {
+    event.returnValue = err;
+  }
 });
 
 /*electron.ipcMain.on('get-gg-state', async (event) => {
