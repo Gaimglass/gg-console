@@ -30,6 +30,10 @@ var mouseState = {
   down: false
 }
 
+// https://www.electronforge.io/config/makers/squirrel.windows
+// run this as early in the main process as possible
+if (require('electron-squirrel-startup')) app.quit();
+
 
 //const appIcon = new electron.Tray('./assets/gg_icon.png')
 
