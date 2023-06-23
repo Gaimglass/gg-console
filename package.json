@@ -6,7 +6,7 @@
   "description": "Desktop application for the Gaimglass 2",
   "scripts": {
     "react": "react-scripts start",
-    "build": "react-scripts build",
+    "build:react": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron": "electron .",
@@ -15,7 +15,9 @@
     "postinstall": "./node_modules/.bin/electron-rebuild",
     "start": "electron-forge start",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "start:ow": "ow-electron .",
+    "build:ow-electron": "ow-electron-builder --publish=never"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.7.1",
@@ -45,6 +47,8 @@
     "@electron-forge/maker-squirrel": "^6.2.1",
     "@electron-forge/maker-zip": "^6.2.1",
     "@electron-forge/plugin-auto-unpack-natives": "^6.2.1",
+    "@overwolf/ow-electron": "^22.3.3",
+    "@overwolf/ow-electron-builder": "^23.6.0",
     "electron": "^19.0.8",
     "electron-rebuild": "^3.2.8"
   },
@@ -67,5 +71,9 @@
       "last 1 safari version"
     ]
   },
-  "homepage": "./"
+  "homepage": "./",
+  "build": {
+    "extends": null,
+    "appId": "gaimglass"
+  }
 }
