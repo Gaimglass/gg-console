@@ -1,6 +1,17 @@
 const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
+const {startExpress} = require('../express');
+//const { fork } = require("child_process");
+
+
+/* let ps;
+//...
+ps = fork(`${__dirname}/../express/index.js`, [], {
+  cwd: `${__dirname}/../express`,
+}); */
+
+
 
 //yarn add global-mouse-events --save
 const mouseEvents = require("global-mouse-events");
@@ -102,6 +113,8 @@ if (!gotTheLock) {
 }
 
 async function createWindow() {
+  
+
   const isMac = process.platform === 'darwin';
   // Create the browser window.
   mainWindow = new BrowserWindow({
@@ -127,12 +140,17 @@ async function createWindow() {
   //const appIcon = new electron.Tray('./assets/gg_icon.png')
   
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  mainWindow.on("ready-to-show", () => {
+    mainWindow.webContents.openDevTools();
+  });
+  
+  
 
   
   // TODO remove the await and allow the UI to load before port is ready, this is buggy at present.
   // UI also needs to load if USB is unplugged
   connectUsb(mainWindow);
+  startExpress(mainWindow);
 
   mouseEvents.on("mouseup", event => {
     if (event.button === 2) {
@@ -192,6 +210,7 @@ async function createWindow() {
   mainWindow.on('restore', function (event) {
     //
   });
+
 }
 
 
@@ -293,5 +312,3 @@ electron.ipcMain.on('window-close', async (event) => {
 });
 
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

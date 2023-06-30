@@ -57,6 +57,10 @@ function App() {
       parseDefaultColors(message);
     });
 
+    ipcRenderer.on('update-send-test-ow-event', function (evt, message) {
+      console.log("TEST!", message)
+    });
+
     /* // mouse 2 events
     ipcRenderer.on('update-mouse-down', function (evt, message) {
       setAdsActive(true);
