@@ -3,6 +3,7 @@ const usb = require('usb');
 const Store = require('electron-store');
 const {startExpress} = require('../express');
 //const { fork } = require("child_process");
+const find = require('find-process');
 
 
 /* let ps;
@@ -10,6 +11,20 @@ const {startExpress} = require('../express');
 ps = fork(`${__dirname}/../express/index.js`, [], {
   cwd: `${__dirname}/../express`,
 }); */
+
+async function foo() {
+const processesList = await find('name', /overwolf.exe/i, false)
+console.log(">>>>>>>>>>>>>>>>>>>>>>\\n\n",{ processesList });
+
+if (processesList.length === 0) {
+   /**
+    * No process
+    * (create it)
+    */
+   // ......
+}
+}
+foo();
 
 
 

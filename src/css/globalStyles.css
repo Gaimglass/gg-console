@@ -77,6 +77,34 @@ button:active {
   box-shadow: none;
 }
 
+.react-colorful__alpha.react-colorful__last-control {
+  color: red;
+  width: 100%;
+  top: 5em;
+  border-radius: 15px;
+}
+
+.react-colorful__hue {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.react-colorful__alpha-gradient {
+  
+  background-image: linear-gradient(90deg, rgba(0, 0, 0, 0.6), rgb(255, 255, 255))!important; 
+  
+}
+
+.react-colorful__alpha .react-colorful__pointer-fill {
+  background-color: #222!important;
+}
+
+
+.hideAlpha .react-colorful__alpha {
+  /* visibility: hidden; */
+}
+
+
 a {
   text-decoration: none;
   color: #7ab4ff;

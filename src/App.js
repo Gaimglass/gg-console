@@ -401,9 +401,14 @@ function App() {
             </div>
             
             <RgbaColorPicker
+              className={classNames({
+                'hideAlpha': !!editSwatch
+              })}
               color={color}
               onChange={ throttle(handleColorChange, 50) }
             ></RgbaColorPicker>
+
+            
             <div className={styles.rgbInputs}>
                 <label>R</label><input key={'red_' + inputColorKey.r} onChange={(e)=>(changeRgb(e, 'r'))} defaultValue={color.r} type="text"></input>
                 <label>G</label><input key={'green_' + inputColorKey.g} onChange={(e)=>(changeRgb(e, 'g'))} defaultValue={color.g} type="text"></input>
