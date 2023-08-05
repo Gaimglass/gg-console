@@ -289,6 +289,10 @@ function setDefaultColors(colors) {
     `${color.b}`.padStart(3, 0) +
     `${enabled}`)
   })
+  for (let i = defaultColor.length; i < 8; i++) {
+    // send disabled colors to fill buffer
+    defaultColorStrs.push(`000`+`000`+`000`+`0`)
+  }
   const commandStr = defaultColorStrs.join(',')
   console.log(commandStr);
   return writeCommand(SET_DEFAULT_LEDS, commandStr);

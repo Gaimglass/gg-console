@@ -1,0 +1,26 @@
+.confirmWrapper {
+  position: fixed;
+  width: 100%;
+  display: block;
+  bottom: 0;
+  left: 0;
+  flex-direction: row;
+  display: blocvk;
+  text-align: center;
+}
+.confirm {
+  background-color: black;
+  padding: 0.5em;
+}
+
+.confirm button {
+  margin-left: 1em; 
+  width: 10em;
+}
+
+.reset {
+
+}
+.delete {
+  background-color: rgb(122 37 37);
+}

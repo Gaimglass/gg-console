@@ -31,7 +31,7 @@ function App() {
   const [ledOn, setLEDOn] = useState(true);
   const [isMaximized, setMaximized] = useState(false);
   const [isMac, setMac] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true); // FORCE true if not using device
   const [editSwatch, setEditSwatch] = useState(null);
 
   const [inputColorKey, setInputColorKey] = useState({});
@@ -96,9 +96,8 @@ function App() {
     }
   }, [adsActive, ledOn])
   
-  function initialDefaults() {
-    const defaults = [];
-    const initialDefaultColors = [
+  function createDefaultColors() {
+    return [
       {r:0,g:255, b:0},
       {r:255, g:240, b:0}, 
       {r:255, g:110, b:0}, 
@@ -108,6 +107,11 @@ function App() {
       {r:100, g:180, b:255}, 
       {r:0, g:255, b:100}, 
     ];
+  }
+
+  function initialDefaults() {
+    const defaults = [];
+    const initialDefaultColors = createDefaultColors();
     for (let i = 0; i < 8;i++) {
       defaults.push({
         color: initialDefaultColors[i],
@@ -185,6 +189,36 @@ function App() {
     //sendDefaultColors();
   }
   
+  function handleDeleteDefaultColor() {
+    const dc = [...defaultColors];
+    dc.splice(editSwatch, 1);
+    setDefaultColors(dc);
+  }
+
+  function handleAddDefaultColor() {
+    if(defaultColors.length < 8) {
+      const initialDefaultColors = createDefaultColors();
+      const dc = [...defaultColors,
+        {
+          color: initialDefaultColors[defaultColors.length],
+          enabled: true
+        }];
+      setDefaultColors(dc);
+    }
+  }
+
+  function handleResetDefaultColor() {
+    const initialDefaultColors = createDefaultColors();
+    const c = {
+      color: {r: initialDefaultColors[editSwatch].r, g: initialDefaultColors[editSwatch].g, b: initialDefaultColors[editSwatch].b},
+      enabled: true
+    }
+    const dc = [...defaultColors];
+    dc[editSwatch] = c;
+    console.log(dc)
+    setDefaultColors(dc);
+  }
+
 
 
   function handleColorChange(_newColor, defaultIndex = -1,) {
@@ -204,7 +238,7 @@ function App() {
       // button on the device start from where this default color is.
       sendDefaultIndex(defaultIndex); 
     }
-    console.log({editSwatch})
+
     setInputColorKey(newColor);
      
     if (editSwatch !== null) {
@@ -215,7 +249,6 @@ function App() {
       }
       const dc = [...defaultColors];
       dc[editSwatch] = c;
-      console.log(dc)
       setDefaultColors(dc);
     }
     
@@ -324,8 +357,19 @@ function App() {
       [colorComponent]: newColorComponent
     }
     setColor(c);
+    setLEDOn(true);
+    sendMainLEDStatus(c, true);
     if(updateKey) {
       e.target.value = newColorComponent
+    }
+    if (editSwatch !== null) {
+      // when editing a default color, update that color in real time
+      const dc = [...defaultColors];
+      dc[editSwatch] = {
+        color: {...c},
+        enabled: true
+      };
+      setDefaultColors(dc);
     }
   }
   function changeAlpha(e) {
@@ -348,6 +392,8 @@ function App() {
       a: newColorComponent
     }
     setColor(c);
+    setLEDOn(true);
+    sendMainLEDStatus(c, true);
     if(updateKey) {
       e.target.value = newColorComponent;
     }
@@ -416,6 +462,9 @@ function App() {
               editSwatch={editSwatch}
               onSaveDefaultColor={handleSaveDefaultColor}
               onRestoreDefaults={handelRestoreDefaults}
+              onDeleteDefaultColor={handleDeleteDefaultColor}
+              onAddDefaultColor={handleAddDefaultColor}
+              onResetDefaultColor={handleResetDefaultColor}
             ></DefaultColors>
           </div>
           <div className={styles.restoreDefaults}> 

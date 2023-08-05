@@ -103,6 +103,35 @@ editing default swatch
 Each swatch has an edit icon, clicking this establishes a link (curved line) to color picker. Changing the color sets the active LED color and adjusts swatch color too. Two button appear in place of the edit icon. Save and Cancel. Save completes the edit and pushes state to LED and EPROM. Cancel reverts the color to previous and nothing saved to EPROM.
 
 
+============
+themes
+
+
+fixed color
+
+kill streak
+    0 - []        Game: not connected 
+    2 - []        Current streak: 0
+    3 - []  
+    3 - []
+    5 - []
+    8 - []
+    13 - [] 
+    [+] 
+
+frag speed  
+    start 
+      H S
+    maxRate
+      8 per min
+
+weapon color
+
+    Game [auto complete / drop down]
+        weapon1: 
+        weapon2: ....
+
+===========
 
 GG pro
 GG pro long
