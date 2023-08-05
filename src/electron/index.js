@@ -3,7 +3,15 @@ const usb = require('usb');
 const Store = require('electron-store');
 
 //yarn add global-mouse-events --save
-const mouseEvents = require("global-mouse-events");
+console.log("mouse")
+try {
+  const mouseEvents = require("global-mouse-events");
+} catch (e) {
+  // Mac
+  mouseEvents = {
+    on: ()=>{} // stub
+  }
+}
 
 
 const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, disconnectUsb, serialDisconnected } = require('./usb');
@@ -166,7 +174,9 @@ async function createWindow() {
   mainWindow.loadURL(startUrl);
 
   // create the try in Windows
-  tray = createTray();
+  if (process.platform !== 'darwin') {
+    tray = createTray();
+  }
 
   // Emitted when the window is closed.
   mainWindow.on('close', function (e) {
