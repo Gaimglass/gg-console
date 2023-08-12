@@ -1,12 +1,11 @@
 .swatch {
   color: red;
   width: 30px;
-  /* height: 50px; */
+  height: 30px;
   cursor: pointer;
-  height: 100%;
   margin-right: 1em;
   border: 1px solid white;
-  box-shadow: 0 0 15px 0 #00000070;
+  box-shadow: 0 0 15px 0 #00000170;
   border-radius: 0.25em;
 
 }
@@ -22,24 +21,24 @@
 
 .editIcon {
   /* fill: white; */
+  width: 0.75em;
 }
 
 .button {
-  width: 2em;
-  height: 2em;  
+  width: auto;
+  height: auto;
   background-color: #222;
   border: 1px solid black;
   box-shadow: 0 0 15px 0 #00000070;
   border-radius: 0.25em;
   margin-right: 0.5em;
-  padding: 0.5em;
+  padding: 0.2em 0.4em ;
 }
 
 .button:hover {
   cursor: pointer;
 }
 .editButton {
-  
   border-bottom-color: aqua;
 }
 
@@ -74,7 +73,7 @@
   grid-template-rows: repeat(8, 1fr);
   height: 100%;
   grid-gap: 6px;
-  width: 145px;
+  width: 6em;
 }
 
 .plusIcon {
@@ -90,4 +89,5 @@
   width: 30px;
   height: 30px;
   padding: 0;
+  border: 1px solid black;
 }

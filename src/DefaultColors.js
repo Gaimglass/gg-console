@@ -125,23 +125,18 @@ function DefaultColors(props) {
           opacity: disabledSwatch ? 0.2 : 1
         }} 
         onClick={()=>{
-          //changeColor(i);}
-          if (props.editSwatch !== i) {
-            edit(i)
-          } else {
-            save();
-          }
+          changeColor(i);
         }} key={i} ref={el => swatchRefs.current[i] = el} 
         className={classNames({
           [styles.swatch]: true,
           [styles.swatchEdit]: editingSwatch
         })}>
       </div>
-        {/* { (props.editSwatch !== i) &&
+        { (props.editSwatch !== i) &&
           <button onClick={()=>{
             edit(i);
           }} className={styles.button + ' ' + styles.editButton}><Edit className={styles.editIcon}></Edit></button>
-        } */}
+        }
         { (props.editSwatch == i) &&
           <>
           <button onClick={()=>{save(i)}} className={styles.button  + ' ' +  styles.checkButton}><Check className={styles.editIcon}></Check></button>

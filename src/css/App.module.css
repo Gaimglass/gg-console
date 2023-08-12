@@ -93,6 +93,8 @@
   background-color: #222;
   width: 100%;
   color: #888;
+  border: 1px solid black;
+  border-radius: 8px;
   
 }
 
@@ -136,14 +138,4 @@
   padding: 0.5em;
   color: #ccc;
   font-size: 1.1em;
-}
-
-.restoreDefaults {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.restoreDefaults button {
-  margin-bottom: 1em;
 }

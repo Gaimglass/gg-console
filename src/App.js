@@ -183,11 +183,6 @@ function App() {
     // send to device
     sendDefaultColors();
   }
-
-  function handelRestoreDefaults() {
-    initialDefaults();
-    //sendDefaultColors();
-  }
   
   function handleDeleteDefaultColor() {
     const dc = [...defaultColors];
@@ -197,13 +192,19 @@ function App() {
 
   function handleAddDefaultColor() {
     if(defaultColors.length < 8) {
-      const initialDefaultColors = createDefaultColors();
+      //const initialDefaultColors = createDefaultColors();
+      const c = {r:0, b: 0, g: 0};
       const dc = [...defaultColors,
         {
-          color: initialDefaultColors[defaultColors.length],
+          color: c,/* initialDefaultColors[defaultColors.length], */
           enabled: true
         }];
       setDefaultColors(dc);
+      handleColorChange(c, dc.length-1)
+     
+      //setInputColorKey({...c});
+      setEditSwatch(dc.length-1);
+      //setColor({...c});
     }
   }
 
@@ -461,17 +462,11 @@ function App() {
               onSetEditSwatch={handleEditSwatch}
               editSwatch={editSwatch}
               onSaveDefaultColor={handleSaveDefaultColor}
-              onRestoreDefaults={handelRestoreDefaults}
               onDeleteDefaultColor={handleDeleteDefaultColor}
               onAddDefaultColor={handleAddDefaultColor}
               onResetDefaultColor={handleResetDefaultColor}
             ></DefaultColors>
           </div>
-          <div className={styles.restoreDefaults}> 
-            <button onClick={handelRestoreDefaults}>Restore Defaults</button>
-            <a href="">Get Support</a>
-          </div>
-
         </div>
       }
       { !isConnected &&
