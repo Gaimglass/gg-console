@@ -2,15 +2,15 @@ const electron = require('electron');
 const usb = require('usb');
 const Store = require('electron-store');
 
-//yarn add global-mouse-events --save
-console.log("mouse")
+let mouseEvents = {
+  on: ()=>{} // stub
+}
+
 try {
-  const mouseEvents = require("global-mouse-events");
+  const globalMouseEvents = require("global-mouse-events");
+  mouseEvents = globalMouseEvents;
 } catch (e) {
   // Mac
-  mouseEvents = {
-    on: ()=>{} // stub
-  }
 }
 
 
