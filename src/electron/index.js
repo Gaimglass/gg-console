@@ -14,7 +14,7 @@ try {
 }
 
 
-const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, disconnectUsb, serialDisconnected } = require('./usb');
+const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, setComPort, disconnectUsb, serialDisconnected } = require('./usb');
 
 // Module to control application life.
 const app = electron.app;
@@ -231,6 +231,15 @@ electron.ipcMain.on('set-led-state', async (event, ledState) => {
 electron.ipcMain.on('set-default-index', async (event, index) => {
   try {
     const result = await setDefaultIndex(index);
+    event.returnValue = result;
+  } catch(err) {
+    event.returnValue = err;
+  }
+});
+
+electron.ipcMain.on('set-port', async (event, port) => {
+  try {
+    const result = await setComPort(port);
     event.returnValue = result;
   } catch(err) {
     event.returnValue = err;

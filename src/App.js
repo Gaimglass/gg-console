@@ -31,11 +31,15 @@ function App() {
   const [ledOn, setLEDOn] = useState(true);
   const [isMaximized, setMaximized] = useState(false);
   const [isMac, setMac] = useState(false);
-  const [isConnected, setIsConnected] = useState(true); // FORCE true if not using device
+  const [isConnected, setIsConnected] = useState(false); 
   const [editSwatch, setEditSwatch] = useState(null);
 
   const [inputColorKey, setInputColorKey] = useState({});
   const [adsActive, setAdsActive] = useState(false);
+
+  // prototype feature only
+  const  [port, setPort] =  useState(null);
+  const  [portPaths, setPortPaths] =  useState([]);
 
  
 
@@ -56,6 +60,13 @@ function App() {
     ipcRenderer.on('update-default-colors-from-gg', function (evt, message) {
       parseDefaultColors(message);
     });
+
+    // For debug COM ports only!
+    ipcRenderer.on('update-port-paths', function (evt, ports) {
+      setPortPaths([...ports]);
+    });
+
+    
 
     /* // mouse 2 events
     ipcRenderer.on('update-mouse-down', function (evt, message) {
@@ -95,6 +106,7 @@ function App() {
       sendMainLEDStatus(color, !adsActive);
     }
   }, [adsActive, ledOn])
+
   
   function createDefaultColors() {
     return [
@@ -147,6 +159,10 @@ function App() {
   function sendDefaultIndex(index) {
     getMessageResult(ipcRenderer.sendSync('set-default-index', index));
   } 
+
+  function sendPort(event) {
+    getMessageResult(ipcRenderer.sendSync('set-port', event.target.value));
+  }
 
   function sendMainLEDStatus(color, ledOn) {
     getMessageResult(ipcRenderer.sendSync('set-led-state', {
@@ -331,7 +347,6 @@ function App() {
     })); */
   }
 
-  
   async function loadDefaultColorsFromGG() { 
     console.log("loadDefaultColorsFromGG")
     await getMessageResult(ipcRenderer.sendSync('get-default-colors'), (result)=>{
@@ -373,6 +388,7 @@ function App() {
       setDefaultColors(dc);
     }
   }
+
   function changeAlpha(e) {
     const rawString = e.target.value.trim();
     let updateKey = false; // force an update on the input field too
@@ -470,7 +486,17 @@ function App() {
         </div>
       }
       { !isConnected &&
-        <div className={styles.disconnected}><span>Gaimglass not connected.</span></div>
+        <div className={styles.disconnected}><span>Gaimglass not connected.</span>
+          <select name="port" onChange={sendPort}>
+            <option disabled selected value> -- Select COM port -- </option>
+            {
+
+              portPaths.map(port=>{
+                return <option value={port.path}>{port.friendlyName}</option>
+              })
+            }
+          </select>
+        </div>
       }
     </div>
   );

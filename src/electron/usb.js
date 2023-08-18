@@ -31,6 +31,7 @@ const serialMessageResults = {
 
 
 let port = null;
+let portOverride = null; // for debug only
 let parser = null;
 
 // Hack to delay sending data until the arduino is ready. When connecting
@@ -44,12 +45,17 @@ async function initializeUsb(mainWindow) {
   const ports =  await SerialPort.list();
   let path = '';
 
+  // for debug mode only to manually select a port
+  mainWindow.webContents.send('update-port-paths', ports);
+  // 
+
   ports.forEach((portCandidate, index) => {
      // console.log(portCandidate);
     // Mac and Windows have difference casing, because of course they do, sigh.
     const productId = portCandidate.productId?.toLowerCase();
     const vendorId = portCandidate.vendorId?.toLowerCase();
-    if (
+    //console.log(portCandidate);
+    /*if (
       // Arduino Metro Uno
       (vendorId === "10c4" && productId === "ea60") ||
       // Arduino Leonardo
@@ -57,20 +63,32 @@ async function initializeUsb(mainWindow) {
     // Aux Serial USB, TX, RX (only), this won't force reset when connecting
     //if (portCandidate.vendorId === "10C4" && portCandidate.productId === "EA60" && portCandidate.serialNumber === "0001") {
       path = portCandidate.path;
+    }*/
+    if (portOverride) {
+      if (portOverride.toLowerCase() === portCandidate.path.toLocaleLowerCase()) {
+         path = portCandidate.path;
+      }
     }
   })
 
   if (path) {
-    
+  
     port = new SerialPort({
       path,
       baudRate: 115200,
+    })
+
+    port.on('error', (e) => {
+      console.log("Port error", e);
+      disconnectUsb();
+      connectUsb(mainWindow);
     })
 
     // todo, is this \n or \r\n ?
     parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
     parser.on('data', data => {
+      
       const parts = data.split(':');
       const messageId = parts[0].padStart(3,0);
       const ggResponse = parts[1];
@@ -152,6 +170,7 @@ function disconnectUsb() {
   if (port) {
     port.close(function (err) {
       port = null;
+      portOverride = null;
     }, {reconnect: false});
   }
 }
@@ -264,7 +283,10 @@ function setMainLED(color, brightness, ledOn) {
     return writeCommand(SET_MAIN_LED, commandStr);
 }
 
-
+// debug mode to select a port manually
+function setComPort(override) {
+  portOverride = override;
+}
 
 function setDefaultIndex(index) {
   const q = index.toString().padStart(2);
@@ -289,12 +311,13 @@ function setDefaultColors(colors) {
     `${color.b}`.padStart(3, 0) +
     `${enabled}`)
   })
+
   for (let i = defaultColor.length; i < 8; i++) {
     // send disabled colors to fill buffer
     defaultColorStrs.push(`000`+`000`+`000`+`0`)
   }
   const commandStr = defaultColorStrs.join(',')
-  console.log(commandStr);
+  console.log(".....", commandStr);
   return writeCommand(SET_DEFAULT_LEDS, commandStr);
 }
 
@@ -323,4 +346,7 @@ module.exports = {
   setDefaultColors,
   setAuxLED,
   setDefaultIndex,
+
+  // debug helper
+  setComPort,
 }
