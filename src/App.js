@@ -78,10 +78,7 @@ function App() {
     }); */
 
     ipcRenderer.on('update-mouse-up', function (evt, message) {
-      console.log("COLOR!", color.r)
-      console.log("up", message, {adsActive})
       if (adsActive && message.button === 2) {
-        console.log("Light on")
         setAdsActive(false);
         
         sendMainLEDStatus(color, true);
@@ -105,8 +102,7 @@ function App() {
     if (ledOn) {
       sendMainLEDStatus(color, !adsActive);
     }
-  }, [adsActive, ledOn])
-
+  }, [adsActive, ledOn]);
   
   function createDefaultColors() {
     return [
@@ -144,7 +140,6 @@ function App() {
             // ensures the last one always proceeds
             latestFunc.apply(this, args);
             latestFunc = undefined;
-            console.log("apply LAST!");
           }
         }, timeout);
       } else {
@@ -172,9 +167,14 @@ function App() {
     }));
   }
 
-  function sendDefaultColors() {
-    ipcRenderer.sendSync('set-default-colors', 
-    defaultColors) 
+  function sendDefaultColors(dc) {
+    if (dc) {
+      // this condition is preferred over useEffect so we have more control over writing to EPROM
+      // because the defaultColors should not map 1:1 with EPROM
+      ipcRenderer.sendSync('set-default-colors', dc) 
+    } else {
+      ipcRenderer.sendSync('set-default-colors', defaultColors) 
+    }
   }
 
 
@@ -204,6 +204,7 @@ function App() {
     const dc = [...defaultColors];
     dc.splice(editSwatch, 1);
     setDefaultColors(dc);
+    sendDefaultColors(dc);
   }
 
   function handleAddDefaultColor() {
@@ -216,11 +217,9 @@ function App() {
           enabled: true
         }];
       setDefaultColors(dc);
+      sendDefaultColors(dc);
       handleColorChange(c, dc.length-1)
-     
-      //setInputColorKey({...c});
       setEditSwatch(dc.length-1);
-      //setColor({...c});
     }
   }
 
@@ -232,8 +231,8 @@ function App() {
     }
     const dc = [...defaultColors];
     dc[editSwatch] = c;
-    console.log(dc)
     setDefaultColors(dc);
+    sendDefaultColors(dc);
   }
 
 
@@ -285,14 +284,18 @@ function App() {
       let [key, value] = v.split('=')
       if (key == 'color') {
         let [r,g,b,enabled] = value.split(',');
-        defaults.push({
-          color: {
-            r: Number(r), 
-            g: Number(g), 
-            b: Number(b)
-          },
-          enabled
-        });
+        const isEnabled = Boolean(parseInt(enabled));
+        // only add enabled colors
+        if (isEnabled) {
+          defaults.push({
+            color: {
+              r: Number(r), 
+              g: Number(g), 
+              b: Number(b)
+            },
+            enabled: true
+          });
+        }
       } else if (key == 'index') {
         index = Number(value);
       }
@@ -300,12 +303,9 @@ function App() {
     }
     setDefaultColors(defaults);
     setDefaultColorIndex(index);
-
-    console.log("DEFAULT", message); // Returns: {'SAVED': 'File Saved'}
   }
 
   function parseMainLedFromGG(message) { 
-    console.log("parseMainLedFromGG", message);
     const params = message.split('&');
     let c = {};
     let led;
@@ -348,7 +348,6 @@ function App() {
   }
 
   async function loadDefaultColorsFromGG() { 
-    console.log("loadDefaultColorsFromGG")
     await getMessageResult(ipcRenderer.sendSync('get-default-colors'), (result)=>{
       parseDefaultColors(result);
       setIsConnected(true);
@@ -487,12 +486,12 @@ function App() {
       }
       { !isConnected &&
         <div className={styles.disconnected}><span>Gaimglass not connected.</span>
-          <select name="port" onChange={sendPort}>
-            <option disabled selected value> -- Select COM port -- </option>
+          <select defaultValue="default" name="port" onChange={sendPort}>
+            <option disabled value="default"> -- Select COM port -- </option>
             {
 
               portPaths.map(port=>{
-                return <option value={port.path}>{port.friendlyName}</option>
+                return <option key={port.path} value={port.path}>{port.friendlyName}</option>
               })
             }
           </select>
