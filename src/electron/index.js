@@ -145,7 +145,6 @@ async function createWindow() {
   mouseEvents.on("mouseup", event => {
     if (event.button === 2) {
       if (mouseState.down) {
-        console.log("Up")
         mainWindow.webContents.send('update-mouse-up', event);
         mouseState.down = false;
       }
@@ -156,7 +155,6 @@ async function createWindow() {
     //console.log(event); // { x: 2962, y: 483, button: 1 }
     if (event.button === 2) {
       if (!mouseState.down) {
-        console.log("Down")
         mainWindow.webContents.send('update-mouse-down', event);
         mouseState.down = true;
       }

@@ -92,7 +92,6 @@ async function initializeUsb(mainWindow) {
       const parts = data.split(':');
       const messageId = parts[0].padStart(3,0);
       const ggResponse = parts[1];
-      //console.log({ggResponse});
       console.log("Gaimglass:", data);
       
       if (serialMessageResults[messageId]) {
@@ -158,7 +157,6 @@ function connectUsb(mainWindow) {
     const intervalID  = setInterval(async () => {
       const isConnected = await initializeUsb(mainWindow);
       if (isConnected) {
-        console.log("clear Interval");
         clearInterval(intervalID);
         resolve();
       }
@@ -172,70 +170,6 @@ function disconnectUsb() {
       port = null;
       portOverride = null;
     }, {reconnect: false});
-  }
-}
-
-
-/**
- * @deprecated
- */
-function _setColor(red, green, blue, makeDefault=false) {
-  if (port) {
-    if (red < 0) {
-      red = 0;
-    } else if(red > 255) {
-      red = 255;
-    }
-    if (blue < 0) {
-      blue = 0;
-    } else if(blue > 255) {
-      blue = 255;
-    }
-    if (green < 0) {
-      green = 0;
-    } else if(green > 255) {
-      green = 255;
-    }
-
-    // scale values, use non-linear mapping to simulate more realistic c olor dim levels
-
-    // a higher value means more accurate dim colors, but not as bright
-    const rExponent = 2.4;
-    const gExponent = 2;
-    const bExponent = 2.6; 
-    /*const rExponent = 1;
-    const gExponent = 1;
-    const bExponent = 1;*/
-    
-    const rScale = 255/(Math.pow(255, rExponent)/255);
-    const gScale = 255/(Math.pow(255, gExponent)/255);
-    const bScale = 255/(Math.pow(255, bExponent)/255);
-    
-    red = Math.round(Math.pow(red,rExponent)/255 * rScale);
-    green = Math.round(Math.pow(green,gExponent)/255 * gScale);
-    blue = Math.round(Math.pow(blue,bExponent)/255 * bScale);
-
-   let command;
-   if (makeDefault) {
-     command = String.fromCharCode(WRITE_DEFAULT_LED_COLOR);
-   } else {
-     console.log("SET_MAIN_LED_COLOR");
-     command = String.fromCharCode(SET_MAIN_LED_COLOR);
-   }
-
-    const sRed = `${red}`.padStart(3, 0)
-    const sGreen = `${green}`.padStart(3, 0)
-    const sBlue = `${blue}`.padStart(3, 0)
-    
-    console.log(`${command}${sRed}${sGreen}${sBlue}\n`);
-    try {
-      port.write(`${command}${sRed}${sGreen}${sBlue}\n`);
-    }catch(e) {
-      console.log("e",e);
-    }
-  }
-  else {
-    throw new Error("USB port not initialized");
   }
 }
 
@@ -262,7 +196,7 @@ function _setColor(red, green, blue, makeDefault=false) {
       resolve,
       reject
     }
-    console.log(">>>write command", command, commandStr);
+    console.log(">>> Write Command:", command, commandStr);
     port.write(`${command}${commandStr}\n`);
   });
 
@@ -273,7 +207,6 @@ function _setColor(red, green, blue, makeDefault=false) {
 // Commands
 
 function setMainLED(color, brightness, ledOn) {  
-  console.log(`${brightness}`)
   const commandStr = 
     `${color.r}`.padStart(3, 0) + 
     `${color.g}`.padStart(3, 0) +
@@ -289,8 +222,6 @@ function setComPort(override) {
 }
 
 function setDefaultIndex(index) {
-  const q = index.toString().padStart(2);
-  console.log(index, index.toString())
   return writeCommand(SET_DEFAULT_INDEX, index.toString().padStart(2));
 }
 
@@ -311,13 +242,11 @@ function setDefaultColors(colors) {
     `${color.b}`.padStart(3, 0) +
     `${enabled}`)
   })
-
-  for (let i = defaultColor.length; i < 8; i++) {
+  for (let i = defaultColorStrs.length; i < 8; i++) {
     // send disabled colors to fill buffer
     defaultColorStrs.push(`000`+`000`+`000`+`0`)
   }
-  const commandStr = defaultColorStrs.join(',')
-  console.log(".....", commandStr);
+    const commandStr = defaultColorStrs.join(',')
   return writeCommand(SET_DEFAULT_LEDS, commandStr);
 }
 
