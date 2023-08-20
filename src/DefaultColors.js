@@ -98,7 +98,6 @@ function DefaultColors(props) {
     props.onSetEditSwatch(null);
   }
 
-  
   const showPlus = props.editSwatch === null && props.colors.length < 8
   const Swatches = []
 
@@ -158,9 +157,9 @@ function DefaultColors(props) {
       <div className={styles.swatches}> 
         {Swatches}
         
-          <buton onClick={props.onAddDefaultColor} style={{
+          <button onClick={props.onAddDefaultColor} style={{
             visibility: showPlus ? 'visible' : 'hidden' 
-          }}className={styles.button  + ' ' +  styles.addButton}><Plus className={styles.plusIcon}></Plus></buton>
+          }}className={styles.button  + ' ' +  styles.addButton}><Plus className={styles.plusIcon}></Plus></button>
         
       </div>
       { (props.editSwatch !== null) &&
