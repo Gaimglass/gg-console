@@ -14,7 +14,7 @@ try {
 }
 
 
-const { connectUsb, setColor, waitForSerial, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, setComPort, disconnectUsb, serialDisconnected } = require('./usb');
+const { connectUsb, setColor, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, disconnectUsb, serialDisconnected } = require('./usb');
 
 // Module to control application life.
 const app = electron.app;
@@ -110,6 +110,7 @@ if (!gotTheLock) {
 }
 
 async function createWindow() {
+  
   const isMac = process.platform === 'darwin';
   // Create the browser window.
   mainWindow = new BrowserWindow({
@@ -121,6 +122,7 @@ async function createWindow() {
     /* minHeight:600,
     minWidth:700, */
     maximizable: false, // BUG: F11 still works for some reason
+    fullscreenable: false,
     resizable: false,
     backgroundColor: '#282c34',
     titleBarStyle: 'hidden',
@@ -229,15 +231,6 @@ electron.ipcMain.on('set-led-state', async (event, ledState) => {
 electron.ipcMain.on('set-default-index', async (event, index) => {
   try {
     const result = await setDefaultIndex(index);
-    event.returnValue = result;
-  } catch(err) {
-    event.returnValue = err;
-  }
-});
-
-electron.ipcMain.on('set-port', async (event, port) => {
-  try {
-    const result = await setComPort(port);
     event.returnValue = result;
   } catch(err) {
     event.returnValue = err;

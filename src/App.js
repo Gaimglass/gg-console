@@ -37,11 +37,6 @@ function App() {
   const [inputColorKey, setInputColorKey] = useState({});
   const [adsActive, setAdsActive] = useState(false);
 
-  // prototype feature only
-  const  [port, setPort] =  useState(null);
-  const  [portPaths, setPortPaths] =  useState([]);
-
- 
 
   useEffect(()=>{
     ipcRenderer.sendSync('get-app-state'); // non-blocking
@@ -61,12 +56,6 @@ function App() {
       parseDefaultColors(message);
     });
 
-    // For debug COM ports only!
-    ipcRenderer.on('update-port-paths', function (evt, ports) {
-      setPortPaths([...ports]);
-    });
-
-    
 
     /* // mouse 2 events
     ipcRenderer.on('update-mouse-down', function (evt, message) {
@@ -95,27 +84,49 @@ function App() {
       // todo, show a better disconnected UI
       setIsConnected(false);
     });
+
+    return ()=>{
+      ipcRenderer.removeAllListeners();
+    }
+    
   }, [])
   
 
   useEffect(()=>{
-    if (ledOn) {
+    
+    if (ledOn && isConnected) {
       sendMainLEDStatus(color, !adsActive);
     }
   }, [adsActive, ledOn]);
   
   function createDefaultColors() {
     return [
-      {r:0,g:255, b:0},
-      {r:255, g:240, b:0}, 
-      {r:255, g:110, b:0}, 
-      {r:255, g:0, b:0}, 
-      {r:255, g:0, b:160}, 
-      {r:0, g:40, b:255}, 
-      {r:100, g:180, b:255}, 
-      {r:0, g:255, b:100}, 
+      {r:15,g:255, b:15},
+      {r:32,g:255, b:180},
+      {r:20,g:175, b:255},
+      {r:134,g:100, b:255},
+      {r:255,g:60, b:180},
+      {r:255,g:15, b:15},
+      {r:255,g:140, b:15},
+      {r:200,g:255, b:40},
     ];
   }
+  /*
+  255, 15, 15
+  255, 128, 15
+  200, 255, 40
+  15, 255, 15
+  32 255 180
+  20 175, 255
+  134, 100, 255
+  255 60, 180
+*/
+
+
+
+
+
+
 
   function initialDefaults() {
     const defaults = [];
@@ -155,9 +166,6 @@ function App() {
     getMessageResult(ipcRenderer.sendSync('set-default-index', index));
   } 
 
-  function sendPort(event) {
-    getMessageResult(ipcRenderer.sendSync('set-port', event.target.value));
-  }
 
   function sendMainLEDStatus(color, ledOn) {
     getMessageResult(ipcRenderer.sendSync('set-led-state', {
@@ -184,7 +192,6 @@ function App() {
       console.warn(result?.message);
     } else {
       // todo, update state with new values 
-      console.log("result:", result);
       if (cb) {
         cb(result);
       };
@@ -339,12 +346,9 @@ function App() {
   
 
   async function loadMainLedFromGG() { 
-    await getMessageResult(ipcRenderer.sendSync('get-led-state'), (result)=>{ 
+    await getMessageResult(ipcRenderer.sendSync('get-led-state'), (result) => {
       parseMainLedFromGG(result);
     });
-    /* await getMessageResult(ipcRenderer.sendSync('get-led-state', (result)=>{
-      debugger;
-    })); */
   }
 
   async function loadDefaultColorsFromGG() { 
@@ -419,7 +423,6 @@ function App() {
       e.target.value = ['0', ...e.target.value].splice(0).join('');      
     }
     if (e.target.value.length > 4) {
-      debugger
       e.target.value = [...e.target.value].splice(0,4).join('');  
     }
   }
@@ -485,17 +488,7 @@ function App() {
         </div>
       }
       { !isConnected &&
-        <div className={styles.disconnected}><span>Gaimglass not connected.</span>
-          <select defaultValue="default" name="port" onChange={sendPort}>
-            <option disabled value="default"> -- Select COM port -- </option>
-            {
-
-              portPaths.map(port=>{
-                return <option key={port.path} value={port.path}>{port.friendlyName}</option>
-              })
-            }
-          </select>
-        </div>
+        <div className={styles.disconnected}><span>Gaimglass connecting...</span></div>
       }
     </div>
   );
