@@ -45,6 +45,8 @@ let deviceInfo = {}
 // Connect to the serial port of the Arduino Uno USB device
 async function initializeUsb(mainWindow) {
   const ports =  await SerialPort.list();
+
+  // console.log(ports)
   
   let path = '';
 
@@ -66,16 +68,18 @@ async function initializeUsb(mainWindow) {
     })
 
     port.on('error', (e) => {
-      console.log("Port error", e);
-      disconnectUsb();
-      connectUsb(mainWindow);
+      nextPortCandidateIndex += 1;
+      setTimeout(()=>{
+        disconnectUsb();
+        connectUsb(mainWindow);
+      }, 300)
+      
     })
 
     // todo, is this \n or \r\n ?
     parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
     parser.on('data', data => {
-      
       const parts = data.split(':');
       const messageId = parts[0].padStart(3,0);
       const ggResponse = parts[1];
@@ -97,6 +101,7 @@ async function initializeUsb(mainWindow) {
         const [name, version] = result.split('&');
         deviceInfo.name = name.split('=')[1]
         deviceInfo.version = version.split('=')[1]
+        
         if (deviceInfo.name !== 'ggpro') {
           throw new Error("Invalid device name");
         }
