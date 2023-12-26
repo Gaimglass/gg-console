@@ -103,7 +103,7 @@ function App() {
     return [
       {r:15,g:255, b:15},
       {r:32,g:255, b:180},
-      {r:20,g:175, b:255},
+      {r:20,g:110, b:255}, 
       {r:134,g:100, b:255},
       {r:255,g:60, b:180},
       {r:255,g:15, b:15},
@@ -240,6 +240,9 @@ function App() {
     dc[editSwatch] = c;
     setDefaultColors(dc);
     sendDefaultColors(dc);
+    const newColor = {r: c.color.r, g: c.color.g, b: c.color.b, a: color.a};
+    setColor(newColor);
+    setInputColorKey(newColor)
   }
 
 
