@@ -136,8 +136,11 @@ async function createWindow() {
 
   //const appIcon = new electron.Tray('./assets/gg_icon.png')
   
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  
+  if (process.env.NODE_ENV === 'development') {
+    // Open the DevTools
+    mainWindow.webContents.openDevTools();
+  }
 
   
   // TODO remove the await and allow the UI to load before port is ready, this is buggy at present.
