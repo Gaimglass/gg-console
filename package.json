@@ -34,7 +34,7 @@
     "react-dom": "^18.0.2",
     "react-redux": "^7.2.6",
     "react-scripts": "5.0.1",
-    "serialport": "^10.0.4",
+    "serialport": "^12.0.0",
     "usb": "^2.9.0",
     "web-vitals": "^2.1.2"
   },
