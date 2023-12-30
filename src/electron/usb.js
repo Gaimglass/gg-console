@@ -46,7 +46,7 @@ let deviceInfo = {}
 async function initializeUsb(mainWindow) {
   const ports =  await SerialPort.list();
 
-  // console.log(ports)
+  
   
   let path = '';
 
@@ -55,9 +55,10 @@ async function initializeUsb(mainWindow) {
 
   // We don't know which device is the gaimglass, we try them in order
   // and keep track of a current index
-    if (nextPortCandidateIndex >= ports.length) {
+  if (nextPortCandidateIndex >= ports.length) {
     nextPortCandidateIndex = 0;
   }
+  console.log({nextPortCandidateIndex})
   path = ports[nextPortCandidateIndex]?.path;
   
 
@@ -68,9 +69,13 @@ async function initializeUsb(mainWindow) {
     })
 
     port.on('error', (e) => {
+      console.log("port error", e)
       nextPortCandidateIndex += 1;
       setTimeout(()=>{
-        disconnectUsb();
+        disconnectUsb({reconnect: false}); // TODO, I'm not convinced we need to call disconnect here? if
+        // This error happens when we have port we tried to connect to that is taken and won't allow connections. 
+        // Normally we would not call connectUsb followed by disconnectUsb, but because the nextPortCandidateIndex is different,
+        // we need to so we can connect to the next port candidate
         connectUsb(mainWindow);
       }, 300)
       
@@ -97,8 +102,11 @@ async function initializeUsb(mainWindow) {
     // Read the port data
     port.on("open", async () => {
       try {
+        console.log(1)
         const result = await getDeviceInfo();
+        console.log(2)
         const [name, version] = result.split('&');
+        console.log(3)
         deviceInfo.name = name.split('=')[1]
         deviceInfo.version = version.split('=')[1]
         
@@ -106,6 +114,8 @@ async function initializeUsb(mainWindow) {
           throw new Error("Invalid device name");
         }
       } catch(err) {
+        //console.log('Serial port write error', {err})
+        nextPortCandidateIndex += 1;
         disconnectUsb();
         return;
       }
@@ -114,13 +124,20 @@ async function initializeUsb(mainWindow) {
     });
 
     port.on("close", (options) => {
+      let mergedOptions = {
+        reconnect: true,
+        delay: 300,
+        ...options
+      }
+      //console.log('Serial port closed', mergedOptions)
       mainWindow.webContents.send('usb-disconnected');
       port = null;
-      nextPortCandidateIndex += 1;
-      setTimeout(()=>{
-        // alway try to re-connect after a short timeout
-        connectUsb(mainWindow);
-      }, 300);
+      //nextPortCandidateIndex += 1;
+      if (mergedOptions.reconnect) {
+        setTimeout(()=>{
+          connectUsb(mainWindow);
+        }, mergedOptions.delay);
+      }
       
     });
 
@@ -150,11 +167,11 @@ async function connectUsb(mainWindow) {
   return initializeUsb(mainWindow);
 }
 
-function disconnectUsb() {
+async function disconnectUsb(options) {
   if (port) {
     port.close(function (err) {
       port = null;
-    }, {reconnect: false});
+    }, options);
   }
 }
 
@@ -172,6 +189,7 @@ function disconnectUsb() {
 
   const serialTimeout = new Promise((_, reject) => {
     setTimeout(()=>{
+      // Do not change this message unless also changing getMessageResult() in App.js in react
       reject(new Error('Serial port timed out'));
     } ,150)
   });
@@ -181,7 +199,7 @@ function disconnectUsb() {
       resolve,
       reject
     }
-    //console.log("Write Command:", command, commandStr);
+    console.log("Write Command:", command, commandStr, port.path);
     port.write(`${command}${commandStr}\n`);
   });
 

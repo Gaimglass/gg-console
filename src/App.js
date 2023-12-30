@@ -1,17 +1,14 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RgbaColorPicker, HslColorPicker } from 'react-colorful';
-import { useSelector, useDispatch } from 'react-redux'
-import { status, setBrightness } from './store/status'
+import React, { useState, useEffect } from 'react';
+import { RgbaColorPicker } from 'react-colorful';
 import classNames from 'classnames';
-
 import DefaultColors from './DefaultColors'
 import WindowControls from './WindowsControls'
 
 import styles from './css/App.module.css'
-
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
-import logo from './assets/logo.png';
+//import logo from './assets/logo.png';
 import './css/globalStyles.css';
+
 
 const electron = window.require('electron');
 const ipcRenderer  = electron.ipcRenderer;
@@ -20,15 +17,11 @@ let timer;
 let latestFunc;
 
 function App() {
-  
-  const dispatch = useDispatch();
-
-  let syncGG = true;//useRef(true);
 
   const [color, setColor] = useState({r:255,g:255,b:255,a:0});
   const [defaultColors, setDefaultColors] = useState([]);
-  const [defaultColorIndex, setDefaultColorIndex] = useState(0); // -1 for a custom color
-  const [ledOn, setLEDOn] = useState(true);
+  //const [defaultColorIndex, setDefaultColorIndex] = useState(0); // -1 for a custom color
+  const [ledOn, setLEDOn] = useState(false); // defaults to false
   const [isMaximized, setMaximized] = useState(false);
   const [isMac, setMac] = useState(false);
   const [isConnected, setIsConnected] = useState(false); 
@@ -39,7 +32,8 @@ function App() {
 
 
   useEffect(()=>{
-    ipcRenderer.sendSync('get-app-state'); // non-blocking
+    //const result = ipcRenderer.sendSync('get-app-state'); // non-blocking
+    getAppState();
     initialDefaults();
     // TODO do we really need these here too?
     loadMainLedFromGG();
@@ -56,6 +50,11 @@ function App() {
       parseDefaultColors(message);
     });
 
+    ipcRenderer.on('deactivate-led', function (evt, message) {
+      console.log("deactivate-led", message)
+      setLEDOn(false);
+      sendMainLEDStatus(color, false);
+    });
 
     /* // mouse 2 events
     ipcRenderer.on('update-mouse-down', function (evt, message) {
@@ -89,7 +88,7 @@ function App() {
       ipcRenderer.removeAllListeners();
     }
     
-  }, [])
+  },  /* eslint-disable */ [])
   
 
   useEffect(()=>{
@@ -111,27 +110,11 @@ function App() {
       {r:200,g:255, b:40},
     ];
   }
-  /*
-  255, 15, 15
-  255, 128, 15
-  200, 255, 40
-  15, 255, 15
-  32 255 180
-  20 175, 255
-  134, 100, 255
-  255 60, 180
-*/
-
-
-
-
-
-
 
   function initialDefaults() {
     const defaults = [];
     const initialDefaultColors = createDefaultColors();
-    for (let i = 0; i < 8;i++) {
+    for (let i = 0; i < 8; i++) {
       defaults.push({
         color: initialDefaultColors[i],
         enabled: true
@@ -162,6 +145,13 @@ function App() {
   }
 
 
+  function getAppState() {
+    getMessageResult(ipcRenderer.sendSync('get-app-state'), (result)=>{
+      setMaximized(result.isMaximized)
+      setMac(result.isMac)
+    })
+  }
+
   function sendDefaultIndex(index) {
     getMessageResult(ipcRenderer.sendSync('set-default-index', index));
   } 
@@ -179,7 +169,7 @@ function App() {
     if (dc) {
       // this condition is preferred over useEffect so we have more control over writing to EPROM
       // because the defaultColors should not map 1:1 with EPROM
-      ipcRenderer.sendSync('set-default-colors', dc) 
+      ipcRenderer.sendSync('set-default-colors', dc)
     } else {
       ipcRenderer.sendSync('set-default-colors', defaultColors) 
     }
@@ -245,8 +235,6 @@ function App() {
     setInputColorKey(newColor)
   }
 
-
-
   function handleColorChange(_newColor, defaultIndex = -1,) {
   
     // defaults don't have an alpha so use the current value
@@ -287,12 +275,11 @@ function App() {
   }
 
   function parseDefaultColors(message) {
-    let vars = message.split('&');
+    const vars = message.split('&');
     const defaults = []; 
-    let index;
     for (let v of vars) {
-      let [key, value] = v.split('=')
-      if (key == 'color') {
+      const [key, value] = v.split('=')
+      if (key === 'color') {
         let [r,g,b,enabled] = value.split(',');
         const isEnabled = Boolean(parseInt(enabled));
         // only add enabled colors
@@ -306,20 +293,16 @@ function App() {
             enabled: true
           });
         }
-      } else if (key == 'index') {
-        index = Number(value);
       }
       
     }
     setDefaultColors(defaults);
-    setDefaultColorIndex(index);
   }
 
   function parseMainLedFromGG(message) { 
     const params = message.split('&');
     let c = {};
     let led;
-    let index;
     params.forEach(param => {
       const [key, value] = param.split('=');
       // eslint-disable-next-line default-case
@@ -336,26 +319,22 @@ function App() {
         case 'brightness':
           c.a = Number(value);
           break;
-        case 'index':
-          index = value;
-          break;
       }
     });
     setColor(c);
     setLEDOn(led);
     setInputColorKey({...c});
-    setDefaultColorIndex(index);
   }
   
 
   async function loadMainLedFromGG() { 
-    await getMessageResult(ipcRenderer.sendSync('get-led-state'), (result) => {
+    getMessageResult(ipcRenderer.sendSync('get-led-state'), (result) => {
       parseMainLedFromGG(result);
     });
   }
 
   async function loadDefaultColorsFromGG() { 
-    await getMessageResult(ipcRenderer.sendSync('get-default-colors'), (result)=>{
+    getMessageResult(ipcRenderer.sendSync('get-default-colors'), (result)=>{
       parseDefaultColors(result);
       setIsConnected(true);
     });

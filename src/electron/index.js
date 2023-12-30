@@ -14,10 +14,12 @@ try {
 }
 
 
-const { connectUsb, setColor, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, disconnectUsb, serialDisconnected } = require('./usb');
+const { connectUsb, setColor, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, disconnectUsb, resume, serialDisconnected } = require('./usb');
 
 // Module to control application life.
 const app = electron.app;
+// https://stackoverflow.com/questions/70267992/win10-electron-error-passthrough-is-not-supported-gl-is-disabled-angle-is
+app.disableHardwareAcceleration()
 
 // Module to create native browser window.
 const BrowserWindow = electron.BrowserWindow;
@@ -73,19 +75,47 @@ function createTray() {
 // single lock (required on Windows to prevent multiple instances)
 const additionalData = {}
 const gotTheLock = app.requestSingleInstanceLock(additionalData)
+
+
 if (!gotTheLock) {
   app.quit()
 } else {
   // This method will be called when Electron has finished
   // initialization and is ready to create browser windows.
   // Some APIs can only be used after this event occurs.
-  app.on('ready', createWindow);
+  app.on('ready', ()=>{
+    createWindow();
+    /*electron.powerMonitor.on("lock-screen", () => {
+    });*/
+    electron.powerMonitor.on("suspend", () => {
+      // Turn off the LED when sleeping
+      mainWindow.webContents.send('deactivate-led');
+      /*setTimeout(()=>{
+        disconnectUsb({
+          reconnect: false
+        });
+      }, 50)*/
+    });
+    electron.powerMonitor.on("resume", () => {
+      // Always force a disconnect on wake. Sometimes (but not always) we see that the USB connection is broken
+      // but the port is still open. This happens when the PC sleeps and the GG cycles and goes
+      // full bright for a few seconds before turning off. I don't know how to prevent this behavior
+      
+      disconnectUsb({
+        delay: 0,
+        reconnect: true // this will force a reconnection
+      });
+      // connectUsb(mainWindow); // use connectUsb if we have previously disconnected on suspect
+      // Doing so will will prevent the GG from waking the PC if a button is pushed and the device did not cycle.
+    });
+
+  });
 
   // Quit when all windows are closed.
   app.on('window-all-closed', function () {
     // On OS X it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
-    disconnectUsb();
+    disconnectUsb({reconnect: false});
     if (process.platform !== 'darwin') { 
       app.quit()
     }
@@ -94,6 +124,7 @@ if (!gotTheLock) {
   app.on('activate', function () {
     // On OS X it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
+    console.log("11")
     if (mainWindow === null) {
       createWindow()
     }
@@ -101,6 +132,7 @@ if (!gotTheLock) {
 
   app.on('second-instance', (event, commandLine, workingDirectory, additionalData) => {
     // Someone tried to run a second instance, we should focus our window.
+    console.log("22")
     if (mainWindow) {
       mainWindow.show();
       mainWindow.setSkipTaskbar(false);
@@ -135,7 +167,7 @@ async function createWindow() {
   });
 
   //const appIcon = new electron.Tray('./assets/gg_icon.png')
-  
+
   
   if (process.env.NODE_ENV === 'development') {
     // Open the DevTools
@@ -195,18 +227,21 @@ async function createWindow() {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element
-      mainWindow = null
+    mainWindow = null
   })
 
   mainWindow.on('minimize', function (event) {
-    //
+    
   });
 
   mainWindow.on('restore', function (event) {
-    //
+    
+  });
+
+  mainWindow.on('show', function (event) {
+    
   });
 }
-
 
 
 //
@@ -259,17 +294,6 @@ electron.ipcMain.on('set-default-colors', async (event, colors) => {
   }
 });
 
-/*electron.ipcMain.on('get-gg-state', async (event) => {
-  try {
-    const ledStateStr = ''//await getMainLED();
-    const defaultColors = ''//await getDefaultLEDs();
-    event.returnValue = `${ledStateStr}&${defaultColors}`;
-    //getDefaultLEDs()
-    //event.returnValue = await getStatus();
-  } catch(err) {
-    event.returnValue = err;
-  }
-});*/
 
 // Windows commands
 
@@ -304,6 +328,8 @@ electron.ipcMain.on('window-close', async (event) => {
   mainWindow.hide();
   event.returnValue = 'okay';
 });
+
+
 
 
 // In this file you can include the rest of your app's specific main process
