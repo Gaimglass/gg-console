@@ -1,5 +1,3 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { PropTypes } from "prop-types";
 import styles from './css/DefaultRevertConfirm.module.css'
 
 function DefaultRevertConfirm(props) {

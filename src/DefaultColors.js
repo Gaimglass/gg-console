@@ -1,20 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PropTypes } from "prop-types";
 import styles from './css/DefaultColors.module.css'
 import {ReactComponent as Edit} from './assets/pen-to-square-solid.svg';
 import {ReactComponent as Cancel} from './assets/xmark-solid.svg';
 import {ReactComponent as Check} from './assets/check-solid.svg';
-import {ReactComponent as Minus} from './assets/minus-solid.svg';
 import {ReactComponent as Plus} from './assets/plus-solid.svg';
-import {ReactComponent as Revert} from './assets/rotate-left-solid.svg';
 import classNames from 'classnames';
 
 import DefaultRevertConfirm from './DefaultRevertConfirm'
-
-
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
-//const fs = electron.remote.require('fs');
 
 
 function DefaultColors(props) {
@@ -23,30 +16,17 @@ function DefaultColors(props) {
   const swatchRefs = useRef([]);
   const [previousColor, setPreviousColor] = useState(null);
 
-  
-
-  /*for(let i = 0; i < 8;i++) {
-    swatchRefs.push(useRef(null));
-  }*/
-
-  
   useEffect(() => {
     var c = canvasRef.current;
     var ctx = c.getContext('2d');
     ctx.clearRect(0, 0, c.width, c.height);
 
-
-    
-    //c.width = c.clientWidth;
-    //c.height = c.clientHeight;
     for (let i = 0; i < props.colors.length; i++) {
       if (props.colors[i]?.enabled === false) {
         continue
       }
       var s = swatchRefs.current[i];
-      //debugger;
       const yc = s.offsetTop + (s.clientHeight/2);
-      const x = s.offsetWidth
 
       ctx.beginPath()
       if(props.editSwatch===i) {
@@ -86,10 +66,6 @@ function DefaultColors(props) {
   function save(swatch) {
     props.onSetEditSwatch(null);
     props.onSaveDefaultColor(props.colors[swatch].color, swatch);
-  }
-
-  function changeDefaultColor(color) {
-    //setEditSwatch(null);
   }
 
   function cancel() {
@@ -136,7 +112,7 @@ function DefaultColors(props) {
             edit(i);
           }} className={styles.button + ' ' + styles.editButton}><Edit className={styles.editIcon}></Edit></button>
         }
-        { (props.editSwatch == i) &&
+        { (props.editSwatch === i) &&
           <>
           <button onClick={()=>{save(i)}} className={styles.button  + ' ' +  styles.checkButton}><Check className={styles.editIcon}></Check></button>
           <button onClick={()=>{cancel()}} className={styles.button  + ' ' +  styles.cancelButton}><Cancel className={styles.editIcon}></Cancel></button>
