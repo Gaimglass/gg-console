@@ -8,6 +8,7 @@ import styles from './css/App.module.css'
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
 //import logo from './assets/logo.png';
 import './css/globalStyles.css';
+import { func } from 'prop-types';
 
 
 const electron = window.require('electron');
@@ -50,27 +51,11 @@ function App() {
       parseDefaultColors(message);
     });
 
+    // special event when suspending PC to turn off GG
     ipcRenderer.on('deactivate-led', function (evt, message) {
       console.log("deactivate-led", message)
       setLEDOn(false);
       sendMainLEDStatus(color, false);
-    });
-
-    /* // mouse 2 events
-    ipcRenderer.on('update-mouse-down', function (evt, message) {
-      setAdsActive(true);
-     });
-
-     ipcRenderer.on('update-mouse-up', function (evt, message) {
-      setAdsActive(false);
-    }); */
-
-    ipcRenderer.on('update-mouse-up', function (evt, message) {
-      if (adsActive && message.button === 2) {
-        setAdsActive(false);
-        
-        sendMainLEDStatus(color, true);
-      }
     });
 
     ipcRenderer.on('usb-connected', function (evt, message) {
@@ -90,13 +75,48 @@ function App() {
     
   },  /* eslint-disable */ [])
   
+  useEffect(()=>{
+    ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
+    return ()=>{
+      ipcRenderer.removeListener('shortcut-toggle-led', toggleLEDOn);
+    }
+  }, [color]);
 
   useEffect(()=>{
-    
     if (ledOn && isConnected) {
       sendMainLEDStatus(color, !adsActive);
     }
-  }, [adsActive, ledOn]);
+
+    // shortcuts need update state values, so these hooks need to be trigger
+    ipcRenderer.on('shortcut-increase-brightness', increaseBrightnessShortcut);
+    ipcRenderer.on('shortcut-decrease-brightness', decreaseBrightnessShortcut);
+    ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
+    
+
+    /* // mouse 2 events
+    ipcRenderer.on('update-mouse-down', function (evt, message) {
+      setAdsActive(true);
+     });
+
+     ipcRenderer.on('update-mouse-up', function (evt, message) {
+      setAdsActive(false);
+    }); */
+
+    /*
+    ipcRenderer.on('update-mouse-up', function (evt, message) {
+      if (adsActive && message.button === 2) {
+        setAdsActive(false);
+        
+        sendMainLEDStatus(color, true);
+      }
+    });*/
+
+    return ()=>{
+      ipcRenderer.removeListener('shortcut-increase-brightness', increaseBrightnessShortcut);
+      ipcRenderer.removeListener('shortcut-decrease-brightness', decreaseBrightnessShortcut);
+      ipcRenderer.removeListener('shortcut-switch-color', switchColorShortcut);
+    }
+  }, [adsActive, ledOn, color, defaultColors]);
   
   function createDefaultColors() {
     return [
@@ -252,7 +272,6 @@ function App() {
       // button on the device start from where this default color is.
       sendDefaultIndex(defaultIndex); 
     }
-
     setInputColorKey(newColor);
      
     if (editSwatch !== null) {
@@ -269,9 +288,67 @@ function App() {
   };
 
   function toggleLEDOn() {
-    const on = !ledOn;
-    setLEDOn(on);
-    sendMainLEDStatus(color, on);
+    setLEDOn(on=>{
+      sendMainLEDStatus(color, !on);
+      return !on;
+    });    
+  }
+
+  function switchColorShortcut(event, index) {
+    if (ledOn) {
+      index = Number(index-1);
+      if (index < 0)  {
+        return;
+      }
+      const alpha = color.a;
+      const newColor = {
+        ...defaultColors[index].color,
+        a: alpha
+      }
+      setColor(newColor);
+      sendMainLEDStatus(newColor, true);
+      setInputColorKey(newColor);
+      // update the index position on the device so that the left and right color 
+      // button on the device start from where this default color is.
+      sendDefaultIndex(index);
+    }
+  }
+
+  function decreaseBrightnessShortcut() {
+    if (ledOn) {
+      setColor(c=>{
+        let newAlpha = c.a - 0.05;
+        if (newAlpha < 0.075) {
+          // minimum alpha
+          newAlpha = 0.075; // this value matches the value on the device
+        }
+        const newColor = {
+          ...c,
+          a: newAlpha
+        }
+        sendMainLEDStatus(newColor, true);
+        setInputColorKey(newColor);
+        return newColor;
+      })
+      
+    }
+  }
+  function increaseBrightnessShortcut() {
+    if (ledOn) {
+      setColor(c=>{
+        let newAlpha = c.a + 0.05;
+        if (newAlpha > 1) {
+          newAlpha = 1;
+        }
+        const newColor = {
+          ...c,
+          a: newAlpha
+        }
+        sendMainLEDStatus(newColor, true);
+        setInputColorKey(newColor);
+        return newColor;
+      })
+    }
   }
 
   function parseDefaultColors(message) {

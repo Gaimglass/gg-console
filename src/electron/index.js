@@ -1,6 +1,6 @@
 const electron = require('electron');
-const usb = require('usb');
 const Store = require('electron-store');
+
 
 let mouseEvents = {
   on: ()=>{} // stub
@@ -15,6 +15,7 @@ try {
 
 
 const { connectUsb, setColor, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, disconnectUsb, resume, serialDisconnected } = require('./usb');
+const { registerKeyboardShortcuts } = require('./shortcuts');
 
 // Module to control application life.
 const app = electron.app;
@@ -85,6 +86,7 @@ if (!gotTheLock) {
   // Some APIs can only be used after this event occurs.
   app.on('ready', ()=>{
     createWindow();
+    registerKeyboardShortcuts(mainWindow);
     /*electron.powerMonitor.on("lock-screen", () => {
     });*/
     electron.powerMonitor.on("suspend", () => {
@@ -328,9 +330,3 @@ electron.ipcMain.on('window-close', async (event) => {
   mainWindow.hide();
   event.returnValue = 'okay';
 });
-
-
-
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
