@@ -51,13 +51,6 @@ function App() {
       parseDefaultColors(message);
     });
 
-    // special event when suspending PC to turn off GG
-    ipcRenderer.on('deactivate-led', function (evt, message) {
-      console.log("deactivate-led", message)
-      setLEDOn(false);
-      sendMainLEDStatus(color, false);
-    });
-
     ipcRenderer.on('usb-connected', function (evt, message) {
       // initialize values
       loadMainLedFromGG();
@@ -77,9 +70,15 @@ function App() {
   
   useEffect(()=>{
     ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
+    
+    // special event when suspending PC to turn off GG
+    ipcRenderer.on('deactivate-led', deactivateLED);
+
     return ()=>{
+      ipcRenderer.removeListener('shortcut-toggle-led', deactivateLED);
       ipcRenderer.removeListener('shortcut-toggle-led', toggleLEDOn);
     }
+    
   }, [color]);
 
   useEffect(()=>{
@@ -287,11 +286,18 @@ function App() {
     
   };
 
+  function deactivateLED() {
+    setLEDOn(_on=>{
+      sendMainLEDStatus(color, false);
+      return false;
+    });
+  }
+
   function toggleLEDOn() {
     setLEDOn(on=>{
       sendMainLEDStatus(color, !on);
       return !on;
-    });    
+    });
   }
 
   function switchColorShortcut(event, index) {
