@@ -33,7 +33,6 @@ const serialMessageResults = {
 
 
 let port = null;
-let nextPortCandidateIndex = 0;
 let parser = null;
 let deviceInfo = {}
 
@@ -46,21 +45,18 @@ let deviceInfo = {}
 async function initializeUsb(mainWindow) {
   const ports =  await SerialPort.list();
 
-  
-  
+
   let path = '';
-
-  // for debug mode only to manually select a port
-  //mainWindow.webContents.send('update-port-paths', ports);
-
-  // We don't know which device is the gaimglass, we try them in order
-  // and keep track of a current index
-  if (nextPortCandidateIndex >= ports.length) {
-    nextPortCandidateIndex = 0;
+  for (let i = 0; i < ports.length; i++) {
+    const vendorId = ports[i].vendorId;
+    const productId = ports[i].productId;
+    // hard coded to Arduino (2341) and 5400 for now
+    if (productId === '5400' && vendorId === '2341') {
+      path = ports[i]?.path;
+      break;
+    }
   }
-  console.log({nextPortCandidateIndex})
-  path = ports[nextPortCandidateIndex]?.path;
-  
+
 
   if (path) {
     port = new SerialPort({
@@ -70,14 +66,13 @@ async function initializeUsb(mainWindow) {
 
     port.on('error', (e) => {
       console.log("port error", e)
-      nextPortCandidateIndex += 1;
       setTimeout(()=>{
         disconnectUsb({reconnect: false}); // TODO, I'm not convinced we need to call disconnect here? if
         // This error happens when we have port we tried to connect to that is taken and won't allow connections. 
         // Normally we would not call connectUsb followed by disconnectUsb, but because the nextPortCandidateIndex is different,
         // we need to so we can connect to the next port candidate
         connectUsb(mainWindow);
-      }, 300)
+      }, 800)
       
     })
 
@@ -102,11 +97,8 @@ async function initializeUsb(mainWindow) {
     // Read the port data
     port.on("open", async () => {
       try {
-        console.log(1)
         const result = await getDeviceInfo();
-        console.log(2)
         const [name, version] = result.split('&');
-        console.log(3)
         deviceInfo.name = name.split('=')[1]
         deviceInfo.version = version.split('=')[1]
         
@@ -114,8 +106,6 @@ async function initializeUsb(mainWindow) {
           throw new Error("Invalid device name");
         }
       } catch(err) {
-        //console.log('Serial port write error', {err})
-        nextPortCandidateIndex += 1;
         disconnectUsb();
         return;
       }
@@ -124,29 +114,29 @@ async function initializeUsb(mainWindow) {
     });
 
     port.on("close", (options) => {
+      console.log('Serial port closed');
       let mergedOptions = {
         reconnect: true,
-        delay: 300,
+        delay: 800,
         ...options
       }
-      //console.log('Serial port closed', mergedOptions)
       mainWindow.webContents.send('usb-disconnected');
       port = null;
-      //nextPortCandidateIndex += 1;
       if (mergedOptions.reconnect) {
         setTimeout(()=>{
           connectUsb(mainWindow);
         }, mergedOptions.delay);
       }
-      
     });
-
-    // connected, but not validated. We can still throw an error if this device is not a gaimglass
     return true
     
   } else {
-    console.log('USB com port not found');
+    setTimeout(()=>{
+      // retry after a short delay
+      connectUsb(mainWindow);
+    }, 800);
     return false;
+    
   }
 }
 
@@ -174,7 +164,6 @@ async function disconnectUsb(options) {
     }, options);
   }
 }
-
 
 /**
  * Write a command string to Gaimglass over the serial port and return a promise
