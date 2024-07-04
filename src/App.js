@@ -70,7 +70,6 @@ function App() {
   
   useEffect(()=>{
     ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
-    
     // special event when suspending PC to turn off GG
     ipcRenderer.on('deactivate-led', deactivateLED);
 
@@ -460,7 +459,7 @@ function App() {
   function changeAlpha(e) {
     const rawString = e.target.value.trim();
     let updateKey = false; // force an update on the input field too
-    let newColorComponent = parseFloat(rawString).toFixed(2);
+    let newColorComponent = parseFloat(rawString);
     
 
     if (isNaN(newColorComponent)) {
