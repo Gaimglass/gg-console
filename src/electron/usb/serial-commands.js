@@ -2,23 +2,6 @@ const {writeCommand} = require('./usb');
 const {SERIAL_COMMANDS} = require('./serial-codes');
 
 
-// Serial Commands
-/*
-const SET_MAIN_LED = '000';
-const SET_AUX_LED = '001';
-const SET_DEFAULT_LEDS = '002';
-const SET_DEFAULT_INDEX = '003';
-
-const GET_MAIN_LED = '128';
-const GET_DEFAULT_LEDS = '129';
-const GET_DEVICE_INFO = '130'
-
-// when a button is pushed on the GG
-const UPDATE_MAIN_LED = '130';
-const UPDATE_DEFAULT_LEDS = '131'*/
-
-
-
 // Commands
 
 function setMainLED(color, brightness, ledOn) {
@@ -35,11 +18,12 @@ function setDefaultIndex(index) {
   return writeCommand(SERIAL_COMMANDS.SET_DEFAULT_INDEX, index.toString().padStart(2));
 }
 
-
+/*
 function setAuxLED(color, ledOn) {
   // todo...
   return writeCommand(SERIAL_COMMANDS.SET_AUX_LED);
 }
+*/
 
 function setDefaultColors(colors) {
   const defaultColorStrs = [];
@@ -60,23 +44,19 @@ function setDefaultColors(colors) {
   return writeCommand(SERIAL_COMMANDS.SET_DEFAULT_LEDS, commandStr);
 }
 
-
 function getMainLED() {
   return writeCommand(SERIAL_COMMANDS.GET_MAIN_LED);
 }
-
 
 function getDefaultLEDs() {
   return writeCommand(SERIAL_COMMANDS.GET_DEFAULT_LEDS);
 }
 
 module.exports = {
-
-  // commands
   getMainLED,
   getDefaultLEDs,
   setMainLED,
   setDefaultColors,
-  setAuxLED,
+  //setAuxLED,
   setDefaultIndex,
 }

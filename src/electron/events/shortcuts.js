@@ -2,6 +2,8 @@ const {app, globalShortcut} = require('electron')
 
 // https://www.electronjs.org/docs/latest/api/accelerator
 
+// TODO make these customizable from the UI
+
 function registerKeyboardShortcuts(mainWindow) {
   globalShortcut.register('CommandOrControl+numsub', () => {
     mainWindow.webContents.send('shortcut-decrease-brightness');

@@ -1,10 +1,8 @@
 const electron = require('electron');
 const Store = require('electron-store');
+
 const { registerUIEvents } = require('./events/ui');
 const { registerMouseEvents } = require('./events/mouse');
-
-
-
 const { connectUsb,  disconnectUsb } = require('./usb/usb');
 const { registerKeyboardShortcuts } = require('./events/shortcuts');
 
@@ -19,13 +17,15 @@ const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const url = require('url');
 
-// use electron store for persistent data after app closes
+// Electron store for persistent data after app closes.
+// TODO: Use this for custom keyboard shortcuts.
 const store = new Store();
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 var mainWindow;
-var tray;
+// task tray object reference
+var tray = 1;
 
 
 var mouseState = {
@@ -85,23 +85,15 @@ if (!gotTheLock) {
     electron.powerMonitor.on("suspend", () => {
       // Turn off the LED when sleeping
       mainWindow.webContents.send('deactivate-led');
-      /*setTimeout(()=>{
-        disconnectUsb({
-          reconnect: false
-        });
-      }, 50)*/
     });
     electron.powerMonitor.on("resume", () => {
       // Always force a disconnect on wake. Sometimes (but not always) we see that the USB connection is broken
       // but the port is still open. This happens when the PC sleeps and the GG cycles and goes
       // full bright for a few seconds before turning off. I don't know how to prevent this behavior
-      
       disconnectUsb({
         delay: 0,
         reconnect: true // this will force a reconnection
       });
-      // connectUsb(mainWindow); // use connectUsb if we have previously disconnected on suspect
-      // Doing so will will prevent the GG from waking the PC if a button is pushed and the device did not cycle.
     });
 
   });
@@ -146,7 +138,7 @@ async function createWindow() {
     icon: path.join(__dirname, '../assets/gg_icon.png'),
     /* minHeight:600,
     minWidth:700, */
-    maximizable: false, // BUG: F11 still works for some reason
+    maximizable: false,
     fullscreenable: false,
     resizable: false,
     backgroundColor: '#282c34',
@@ -160,19 +152,13 @@ async function createWindow() {
   });
 
   //const appIcon = new electron.Tray('./assets/gg_icon.png')
-
   
   if (process.env.NODE_ENV === 'development') {
     // Open the DevTools
     mainWindow.webContents.openDevTools();
   }
-
-  
-  // TODO remove the await and allow the UI to load before port is ready, this is buggy at present.
-  // UI also needs to load if USB is unplugged
   connectUsb(mainWindow);
-  
-  
+
   // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
       pathname: path.join(__dirname, '../../build/index.html'),
@@ -198,7 +184,7 @@ async function createWindow() {
   });
   
   mainWindow.on('closed', function () {
-    // Dereference the window object, usually you would store windows
+    // De-reference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element
     mainWindow = null

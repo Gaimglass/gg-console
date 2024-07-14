@@ -6,11 +6,12 @@ try {
   const globalMouseEvents = require("global-mouse-events");
   mouseEvents = globalMouseEvents;
 } catch (e) {
-  // Mac
+  // Mac is not supported ATM
 }
 
+// These events can be used for mouse2 effects such as dimming when pressing ADS.
+// Note: We currently don't have a way to do this for controllers.
 function registerMouseEvents(mainWindow) {
-
   mouseEvents.on("mouseup", event => {
     if (event.button === 2) {
       if (mouseState.down) {

@@ -1,30 +1,12 @@
 const { SerialPort } = require('serialport')
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { SERIAL_COMMANDS } = require('./serial-codes');
-// Serial Commands
-
-/*
-const SET_MAIN_LED = '000';
-const SET_AUX_LED = '001';
-const SET_DEFAULT_LEDS = '002';
-const SET_DEFAULT_INDEX = '003';
-
-const GET_MAIN_LED = '128';
-const GET_DEFAULT_LEDS = '129';
-const GET_DEVICE_INFO = '130'
-
-// when a button is pushed on the GG
-const UPDATE_MAIN_LED = '130';
-const UPDATE_DEFAULT_LEDS = '131'
-*/
-
 
 // Serial result promise resolvers
 //  <message ID> : {
 //    resolve,
 //    reject
 //  }, ...
-
 const serialMessageResults = {
   [SERIAL_COMMANDS.SET_MAIN_LED]: null,
   [SERIAL_COMMANDS.SET_AUX_LED]: null,
@@ -34,14 +16,7 @@ const serialMessageResults = {
   [SERIAL_COMMANDS.GET_DEVICE_INFO]: null,
 };
 
-
 let port = null;
-let portResolver = null;
-
-const portPromise = new Promise((resolve, _reject)=>{
-  portResolver = resolve;
-});
-
 let parser = null;
 let deviceInfo = {}
 
@@ -68,14 +43,11 @@ async function initializeUsb(mainWindow) {
 
 
   if (path) {
+
     port = new SerialPort({
       path,
       baudRate: 115200,
     })
-    portResolver(port);
-    //if (portResolver) {
-      
-    //}
 
     port.on('error', (e) => {
       console.log("port error", e)
@@ -109,25 +81,23 @@ async function initializeUsb(mainWindow) {
 
     // Read the port data
     port.on("open", async () => {
-      
+
       try {
         const result = await getDeviceInfo();
         const [name, version] = result.split('&');
         deviceInfo.name = name.split('=')[1]
         deviceInfo.version = version.split('=')[1]
-        
+
         if (deviceInfo.name !== 'ggpro') {
-          console.log("open2")
           throw new Error("Invalid device name");
         }
-        console.log("open DONE!")
       } catch(err) {
         console.error(err)
         disconnectUsb();
         return;
       }
       mainWindow.webContents.send('usb-connected');
-      console.log('Serial port open');
+      console.log('Seral porti open');
     });
 
     port.on("close", (options) => {
@@ -157,6 +127,8 @@ async function initializeUsb(mainWindow) {
   }
 }
 
+// Special initialize command that we need local to this file, moving to serial-commands.js would cause a 
+// circular import issue
 function getDeviceInfo() {
   return writeCommand(SERIAL_COMMANDS.GET_DEVICE_INFO);
 }
@@ -185,8 +157,6 @@ async function disconnectUsb(options) {
     }, options);
   }
 }
-
-
 
 
 /**
@@ -218,7 +188,6 @@ async function writeCommand(command, commandStr='') {
 
   return Promise.race([serialResponse, serialTimeout]);
 }
-
 
 
 module.exports = {

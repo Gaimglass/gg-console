@@ -1,12 +1,11 @@
 const electron = require('electron');
 const { getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 
-//
-// Synchronous events from UI
-//
 
 function registerUIEvents(mainWindow) {
-  console.log("initializeUIEvents")
+  //
+  // Synchronous events from UI to electron
+  //
   electron.ipcMain.on('get-led-state', async (event) => {
     try {
       const result = await getMainLED();
@@ -53,9 +52,9 @@ function registerUIEvents(mainWindow) {
     }
   });
   
-  
+  //
   // Windows commands
-  
+  //
   electron.ipcMain.on('get-app-state', async (event) => {
     event.returnValue = {
       isMaximized: mainWindow.isMaximized(),
