@@ -1,21 +1,12 @@
 const electron = require('electron');
 const Store = require('electron-store');
+const { registerUIEvents } = require('./events/ui');
+const { registerMouseEvents } = require('./events/mouse');
 
 
-let mouseEvents = {
-  on: ()=>{} // stub
-}
 
-try {
-  const globalMouseEvents = require("global-mouse-events");
-  mouseEvents = globalMouseEvents;
-} catch (e) {
-  // Mac
-}
-
-
-const { connectUsb, setColor, setLEDOn, getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, disconnectUsb, resume, serialDisconnected } = require('./usb');
-const { registerKeyboardShortcuts } = require('./shortcuts');
+const { connectUsb,  disconnectUsb } = require('./usb/usb');
+const { registerKeyboardShortcuts } = require('./events/shortcuts');
 
 // Module to control application life.
 const app = electron.app;
@@ -86,6 +77,8 @@ if (!gotTheLock) {
   // Some APIs can only be used after this event occurs.
   app.on('ready', ()=>{
     createWindow();
+    registerUIEvents(mainWindow)
+    registerMouseEvents(mainWindow)
     registerKeyboardShortcuts(mainWindow);
     /*electron.powerMonitor.on("lock-screen", () => {
     });*/
@@ -178,25 +171,6 @@ async function createWindow() {
   // TODO remove the await and allow the UI to load before port is ready, this is buggy at present.
   // UI also needs to load if USB is unplugged
   connectUsb(mainWindow);
-
-  mouseEvents.on("mouseup", event => {
-    if (event.button === 2) {
-      if (mouseState.down) {
-        mainWindow.webContents.send('update-mouse-up', event);
-        mouseState.down = false;
-      }
-    }
-  });
-  
-  mouseEvents.on("mousedown", event => {
-    //console.log(event); // { x: 2962, y: 483, button: 1 }
-    if (event.button === 2) {
-      if (!mouseState.down) {
-        mainWindow.webContents.send('update-mouse-down', event);
-        mouseState.down = true;
-      }
-    }
-  });
   
   
   // and load the index.html of the app.
@@ -242,89 +216,3 @@ async function createWindow() {
     
   });
 }
-
-
-//
-// Synchronous events from UI
-//
-
-electron.ipcMain.on('get-led-state', async (event) => {
-  try {
-    const result = await getMainLED();
-    event.returnValue = result;
-  } catch(err) {
-    event.returnValue = err;
-  }
-});
-
-electron.ipcMain.on('set-led-state', async (event, ledState) => {
-  try {
-    const result = await setMainLED(ledState.color, ledState.brightness, ledState.ledOn);
-    event.returnValue = result;
-  } catch(err) {
-    event.returnValue = err;
-  }
-});
-
-electron.ipcMain.on('set-default-index', async (event, index) => {
-  try {
-    const result = await setDefaultIndex(index);
-    event.returnValue = result;
-  } catch(err) {
-    event.returnValue = err;
-  }
-});
-
-
-electron.ipcMain.on('get-default-colors', async (event) => { 
-  try {
-    const ledStateStr = await getDefaultLEDs();
-    event.returnValue = ledStateStr;
-  } catch(err) {
-    event.returnValue = err;
-  }
-});
-
-electron.ipcMain.on('set-default-colors', async (event, colors) => {
-  try {
-    const result = await setDefaultColors(colors);
-    event.returnValue = result;
-  } catch(err) {
-    event.returnValue = err;
-  }
-});
-
-
-// Windows commands
-
-electron.ipcMain.on('get-app-state', async (event) => {
-  
-  event.returnValue = {
-    isMaximized: mainWindow.isMaximized(),
-    isMac: process.platform === 'darwin'
-    // add others... 
-    // TODO these should be pulled from the electron store at boot time and saved there on close
-  };
-});
-
-
-electron.ipcMain.on('window-maximize', async (event) => {
-  mainWindow.maximize();
-  event.returnValue = 'okay';
-});
-
-electron.ipcMain.on('window-restore', async (event) => {
-  event.returnValue = 'okay';
-});
-
-electron.ipcMain.on('window-minimize', async (event) => {
-  mainWindow.minimize();
-  event.returnValue = 'okay';
-});
-
-electron.ipcMain.on('window-close', async (event) => {
-  // hide to try, not exit
-  mainWindow.setSkipTaskbar(true);
-  mainWindow.hide();
-  event.returnValue = 'okay';
-});

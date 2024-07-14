@@ -1,7 +1,9 @@
 const { SerialPort } = require('serialport')
 const { ReadlineParser } = require('@serialport/parser-readline');
-
+const { SERIAL_COMMANDS } = require('./serial-codes');
 // Serial Commands
+
+/*
 const SET_MAIN_LED = '000';
 const SET_AUX_LED = '001';
 const SET_DEFAULT_LEDS = '002';
@@ -14,7 +16,7 @@ const GET_DEVICE_INFO = '130'
 // when a button is pushed on the GG
 const UPDATE_MAIN_LED = '130';
 const UPDATE_DEFAULT_LEDS = '131'
-
+*/
 
 
 // Serial result promise resolvers
@@ -22,17 +24,24 @@ const UPDATE_DEFAULT_LEDS = '131'
 //    resolve,
 //    reject
 //  }, ...
+
 const serialMessageResults = {
-  [SET_MAIN_LED]: null,
-  [SET_AUX_LED]: null,
-  [SET_DEFAULT_LEDS]: null,
-  [GET_MAIN_LED]: null,
-  [GET_DEFAULT_LEDS]: null,
-  [GET_DEVICE_INFO]: null,
+  [SERIAL_COMMANDS.SET_MAIN_LED]: null,
+  [SERIAL_COMMANDS.SET_AUX_LED]: null,
+  [SERIAL_COMMANDS.SET_DEFAULT_LEDS]: null,
+  [SERIAL_COMMANDS.GET_MAIN_LED]: null,
+  [SERIAL_COMMANDS.GET_DEFAULT_LEDS]: null,
+  [SERIAL_COMMANDS.GET_DEVICE_INFO]: null,
 };
 
 
 let port = null;
+let portResolver = null;
+
+const portPromise = new Promise((resolve, _reject)=>{
+  portResolver = resolve;
+});
+
 let parser = null;
 let deviceInfo = {}
 
@@ -63,6 +72,10 @@ async function initializeUsb(mainWindow) {
       path,
       baudRate: 115200,
     })
+    portResolver(port);
+    //if (portResolver) {
+      
+    //}
 
     port.on('error', (e) => {
       console.log("port error", e)
@@ -96,6 +109,7 @@ async function initializeUsb(mainWindow) {
 
     // Read the port data
     port.on("open", async () => {
+      
       try {
         const result = await getDeviceInfo();
         const [name, version] = result.split('&');
@@ -103,9 +117,12 @@ async function initializeUsb(mainWindow) {
         deviceInfo.version = version.split('=')[1]
         
         if (deviceInfo.name !== 'ggpro') {
+          console.log("open2")
           throw new Error("Invalid device name");
         }
+        console.log("open DONE!")
       } catch(err) {
+        console.error(err)
         disconnectUsb();
         return;
       }
@@ -140,14 +157,18 @@ async function initializeUsb(mainWindow) {
   }
 }
 
+function getDeviceInfo() {
+  return writeCommand(SERIAL_COMMANDS.GET_DEVICE_INFO);
+}
+
 // Messages directly from GG that are not provoked from the console. This could be a button
 // press for example
 function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
   // Uninitiated messages. When a user presses a button on the device
-  if ( UPDATE_MAIN_LED === messageId) {
+  if ( SERIAL_COMMANDS.UPDATE_MAIN_LED === messageId) {
     mainWindow.webContents.send('update-main-led-state-from-gg', ggResponse);
   }
-  if ( UPDATE_DEFAULT_LEDS === messageId) {
+  if ( SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS === messageId) {
     mainWindow.webContents.send('update-default-colors-from-gg', ggResponse);
   }
 }
@@ -165,13 +186,16 @@ async function disconnectUsb(options) {
   }
 }
 
+
+
+
 /**
  * Write a command string to Gaimglass over the serial port and return a promise
  * that will contain the response from Gaimglass. The response may contain data when
  * requested or it simply may be an "okay" status when new state has been received.
  */
- function writeCommand(command, commandStr='') {
-
+async function writeCommand(command, commandStr='') {
+  
   if (!port || !port.port?.fd) {
      return Promise.reject(new Error('Port has closed'));
   }
@@ -196,76 +220,10 @@ async function disconnectUsb(options) {
 }
 
 
-// Commands
-
-function setMainLED(color, brightness, ledOn) {
-  const commandStr = 
-    `${color.r}`.padStart(3, 0) + 
-    `${color.g}`.padStart(3, 0) +
-    `${color.b}`.padStart(3, 0) +
-    `${brightness.toFixed(2)}` +
-    Number(ledOn);
-    return writeCommand(SET_MAIN_LED, commandStr);
-}
-
-function setDefaultIndex(index) {
-  return writeCommand(SET_DEFAULT_INDEX, index.toString().padStart(2));
-}
-
-
-function setAuxLED(color, ledOn) {
-  // todo...
-  return writeCommand(SET_AUX_LED);
-}
-
-function setDefaultColors(colors) {
-  const defaultColorStrs = [];
-  colors.forEach((defaultColor, index) => {
-    const color = defaultColor.color;
-    const enabled = Number(defaultColor.enabled);
-    defaultColorStrs.push(
-    `${color.r}`.padStart(3, 0) + 
-    `${color.g}`.padStart(3, 0) +
-    `${color.b}`.padStart(3, 0) +
-    `${enabled}`)
-  })
-  for (let i = defaultColorStrs.length; i < 8; i++) {
-    // send disabled colors to fill buffer
-    defaultColorStrs.push(`000`+`000`+`000`+`0`)
-  }
-    const commandStr = defaultColorStrs.join(',')
-  return writeCommand(SET_DEFAULT_LEDS, commandStr);
-}
-
-
-function getMainLED() {
-  return writeCommand(GET_MAIN_LED);
-}
-
-function getDeviceInfo() {
-  return writeCommand(GET_DEVICE_INFO);
-}
-
-function getDefaultLEDs() {
-  return writeCommand(GET_DEFAULT_LEDS);
-}
-
 
 module.exports = {
   connectUsb,
-
+  writeCommand,
   disconnectUsb,
   initializeUsb,
-
-  // commands
-  getMainLED,
-  getDefaultLEDs,
-
-  setMainLED,
-  setDefaultColors,
-  setAuxLED,
-  setDefaultIndex,
-
-  // debug helper
-  //setComPort,
 }
