@@ -27,21 +27,26 @@ let deviceInfo = {}
 
 // Connect to the serial port of the Arduino Uno USB device
 async function initializeUsb(mainWindow) {
+  if (port) {
+    // do not try to connect twice to an open port, this will cause an Access defined error
+    disconnectUsb(); // this function reconnects automatically
+    return;
+  }
   const ports =  await SerialPort.list();
-
-
   let path = '';
   for (let i = 0; i < ports.length; i++) {
     const vendorId = ports[i].vendorId;
     const productId = ports[i].productId;
     // hard coded to Arduino (2341) and 5400 for now
-    if (productId === '5400' && vendorId === '2341') {
+    
+    // TODO do not consider the productID for now so we can connect to any arduino. Note this will always connect to the
+    // first one found so you must only connect one at a time.
+    if (/*productId === '5400' &&*/ vendorId === '2341') {
+      //console.log({productId, vendorId})
       path = ports[i]?.path;
       break;
     }
   }
-
-
   if (path) {
 
     port = new SerialPort({
@@ -50,9 +55,10 @@ async function initializeUsb(mainWindow) {
     })
 
     port.on('error', (e) => {
-      console.log("port error", e)
+      console.log("port error")
+      console.log(e.message)
       setTimeout(()=>{
-        disconnectUsb({reconnect: false}); // TODO, I'm not convinced we need to call disconnect here? if
+        //disconnectUsb({reconnect: false}); // TODO, I'm not convinced we need to call disconnect here? if
         // This error happens when we have port we tried to connect to that is taken and won't allow connections. 
         // Normally we would not call connectUsb followed by disconnectUsb, but because the nextPortCandidateIndex is different,
         // we need to so we can connect to the next port candidate
@@ -65,6 +71,7 @@ async function initializeUsb(mainWindow) {
     parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
     parser.on('data', data => {
+
       const parts = data.split(':');
       const messageId = parts[0].padStart(3,0);
       const ggResponse = parts[1];
@@ -81,7 +88,6 @@ async function initializeUsb(mainWindow) {
 
     // Read the port data
     port.on("open", async () => {
-
       try {
         const result = await getDeviceInfo();
         const [name, version] = result.split('&');
@@ -96,8 +102,9 @@ async function initializeUsb(mainWindow) {
         disconnectUsb();
         return;
       }
+      // send previous state to GG if there was any
       mainWindow.webContents.send('usb-connected');
-      console.log('Seral porti open');
+      console.log('Seral port open');
     });
 
     port.on("close", (options) => {
@@ -107,8 +114,8 @@ async function initializeUsb(mainWindow) {
         delay: 800,
         ...options
       }
-      mainWindow.webContents.send('usb-disconnected');
       port = null;
+      mainWindow.webContents.send('usb-disconnected');
       if (mergedOptions.reconnect) {
         setTimeout(()=>{
           connectUsb(mainWindow);
@@ -120,6 +127,7 @@ async function initializeUsb(mainWindow) {
   } else {
     setTimeout(()=>{
       // retry after a short delay
+      //console.log("retry")
       connectUsb(mainWindow);
     }, 800);
     return false;
@@ -153,7 +161,6 @@ async function connectUsb(mainWindow) {
 async function disconnectUsb(options) {
   if (port) {
     port.close(function (err) {
-      port = null;
     }, options);
   }
 }

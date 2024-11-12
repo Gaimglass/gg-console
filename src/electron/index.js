@@ -87,13 +87,8 @@ if (!gotTheLock) {
       mainWindow.webContents.send('deactivate-led');
     });
     electron.powerMonitor.on("resume", () => {
-      // Always force a disconnect on wake. Sometimes (but not always) we see that the USB connection is broken
-      // but the port is still open. This happens when the PC sleeps and the GG cycles and goes
-      // full bright for a few seconds before turning off. I don't know how to prevent this behavior
-      disconnectUsb({
-        delay: 0,
-        reconnect: true // this will force a reconnection
-      });
+      // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
+      connectUsb(mainWindow);
     });
 
   });
