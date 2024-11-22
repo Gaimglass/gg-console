@@ -1,0 +1,36 @@
+.container {
+  width: 100%;
+  background-color: #306ce1;
+  padding: 0.2em 0;
+  text-align: center;
+  position: fixed;
+}
+
+.container.error {
+  background-color: #e13030;
+}
+
+.update {
+  margin-left: 2em;
+}
+
+.errorWrapper {
+  width: 100%;
+}
+
+.button {
+  float: right;
+  width: auto;
+  height: auto;
+  background-color: transparent;
+  padding: 0.2em 0.4em ;
+  margin-right: 0.5em;
+}
+
+.restart {
+  width: 0.75em;
+  margin-right: 0.5em;
+}
+.button svg {
+  width: 0.75em;
+}

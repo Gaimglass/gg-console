@@ -1,4 +1,4 @@
-let mouseEvents = {
+/* let mouseEvents = {
   on: ()=>{} // stub
 }
 
@@ -34,4 +34,4 @@ function registerMouseEvents(mainWindow) {
 
 module.exports = {
   registerMouseEvents
-}
+} */

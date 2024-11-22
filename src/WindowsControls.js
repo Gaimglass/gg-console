@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import styles from './css/WindowsControls.module.css'
 import PropTypes from 'prop-types';
 
@@ -9,28 +8,29 @@ const ipcRenderer  = electron.ipcRenderer;
 
 function WindowControls(props) {
 
-  const [maximized, setMaximized] = useState(props.maximized);
+  //const [maximized, setMaximized] = useState(props.maximized);
   
   function onMin() {
     ipcRenderer.sendSync('window-minimize');
   }
-  function onMax() {
+  /*function onMax() {
     ipcRenderer.sendSync('window-maximize');
     setMaximized(true);
-  }
+  }*/
   function onClose() {
     ipcRenderer.sendSync('window-close');
   }
-  function onRestore() {
+  /*function onRestore() {
     ipcRenderer.sendSync('window-restore');
     setMaximized(false);
-  }
+  }*/
+
   return (
     <>
       {props.showControls &&
         <div className={styles.controls}>
           <button onClick={onMin}  tabIndex="-1" className={`${styles.button} ${styles.min}`}>
-            <img className={styles.icon} srcSet="icons/min-w-10.png 1x, icons/min-w-12.png 1.25x, icons/min-w-15.png 1.5x, icons/min-w-15.png 1.75x, icons/min-w-20.png 2x, icons/min-w-20.png 2.25x, icons/min-w-24.png 2.5x, icons/min-w-30.png 3x, icons/min-w-30.png 3.5x" draggable="false" />
+            <img alt="" className={styles.icon} srcSet="icons/min-w-10.png 1x, icons/min-w-12.png 1.25x, icons/min-w-15.png 1.5x, icons/min-w-15.png 1.75x, icons/min-w-20.png 2x, icons/min-w-20.png 2.25x, icons/min-w-24.png 2.5x, icons/min-w-30.png 3x, icons/min-w-30.png 3.5x" draggable="false" />
           </button>
 
           {/* { !maximized &&
@@ -44,7 +44,7 @@ function WindowControls(props) {
             </button>
           } */}
           <button onClick={onClose} tabIndex="-1"  className={`${styles.button} ${styles.close}`}>
-            <img className={styles.icon} srcSet="icons/close-w-10.png 1x, icons/close-w-12.png 1.25x, icons/close-w-15.png 1.5x, icons/close-w-15.png 1.75x, icons/close-w-20.png 2x, icons/close-w-20.png 2.25x, icons/close-w-24.png 2.5x, icons/close-w-30.png 3x, icons/close-w-30.png 3.5x" draggable="false" />
+            <img alt="" className={styles.icon} srcSet="icons/close-w-10.png 1x, icons/close-w-12.png 1.25x, icons/close-w-15.png 1.5x, icons/close-w-15.png 1.75x, icons/close-w-20.png 2x, icons/close-w-20.png 2.25x, icons/close-w-24.png 2.5x, icons/close-w-30.png 3x, icons/close-w-30.png 3.5x" draggable="false" />
           </button>
         </div>
       }
