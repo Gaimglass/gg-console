@@ -41,7 +41,7 @@ async function initializeUsb(mainWindow) {
     
     // TODO do not consider the productID for now so we can connect to any arduino. Note this will always connect to the
     // first one found so you must only connect one at a time.
-    if (/*productId === '5400' &&*/ vendorId === '2341') {
+    if (productId === '5400' && vendorId === '2341') {
       //console.log({productId, vendorId})
       path = ports[i]?.path;
       break;
@@ -75,7 +75,7 @@ async function initializeUsb(mainWindow) {
       const parts = data.split(':');
       const messageId = parts[0].padStart(3,0);
       const ggResponse = parts[1];
-      console.log("Gaimglass:", data);
+      //console.log("Gaimglass:", data);
       
       if (serialMessageResults[messageId]) {
         serialMessageResults[messageId].resolve(ggResponse);
@@ -189,7 +189,7 @@ async function writeCommand(command, commandStr='') {
       resolve,
       reject
     }
-    console.log("Write Command:", command, commandStr, port.path);
+    //console.log("Write Command:", command, commandStr, port.path);
     port.write(`${command}${commandStr}\n`);
   });
 

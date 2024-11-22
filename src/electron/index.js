@@ -1,8 +1,10 @@
 const electron = require('electron');
 const Store = require('electron-store');
+const log = require('electron-log/main');
+const fs = require('fs');
 
 const { registerUIEvents } = require('./events/ui');
-const { registerMouseEvents } = require('./events/mouse');
+//const { registerMouseEvents } = require('./events/mouse');
 const { connectUsb,  disconnectUsb } = require('./usb/usb');
 const { registerKeyboardShortcuts } = require('./events/shortcuts');
 
@@ -24,6 +26,7 @@ const store = new Store();
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 var mainWindow;
+var isDev = false;
 // task tray object reference
 var tray = 1;
 
@@ -77,8 +80,8 @@ if (!gotTheLock) {
   // Some APIs can only be used after this event occurs.
   app.on('ready', ()=>{
     createWindow();
-    registerUIEvents(mainWindow)
-    registerMouseEvents(mainWindow)
+    registerUIEvents(mainWindow, app, isDev)
+    //registerMouseEvents(mainWindow)
     registerKeyboardShortcuts(mainWindow);
     /*electron.powerMonitor.on("lock-screen", () => {
     });*/
@@ -126,7 +129,6 @@ async function createWindow() {
   const isMac = process.platform === 'darwin';
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1400,
     width: 720,
     height: 500,
     frame: false,
@@ -150,8 +152,24 @@ async function createWindow() {
   
   if (process.env.NODE_ENV === 'development') {
     // Open the DevTools
+    isDev = true;
     mainWindow.webContents.openDevTools();
+  } else {
+    if(isMac) {
+      // todo https://www.npmjs.com/package/electron-log
+    } else {
+      console.log = log.log
+      console.warn = log.warn
+      console.error = log.error
+      fs.unlink(`${process.env.APPDATA}/Gaimglass/logs/main.log`, (err) => {
+        if (err) {
+          console.error(`Error removing file: ${err}`);
+          return;
+        }
+      });
+    }
   }
+
   connectUsb(mainWindow);
 
   // and load the index.html of the app.
@@ -178,7 +196,7 @@ async function createWindow() {
     }
   });
   
-  mainWindow.on('closed', function () {
+  mainWindow.on('closed', function () { 
     // De-reference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element

@@ -41,6 +41,7 @@ button {
   cursor: pointer;
   text-align: center;
   transition: background 100ms ease-in-out;
+  appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
 
@@ -53,18 +54,10 @@ button {
 }
 
 button:hover {
+  cursor: pointer;
   /* transition: background 50ms ease-in-out;
   background: rgb(30 80 155);
  */
-}
-
-button:focus {
-  /* outline: 1px solid #fff;  
-  outline-offset: -4px;    */
-}
-
-button:active {
- /* background: #6078d8; */
 }
 
 #root .react-colorful {

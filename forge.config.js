@@ -22,7 +22,7 @@ module.exports = {
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {}
     },*/
   ],
   plugins: [
@@ -31,4 +31,17 @@ module.exports = {
       config: {},
     },
   ],
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'Gaimglass',
+          name: 'gg-console'
+        },
+        prerelease: false,
+        draft: true
+      }
+    }
+  ]
 };

@@ -3,13 +3,12 @@ import { RgbaColorPicker } from 'react-colorful';
 import classNames from 'classnames';
 import DefaultColors from './DefaultColors'
 import WindowControls from './WindowsControls'
-
+import UpdateUI from './UpdatesUI'
 import styles from './css/App.module.css'
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
+import  { getMessageResult } from './Utils'
 //import logo from './assets/logo.png';
 import './css/globalStyles.css';
-import { func } from 'prop-types';
-
 
 const electron = window.require('electron');
 const ipcRenderer  = electron.ipcRenderer;
@@ -24,12 +23,12 @@ function App() {
   //const [defaultColorIndex, setDefaultColorIndex] = useState(0); // -1 for a custom color
   const [ledOn, setLEDOn] = useState(false); // defaults to false
   const [isMaximized, setMaximized] = useState(false);
+  const [version, setVersion] = useState('');
   const [isMac, setMac] = useState(false);
-  const [isConnected, setIsConnected] = useState(false); 
+  const [isConnected, setIsConnected] = useState(false);
   const [editSwatch, setEditSwatch] = useState(null);
-
   const [inputColorKey, setInputColorKey] = useState({});
-  const [adsActive, setAdsActive] = useState(false);
+  const [adsActive] = useState(false);
 
 
   useEffect(()=>{
@@ -41,6 +40,9 @@ function App() {
     loadDefaultColorsFromGG();
     // 
     
+    // Receive uninitiated messages from the gg device
+    // these messages are prefixed with "update-" for organization
+
     ipcRenderer.on('update-main-led-state-from-gg', function (evt, message) {
       (throttle(()=>{
         parseMainLedFromGG(message) 
@@ -50,7 +52,7 @@ function App() {
     ipcRenderer.on('update-default-colors-from-gg', function (evt, message) {
       parseDefaultColors(message);
     });
-
+    
     ipcRenderer.on('usb-connected', function (evt, message) {
       // initialize values
       loadMainLedFromGG();
@@ -167,6 +169,7 @@ function App() {
     getMessageResult(ipcRenderer.sendSync('get-app-state'), (result)=>{
       setMaximized(result.isMaximized)
       setMac(result.isMac)
+      setVersion(result.version)
     })
   }
 
@@ -194,17 +197,6 @@ function App() {
   }
 
 
-  async function getMessageResult(promise, cb) {
-    const result = await promise;
-     if (result instanceof Error) {
-      console.warn(result?.message);
-    } else {
-      // todo, update state with new values 
-      if (cb) {
-        cb(result);
-      };
-    }
-  }
 
   function handleEditSwatch(swatch) {
     setEditSwatch(swatch);
@@ -503,6 +495,7 @@ function App() {
             }>
             g<span className={styles.green}>aim</span>glass
             {/* <img src={logo} className="App-logo" alt="gaimglass" /> */}
+            <span className={styles.version}>{version}</span>
           </div>
           <WindowControls maximized={isMaximized} showControls={!isMac}></WindowControls>
         </div>
@@ -510,44 +503,47 @@ function App() {
 
       { isConnected &&
         <div className={styles.mainContainer}>
-          <div className={styles.main}>
-            <div className={styles.mainControls}>
-              {/* <button onClick={readDefault}>Get Default Color</button> */}
-              
-                <button className={classNames({
-                    [styles.power]: true,
-                    [styles.enabled]: ledOn
-                })} onClick={toggleLEDOn}>
-                  <PowerSwitch className={styles.powerIcon}></PowerSwitch>
-                  <span className={styles.ledText}>LED: {ledOn ? " ON " : "OFF"}</span>
-                </button>
-              
-              
-            </div>
-            
-            <RgbaColorPicker
-              color={color}
-              onChange={ throttle(handleColorChange, 50) }
-            ></RgbaColorPicker>
-            <div className={styles.rgbInputs}>
-                <label>R</label><input key={'red_' + inputColorKey.r} onChange={(e)=>(changeRgb(e, 'r'))} defaultValue={color.r} type="text"></input>
-                <label>G</label><input key={'green_' + inputColorKey.g} onChange={(e)=>(changeRgb(e, 'g'))} defaultValue={color.g} type="text"></input>
-                <label>B</label><input key={'blue_' + inputColorKey.b} onChange={(e)=>(changeRgb(e, 'b'))} defaultValue={color.b} type="text"></input>
-                <label>A</label><input key={'alpha_' + inputColorKey.a} onChange={changeAlpha} defaultValue={color.a} type="text"></input>
+          <UpdateUI></UpdateUI>
+          <div className={styles.mainContent}>
+            <div className={styles.main}>
+              <div className={styles.mainControls}>
+                {/* <button onClick={readDefault}>Get Default Color</button> */}
+                
+                  <button className={classNames({
+                      [styles.power]: true,
+                      [styles.enabled]: ledOn
+                  })} onClick={toggleLEDOn}>
+                    <PowerSwitch className={styles.powerIcon}></PowerSwitch>
+                    <span className={styles.ledText}>LED: {ledOn ? " ON " : "OFF"}</span>
+                  </button>
+                
+                
               </div>
-          </div>
-          <div className={styles.colors}>
-            <DefaultColors
-              //activeIndex={defaultColorIndex}
-              colors={defaultColors}
-              onChangeColor={handleColorChange}
-              onSetEditSwatch={handleEditSwatch}
-              editSwatch={editSwatch}
-              onSaveDefaultColor={handleSaveDefaultColor}
-              onDeleteDefaultColor={handleDeleteDefaultColor}
-              onAddDefaultColor={handleAddDefaultColor}
-              onResetDefaultColor={handleResetDefaultColor}
-            ></DefaultColors>
+              
+              <RgbaColorPicker
+                color={color}
+                onChange={ throttle(handleColorChange, 50) }
+              ></RgbaColorPicker>
+              <div className={styles.rgbInputs}>
+                  <label>R</label><input key={'red_' + inputColorKey.r} onChange={(e)=>(changeRgb(e, 'r'))} defaultValue={color.r} type="text"></input>
+                  <label>G</label><input key={'green_' + inputColorKey.g} onChange={(e)=>(changeRgb(e, 'g'))} defaultValue={color.g} type="text"></input>
+                  <label>B</label><input key={'blue_' + inputColorKey.b} onChange={(e)=>(changeRgb(e, 'b'))} defaultValue={color.b} type="text"></input>
+                  <label>A</label><input key={'alpha_' + inputColorKey.a} onChange={changeAlpha} defaultValue={color.a} type="text"></input>
+                </div>
+            </div>
+            <div className={styles.colors}>
+              <DefaultColors
+                //activeIndex={defaultColorIndex}
+                colors={defaultColors}
+                onChangeColor={handleColorChange}
+                onSetEditSwatch={handleEditSwatch}
+                editSwatch={editSwatch}
+                onSaveDefaultColor={handleSaveDefaultColor}
+                onDeleteDefaultColor={handleDeleteDefaultColor}
+                onAddDefaultColor={handleAddDefaultColor}
+                onResetDefaultColor={handleResetDefaultColor}
+              ></DefaultColors>
+            </div>
           </div>
         </div>
       }

@@ -1,8 +1,8 @@
 const electron = require('electron');
 const { getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
+const { checkForUpdates, updateAndRestart } = require('../updates')
 
-
-function registerUIEvents(mainWindow) {
+function registerUIEvents(mainWindow, app, isDev) {
   //
   // Synchronous events from UI to electron
   //
@@ -58,7 +58,8 @@ function registerUIEvents(mainWindow) {
   electron.ipcMain.on('get-app-state', async (event) => {
     event.returnValue = {
       isMaximized: mainWindow.isMaximized(),
-      isMac: process.platform === 'darwin'
+      isMac: process.platform === 'darwin',
+      version: app.getVersion()
       // add others... 
       // TODO these should be pulled from the electron store at boot time and saved there on close
     };
@@ -82,6 +83,28 @@ function registerUIEvents(mainWindow) {
     // hide to try, not exit
     mainWindow.setSkipTaskbar(true);
     mainWindow.hide();
+    event.returnValue = 'okay';
+  });
+
+  electron.ipcMain.on('check-for-updates', async (event) => {
+    try {
+      const result = await checkForUpdates(app.getVersion(), isDev);
+      event.returnValue = {
+        ...result
+      };
+    } catch(err) {
+      event.returnValue = {
+        error: err.message
+      };
+    }
+  });
+
+  electron.ipcMain.on('restart-and-update-app', async (event) => {
+    try {
+      updateAndRestart(app);
+    } catch(err) {
+      console.warn(err)
+    }
     event.returnValue = 'okay';
   });
 }
