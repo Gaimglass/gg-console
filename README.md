@@ -35,7 +35,7 @@ yarn build
 yarn electron-forge make
 ```
 
-This will create a Windows executable file in the `/out/Gaimglass-win32-x64` folder that can be installed locally.
+This will create a Windows executable file in the `\out\make\squirrel.windows\x64` folder that can be installed locally.
 
 To publish a release, ensure the version in incremented in `package.json`. Then merge
 the `develop` branch to main `main`. The release is then built from the publish workflow as a draft. 

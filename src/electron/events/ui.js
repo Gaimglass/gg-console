@@ -86,14 +86,17 @@ function registerUIEvents(mainWindow, app, isDev) {
     event.returnValue = 'okay';
   });
 
-  electron.ipcMain.on('check-for-updates', async (event) => {
+
+  electron.ipcMain.handle('check-for-updates', async (event) => {
     try {
+      console.log("check for updates...")
       const result = await checkForUpdates(app.getVersion(), isDev);
-      event.returnValue = {
+      return {
         ...result
       };
     } catch(err) {
-      event.returnValue = {
+      console.error("check for updates error:", err)
+      return {
         error: err.message
       };
     }

@@ -26,7 +26,8 @@ const store = new Store();
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 var mainWindow;
-var isDev = false;
+var isDev = process.env.NODE_ENV === 'development'
+console.log(process.env.NODE_ENV, "process.env.NODE_ENV")
 // task tray object reference
 var tray = 1;
 
@@ -93,7 +94,14 @@ if (!gotTheLock) {
       // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
       connectUsb(mainWindow);
     });
-
+    process.argv.forEach(arg=>{
+      console.log("arg: ", arg)
+      if (arg.indexOf('hidden')>-1) {
+        console.log("hiding app")
+        mainWindow.setSkipTaskbar(true);
+        mainWindow.hide();
+      }
+    })
   });
 
   // Quit when all windows are closed.
@@ -122,6 +130,19 @@ if (!gotTheLock) {
       mainWindow.focus()
     }
   })
+
+  // Set up the app on startup. Do not do this in dev mode or it will
+  // add the dev exe path to windows start registry
+  if (!isDev) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      openAsHidden: true,
+      scope: "user",
+      enabled : true,
+      args: [`"--hidden"`]
+    })
+  }
+
 }
 
 async function createWindow() {
@@ -149,10 +170,8 @@ async function createWindow() {
   });
 
   //const appIcon = new electron.Tray('./assets/gg_icon.png')
-  
-  if (process.env.NODE_ENV === 'development') {
+  if (isDev) {
     // Open the DevTools
-    isDev = true;
     mainWindow.webContents.openDevTools();
   } else {
     if(isMac) {
@@ -171,7 +190,6 @@ async function createWindow() {
   }
 
   connectUsb(mainWindow);
-
   // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
       pathname: path.join(__dirname, '../../build/index.html'),
@@ -193,6 +211,8 @@ async function createWindow() {
       e.preventDefault();
       mainWindow.setSkipTaskbar(true);
       mainWindow.hide();
+    } else {
+      mainWindow.webContents.send('deactivate-led');
     }
   });
   
