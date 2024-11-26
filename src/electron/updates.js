@@ -29,9 +29,7 @@ async function checkForUpdates(currentVersion, isDev) {
     const feed = `${server}/Gaimglass/gg-console/${process.platform}-${process.arch}/${currentVersion}`
     console.log(`Gaimglass update feed URL: ${feed}`)
     electron.autoUpdater.setFeedURL(feed)
-    console.log(`Gaimglass 1`)
     electron.autoUpdater.checkForUpdates();
-    console.log(`Gaimglass 2`)
 
     electron.autoUpdater.on('checking-for-update', (event, releaseNotes, releaseName) => {
       console.log('checking for updates...')
