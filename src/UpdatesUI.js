@@ -28,10 +28,6 @@ export default function UpdatesIU() {
     return () => clearInterval(interval);
   }, [])
 
-  function hide() {
-    setError(false)
-  }
-
   function restart() {
     getMessageResult(ipcRenderer.sendSync('restart-and-update-app'), (result)=>{
       // no-op, the app should just restart
