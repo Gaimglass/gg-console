@@ -18,6 +18,13 @@ function setDefaultIndex(index) {
   return writeCommand(SERIAL_COMMANDS.SET_DEFAULT_INDEX, index.toString().padStart(2));
 }
 
+function setLEDOn(on) {
+  console.log("+" + on.toString().padStart(2).substring(0,3) + "+");
+  return writeCommand(SERIAL_COMMANDS.SET_LED_ON, on.toString().padStart(2));
+}
+
+
+
 /*
 function setAuxLED(color, ledOn) {
   // todo...
@@ -56,6 +63,7 @@ module.exports = {
   getMainLED,
   getDefaultLEDs,
   setMainLED,
+  setLEDOn,
   setDefaultColors,
   //setAuxLED,
   setDefaultIndex,

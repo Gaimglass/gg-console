@@ -7,6 +7,7 @@ const { registerUIEvents } = require('./events/ui');
 //const { registerMouseEvents } = require('./events/mouse');
 const { connectUsb,  disconnectUsb } = require('./usb/usb');
 const { registerKeyboardShortcuts } = require('./events/shortcuts');
+const { setLEDOn } = require('./usb/serial-commands');
 
 // Module to control application life.
 const app = electron.app;
@@ -94,6 +95,7 @@ if (!gotTheLock) {
       // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
       connectUsb(mainWindow);
     });
+    
     process.argv.forEach(arg=>{
       console.log("arg: ", arg)
       if (arg.indexOf('hidden')>-1) {
@@ -189,7 +191,7 @@ async function createWindow() {
     }
   }
 
-  connectUsb(mainWindow);
+  connectUsb(mainWindow, isDev);
   // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
       pathname: path.join(__dirname, '../../build/index.html'),
@@ -212,7 +214,9 @@ async function createWindow() {
       mainWindow.setSkipTaskbar(true);
       mainWindow.hide();
     } else {
-      mainWindow.webContents.send('deactivate-led');
+      // don't send deactivate-led to the UI here, it won't always work.
+      // we are shutting down the app and the UI is not reliable. Just force the LED off
+      setLEDOn(0);
     }
   });
   

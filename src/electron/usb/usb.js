@@ -19,6 +19,7 @@ const serialMessageResults = {
 let port = null;
 let parser = null;
 let deviceInfo = {}
+let isDev = false;
 
 // Hack to delay sending data until the arduino is ready. When connecting
 // to the serial port through the arduino's USB port, it causes a restart and 1 second delay.
@@ -26,7 +27,8 @@ let deviceInfo = {}
 // let serialReady = ()=>(console.error("Promise not created"));
 
 // Connect to the serial port of the Arduino Uno USB device
-async function initializeUsb(mainWindow) {
+async function initializeUsb(mainWindow, _isDev) {
+  isDev = _isDev;
   if (port) {
     // do not try to connect twice to an open port, this will cause an Access defined error
     disconnectUsb(); // this function reconnects automatically
@@ -75,7 +77,10 @@ async function initializeUsb(mainWindow) {
       const parts = data.split(':');
       const messageId = parts[0].padStart(3,0);
       const ggResponse = parts[1];
-      //console.log("Gaimglass:", data);
+      
+      if (isDev) {
+        console.log("Gaimglass:", data);
+      }
       
       if (serialMessageResults[messageId]) {
         serialMessageResults[messageId].resolve(ggResponse);
@@ -154,8 +159,8 @@ function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
 }
 
 // Attempt to connect to the USB device
-async function connectUsb(mainWindow) {
-  return initializeUsb(mainWindow);
+async function connectUsb(mainWindow, isDev) {
+  return initializeUsb(mainWindow, isDev);
 }
 
 async function disconnectUsb(options) {
@@ -189,7 +194,9 @@ async function writeCommand(command, commandStr='') {
       resolve,
       reject
     }
-    //console.log("Write Command:", command, commandStr, port.path);
+    if (isDev) {
+      console.log("Write Command:", command, commandStr, port.path);
+    }
     port.write(`${command}${commandStr}\n`);
   });
 

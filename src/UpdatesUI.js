@@ -37,6 +37,7 @@ export default function UpdatesIU() {
   async function checkForUpdates() {
     const result = await ipcRenderer.invoke('check-for-updates');
     if (result.error) {
+      // keep errors silent, mostly these are network connection issues that can be ignored
       setError(true);
       setUpdateRequired(false);
       //setErrorMessage(result.error);
@@ -53,7 +54,7 @@ export default function UpdatesIU() {
   }
   
 
-  const show = updateRequired || error ? 'visible' : 'hidden';
+  const show = updateRequired ? 'visible' : 'hidden';
   return <div style={{visibility: show}} className={classNames({
     [styles.container]: true,
     //[styles.error]: error
@@ -62,7 +63,7 @@ export default function UpdatesIU() {
       <div>
         <span>New update installed: {releaseName}</span>
         <button onClick={restart} className={styles.update}>
-          <RotateLeft className={styles.restart}></RotateLeft>Restart App</button>
+          <RotateLeft className={styles.restart}></RotateLeft>Restart required</button>
       </div>
     }
     
