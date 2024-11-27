@@ -14,7 +14,7 @@ const ipcRenderer  = electron.ipcRenderer;
 export default function UpdatesIU() {
 
   const [updateRequired, setUpdateRequired] = useState(false);
-  const [error, setError] = useState(false);
+
 
   const [releaseName, setReleaseName] = useState('');
   // eslint-disable-next-line no-unused-vars
@@ -38,18 +38,15 @@ export default function UpdatesIU() {
     const result = await ipcRenderer.invoke('check-for-updates');
     if (result.error) {
       // keep errors silent, mostly these are network connection issues that can be ignored
-      setError(true);
       setUpdateRequired(false);
       //setErrorMessage(result.error);
     } else if (result.updateAvailable) {
       setReleaseName(result.releaseName)
       setReleaseNotes(result.releaseNotes)
-      setError(false);
       setUpdateRequired(true);
     }
     else {
       setUpdateRequired(false);
-      setError(false);
     }
   }
   
