@@ -30,8 +30,12 @@ let isDev = false;
 async function initializeUsb(mainWindow, _isDev) {
   isDev = _isDev;
   if (port) {
+    console.log("port found, closing port")
     // do not try to connect twice to an open port, this will cause an Access defined error
-    disconnectUsb(); // this function reconnects automatically
+    disconnectUsb({
+      reconnect: true,
+      delay: 800,
+    }, mainWindow, isDev);
     return;
   }
   const ports =  await SerialPort.list();
@@ -50,7 +54,6 @@ async function initializeUsb(mainWindow, _isDev) {
     }
   }
   if (path) {
-
     port = new SerialPort({
       path,
       baudRate: 115200,
@@ -60,11 +63,10 @@ async function initializeUsb(mainWindow, _isDev) {
       console.log("port error")
       console.log(e.message)
       setTimeout(()=>{
-        //disconnectUsb({reconnect: false}); // TODO, I'm not convinced we need to call disconnect here? if
-        // This error happens when we have port we tried to connect to that is taken and won't allow connections. 
-        // Normally we would not call connectUsb followed by disconnectUsb, but because the nextPortCandidateIndex is different,
-        // we need to so we can connect to the next port candidate
-        connectUsb(mainWindow);
+        disconnectUsb({
+          reconnect: true,
+          delay: 800,
+        }, mainWindow, isDev);
       }, 800)
       
     })
@@ -100,11 +102,14 @@ async function initializeUsb(mainWindow, _isDev) {
         deviceInfo.version = version.split('=')[1]
 
         if (deviceInfo.name !== 'ggpro') {
-          throw new Error("Invalid device name");
+          throw new Error(`Invalid device name, expected "ggpro" and found ${deviceInfo.name}`);
         }
       } catch(err) {
         console.error(err)
-        disconnectUsb();
+        disconnectUsb({
+          reconnect: true,
+          delay: 800,
+          }, mainWindow);
         return;
       }
       // send previous state to GG if there was any
@@ -123,7 +128,7 @@ async function initializeUsb(mainWindow, _isDev) {
       mainWindow.webContents.send('usb-disconnected');
       if (mergedOptions.reconnect) {
         setTimeout(()=>{
-          connectUsb(mainWindow);
+          connectUsb(mainWindow, isDev);
         }, mergedOptions.delay);
       }
     });
@@ -132,8 +137,7 @@ async function initializeUsb(mainWindow, _isDev) {
   } else {
     setTimeout(()=>{
       // retry after a short delay
-      //console.log("retry")
-      connectUsb(mainWindow);
+      connectUsb(mainWindow, isDev);
     }, 800);
     return false;
     
@@ -163,10 +167,14 @@ async function connectUsb(mainWindow, isDev) {
   return initializeUsb(mainWindow, isDev);
 }
 
-async function disconnectUsb(options) {
+async function disconnectUsb(options, mainWindow, isDev) {
   if (port) {
-    port.close(function (err) {
-    }, options);
+    port.close((err) => {}, options);
+  } else if(options.reconnect) {
+    setTimeout(()=>{
+      connectUsb(mainWindow, isDev);
+    }, options.delay);
+    
   }
 }
 

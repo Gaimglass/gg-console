@@ -1,11 +1,12 @@
 const electron = require('electron');
 
+
 async function checkForUpdates(currentVersion, isDev) {
+
   return new Promise((resolve, reject)=>{
     if (isDev) {
       setTimeout(()=>{
         resolve({
-
           updateAvailable: true,
           releaseNotes:'test', 
           releaseName: '1.2.3'
@@ -13,56 +14,59 @@ async function checkForUpdates(currentVersion, isDev) {
       },1000)
       return
     }
-    /*if (isDev) {
-      // test only
-      resolve({
-        updateAvailable: true,
-        releaseNotes:'test', 
-        releaseName: '1.2.3'});
-        reject({
-          message: "Some error happened"
-        })
-      return
-    }*/
-    // Election auto updates
-    const server = 'https://update.electronjs.org'
-    const feed = `${server}/Gaimglass/gg-console/${process.platform}-${process.arch}/${currentVersion}`
-    console.log(`Gaimglass update feed URL: ${feed}`)
-    electron.autoUpdater.setFeedURL(feed)
-    electron.autoUpdater.checkForUpdates();
 
-    electron.autoUpdater.on('checking-for-update', (event, releaseNotes, releaseName) => {
+    const checkingForUpdate = function(event, releaseNotes, releaseName) {
       console.log('checking for updates...')
       // do we want a loader icon in the UI? this is minor.
-    })
-
-    electron.autoUpdater.on('update-not-available', (event, releaseNotes, releaseName) => {
-      console.log('update-not-available')
-      resolve({updateAvailable: false})
-      // do we want a loader icon in the UI? this is minor.
-    })
-
-    electron.autoUpdater.on('update-available', (event, releaseNotes, releaseName) => {
+    }
+    const updateAvailable = function(event, releaseNotes, releaseName) {
       console.log('update-available')
-      // do we want a loader icon in the UI? this is minor.
-    })
-    
-
-    electron.autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+    }
+    const updateNotAvailable = function(event, releaseNotes, releaseName) {
+      console.log('update-not-available')
+      cleanUpEvents();
+      resolve({updateAvailable: false})
+    }
+    const updateDownloaded = function(event, releaseNotes, releaseName) {
       console.log('updates downloaded')
+      cleanUpEvents();
       resolve({
         updateAvailable: true,
         releaseNotes,
         releaseName,
       })
-    })
-
-    electron.autoUpdater.on('error', (message) => {
+    }
+    const updateError = function(message) {
       console.error('update error', message)
+      cleanUpEvents();
       reject({
         message
       })
-    }) 
+    }
+
+    const cleanUpEvents = function() {
+      console.log("listeners removing....")
+      electron.autoUpdater.removeListener('checking-for-update', checkingForUpdate)
+      electron.autoUpdater.removeListener('update-not-available', updateNotAvailable)
+      electron.autoUpdater.removeListener('update-available', updateAvailable)
+      electron.autoUpdater.removeListener('update-downloaded', updateDownloaded)
+      electron.autoUpdater.removeListener('error', updateError)
+      console.log("listeners removed")
+    }
+
+    const server = 'https://update.electronjs.org'
+    const feed = `${server}/Gaimglass/gg-console/${process.platform}-${process.arch}/${currentVersion}`
+    console.log(`Gaimglass update feed URL: ${feed}`)
+
+    electron.autoUpdater.on('checking-for-update', checkingForUpdate);
+    electron.autoUpdater.on('update-not-available', updateNotAvailable)
+    electron.autoUpdater.on('update-available', updateAvailable)
+    electron.autoUpdater.on('update-downloaded', updateDownloaded)
+    electron.autoUpdater.on('error', updateError)
+
+    electron.autoUpdater.setFeedURL(feed)
+    electron.autoUpdater.checkForUpdates();
+    
   })
 }
 

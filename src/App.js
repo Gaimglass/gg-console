@@ -3,7 +3,7 @@ import { RgbaColorPicker } from 'react-colorful';
 import classNames from 'classnames';
 import DefaultColors from './DefaultColors'
 import WindowControls from './WindowsControls'
-import UpdateUI from './UpdatesUI'
+import UpdatesUI from './UpdatesUI'
 import styles from './css/App.module.css'
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
 import  { getMessageResult } from './Utils'
@@ -503,7 +503,7 @@ function App() {
 
       { isConnected &&
         <div className={styles.mainContainer}>
-          <UpdateUI></UpdateUI>
+          <UpdatesUI></UpdatesUI>
           <div className={styles.mainContent}>
             <div className={styles.main}>
               <div className={styles.mainControls}>
