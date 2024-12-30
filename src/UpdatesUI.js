@@ -21,9 +21,9 @@ export default function UpdatesIU() {
   const [releaseNotes, setReleaseNotes] = useState('');
   
   useEffect(()=>{
-    checkForUpdates();
+    checkForUpdatesUI();
     const interval = setInterval(() => {
-      checkForUpdates();
+      checkForUpdatesUI();
     }, 1000 * 60 * 60); // continue checking once an hour
     return () => clearInterval(interval);
   }, [])
@@ -34,7 +34,7 @@ export default function UpdatesIU() {
     })
   }
 
-  async function checkForUpdates() {
+  async function checkForUpdatesUI() {
     const result = await ipcRenderer.invoke('check-for-updates');
     if (result.error) {
       // keep errors silent, mostly these are network connection issues that can be ignored
