@@ -48,7 +48,7 @@
     "@electron-forge/maker-zip": "^6.2.1",
     "@electron-forge/plugin-auto-unpack-natives": "^6.2.1",
     "@electron-forge/publisher-github": "^7.5.0",
-    "electron": "^19.0.8",
+    "electron": "^19.1.9",
     "electron-rebuild": "^3.2.8"
   },
   "main": "./src/electron/index.js",
