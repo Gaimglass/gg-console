@@ -174,7 +174,15 @@ async function createWindow() {
   //const appIcon = new electron.Tray('./assets/gg_icon.png')
   if (isDev) {
     // Open the DevTools
-    mainWindow.webContents.openDevTools();
+    const devtools = new BrowserWindow({ width: 900, height: 500 });
+    mainWindow.webContents.setDevToolsWebContents(devtools.webContents);  
+    mainWindow.webContents.openDevTools({mode: 'detach'});
+    // HACK to move this stupid devtools window
+    mainWindow.webContents.once('did-finish-load', function () {
+        var windowBounds = mainWindow.getBounds();
+        devtools.setPosition(windowBounds.x + windowBounds.width, windowBounds.y);
+    });
+
   } else {
     if(isMac) {
       // todo https://www.npmjs.com/package/electron-log
