@@ -6,29 +6,47 @@
 
 
 .App {
-  /* background-color: #282c34; */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: left;
-  
-  color: white; 
+  color: #ccc;
 }
 
 .mainContainer {
+  padding-top: 24px; /* match header */
+}
+
+.tabContainer {
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-  padding-top: 24px; /* match header */
 }
+.tabControls {
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  display: flex;
+  list-style-type: none;
+  padding: 0 0.75em;
+}
+
+/* tab */
+.tabControls li {
+  padding: 0;
+}
+.tabControls li[aria-selected=true] button {
+  color: white;
+}
+
+.tabControls li button {
+  background-color: transparent;
+}
+
 
 .mainContent {
   display: flex;
   flex-direction: row;
   align-items: center;
   padding: 0 1em;
-  margin-top: 4em;
+  margin-top: 3em;
 }
 
 .main {
@@ -57,6 +75,8 @@
   width: calc(100% - 2px);
   padding: 4px 0;
   background: rgba(0,0,0,0.3);
+  border-bottom: 1px solid black;
+  box-shadow: 0 0 25px rgba(0,0,0,0.5);
 }
 
 .version {

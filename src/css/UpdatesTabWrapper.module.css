@@ -1,14 +1,18 @@
 .container {
   width: 100%;
-  background-color: #306ce1;
   padding: 0.2em 0;
   text-align: center;
-  position: fixed;
+  display: flex;
+  justify-content: space-between;
 }
 
+.container.restartRequired {
+  background-color: #306ce1;
+}
 .container.error {
   background-color: #e13030;
 }
+
 
 .update {
   margin-left: 2em;
@@ -18,6 +22,9 @@
   width: 100%;
 }
 
+.buttonContainer {
+  margin-right: 1em;
+}
 .button {
   float: right;
   width: auto;

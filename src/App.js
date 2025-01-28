@@ -3,8 +3,11 @@ import { RgbaColorPicker } from 'react-colorful';
 import classNames from 'classnames';
 import DefaultColors from './DefaultColors'
 import WindowControls from './WindowsControls'
-import UpdatesUI from './UpdatesUI'
+import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
+import UpdatesTabWrapper from './UpdatesTabWrapper'
+
 import styles from './css/App.module.css'
+
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
 import  { getMessageResult } from './Utils'
 //import logo from './assets/logo.png';
@@ -248,7 +251,7 @@ function App() {
   function handleColorChange(_newColor, defaultIndex = -1,) {
   
     // defaults don't have an alpha so use the current value
-    let alpha = _newColor.a ?? color.a;
+    let alpha = _newColor?.a ?? color.a;
 
     const newColor = {
       ..._newColor,
@@ -476,10 +479,10 @@ function App() {
     
     var arr = [...e.target.value];
     if (arr[0] === '.') {
-      e.target.value = ['0', ...e.target.value].splice(0).join('');      
+      e.target.value = ['0', ...e.target.value].splice(0).join('');
     }
     if (e.target.value.length > 4) {
-      e.target.value = [...e.target.value].splice(0,4).join('');  
+      e.target.value = [...e.target.value].splice(0,4).join('');
     }
   }
 
@@ -503,48 +506,58 @@ function App() {
 
       { isConnected &&
         <div className={styles.mainContainer}>
-          <UpdatesUI></UpdatesUI>
-          <div className={styles.mainContent}>
-            <div className={styles.main}>
-              <div className={styles.mainControls}>
-                {/* <button onClick={readDefault}>Get Default Color</button> */}
-                
-                  <button className={classNames({
-                      [styles.power]: true,
-                      [styles.enabled]: ledOn
-                  })} onClick={toggleLEDOn}>
-                    <PowerSwitch className={styles.powerIcon}></PowerSwitch>
-                    <span className={styles.ledText}>LED: {ledOn ? " ON " : "OFF"}</span>
-                  </button>
-                
-                
-              </div>
-              
-              <RgbaColorPicker
-                color={color}
-                onChange={ throttle(handleColorChange, 50) }
-              ></RgbaColorPicker>
-              <div className={styles.rgbInputs}>
-                  <label>R</label><input key={'red_' + inputColorKey.r} onChange={(e)=>(changeRgb(e, 'r'))} defaultValue={color.r} type="text"></input>
-                  <label>G</label><input key={'green_' + inputColorKey.g} onChange={(e)=>(changeRgb(e, 'g'))} defaultValue={color.g} type="text"></input>
-                  <label>B</label><input key={'blue_' + inputColorKey.b} onChange={(e)=>(changeRgb(e, 'b'))} defaultValue={color.b} type="text"></input>
-                  <label>A</label><input key={'alpha_' + inputColorKey.a} onChange={changeAlpha} defaultValue={color.a} type="text"></input>
-                </div>
-            </div>
-            <div className={styles.colors}>
-              <DefaultColors
-                //activeIndex={defaultColorIndex}
-                colors={defaultColors}
-                onChangeColor={handleColorChange}
-                onSetEditSwatch={handleEditSwatch}
-                editSwatch={editSwatch}
-                onSaveDefaultColor={handleSaveDefaultColor}
-                onDeleteDefaultColor={handleDeleteDefaultColor}
-                onAddDefaultColor={handleAddDefaultColor}
-                onResetDefaultColor={handleResetDefaultColor}
-              ></DefaultColors>
-            </div>
-          </div>
+              <Tabs className={styles.tabContainer}>
+                <UpdatesTabWrapper>
+                  <TabList className={styles.tabControls}>
+                    <Tab tabIndex="-1"><button>Calibrate</button></Tab>
+                    <Tab tabIndex="-1"><button>Settings</button></Tab>
+                  </TabList>
+                </UpdatesTabWrapper>
+                <TabPanel>
+                  <div className={styles.mainContent}>
+                    <div className={styles.main}>
+                      <div className={styles.mainControls}>
+                        {/* <button onClick={readDefault}>Get Default Color</button> */}
+                        
+                          <button className={classNames({
+                              [styles.power]: true,
+                              [styles.enabled]: ledOn
+                          })} onClick={toggleLEDOn}>
+                            <PowerSwitch className={styles.powerIcon}></PowerSwitch>
+                            <span className={styles.ledText}>LED: {ledOn ? " ON " : "OFF"}</span>
+                          </button>
+                        
+                        
+                      </div>
+                      
+                      <RgbaColorPicker
+                        color={color}
+                        onChange={ throttle(handleColorChange, 50) }
+                      ></RgbaColorPicker>
+                      <div className={styles.rgbInputs}>
+                          <label>R</label><input key={'red_' + inputColorKey.r} onChange={(e)=>(changeRgb(e, 'r'))} defaultValue={color.r} type="text"></input>
+                          <label>G</label><input key={'green_' + inputColorKey.g} onChange={(e)=>(changeRgb(e, 'g'))} defaultValue={color.g} type="text"></input>
+                          <label>B</label><input key={'blue_' + inputColorKey.b} onChange={(e)=>(changeRgb(e, 'b'))} defaultValue={color.b} type="text"></input>
+                          <label>A</label><input key={'alpha_' + inputColorKey.a} onChange={changeAlpha} defaultValue={color.a} type="text"></input>
+                        </div>
+                    </div>
+                    <div className={styles.colors}>
+                      <DefaultColors
+                        //activeIndex={defaultColorIndex}
+                        colors={defaultColors}
+                        onChangeColor={handleColorChange}
+                        onSetEditSwatch={handleEditSwatch}
+                        editSwatch={editSwatch}
+                        onSaveDefaultColor={handleSaveDefaultColor}
+                        onDeleteDefaultColor={handleDeleteDefaultColor}
+                        onAddDefaultColor={handleAddDefaultColor}
+                        onResetDefaultColor={handleResetDefaultColor}
+                      ></DefaultColors>
+                    </div>
+                  </div>
+                </TabPanel>
+          </Tabs>
+          
         </div>
       }
       { !isConnected &&
