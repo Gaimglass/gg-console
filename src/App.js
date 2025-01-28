@@ -451,6 +451,12 @@ function App() {
     }
   }
 
+  function handleChangeToCalibrateTab() {
+    // fixes a bug where if the user was editing a swatch color but didn't save to GG, the color
+    // would be set in the UI, but not in GG, this reset the UI to match GG.
+    loadDefaultColorsFromGG();
+  }
+
   function changeAlpha(e) {
     const rawString = e.target.value.trim();
     let updateKey = false; // force an update on the input field too
@@ -509,7 +515,7 @@ function App() {
               <Tabs className={styles.tabContainer}>
                 <UpdatesTabWrapper>
                   <TabList className={styles.tabControls}>
-                    <Tab tabIndex="-1"><button>Calibrate</button></Tab>
+                    <Tab tabIndex="-1"><button onClick={handleChangeToCalibrateTab}>Calibrate</button></Tab>
                     <Tab tabIndex="-1"><button>Settings</button></Tab>
                   </TabList>
                 </UpdatesTabWrapper>

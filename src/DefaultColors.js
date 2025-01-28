@@ -17,6 +17,13 @@ function DefaultColors(props) {
   const [previousColor, setPreviousColor] = useState(null);
 
   useEffect(() => {
+    return ()=>{
+      // cancel out of editing swatches if unmounting
+      props.onSetEditSwatch(null);
+    }
+  }, [])
+  
+  useEffect(() => {
     var c = canvasRef.current;
     var ctx = c.getContext('2d');
     ctx.clearRect(0, 0, c.width, c.height);
