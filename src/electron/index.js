@@ -12,7 +12,7 @@ const { setLEDOn } = require('./usb/serial-commands');
 // Module to control application life.
 const app = electron.app;
 // https://stackoverflow.com/questions/70267992/win10-electron-error-passthrough-is-not-supported-gl-is-disabled-angle-is
-app.disableHardwareAcceleration()
+//app.disableHardwareAcceleration()
 
 // Module to create native browser window.
 const BrowserWindow = electron.BrowserWindow;
@@ -155,9 +155,11 @@ async function createWindow() {
     width: 720,
     height: 500,
     frame: false,
+    show: false,
     icon: path.join(__dirname, '../assets/gg_icon.png'),
     /* minHeight:600,
     minWidth:700, */
+    //autoHideMenuBar: true, //https://stackoverflow.com/questions/45850802/hiding-the-window-menu-when-app-is-full-screen-on-windows
     maximizable: false,
     fullscreenable: false,
     resizable: false,
@@ -165,6 +167,7 @@ async function createWindow() {
     titleBarStyle: 'hidden',
     titleBarOverlay: process.platform === 'darwin' ? true : false,
     webPreferences: {
+      backgroundThrottling: false,
       nodeIntegration: true,
       enableRemoteModule: true,
       contextIsolation: false,
@@ -206,6 +209,7 @@ async function createWindow() {
       protocol: 'file:',
       slashes: true
   });
+  
 
   mainWindow.loadURL(startUrl);
 
@@ -213,6 +217,10 @@ async function createWindow() {
   if (process.platform !== 'darwin') {
     tray = createTray();
   }
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show()
+  })
 
   // Emitted when the window is closed.
   mainWindow.on('close', function (e) {
