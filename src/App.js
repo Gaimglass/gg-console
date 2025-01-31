@@ -9,6 +9,7 @@ import UpdatesTabWrapper from './UpdatesTabWrapper'
 import styles from './css/App.module.css'
 
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
+import {ReactComponent as Crosshairs} from './assets/crosshair.svg';
 import  { getMessageResult } from './Utils'
 //import logo from './assets/logo.png';
 import './css/globalStyles.css';
@@ -457,6 +458,10 @@ function App() {
     loadDefaultColorsFromGG();
   }
 
+  function handleCalibrate() {
+    ipcRenderer.invoke('calibrate-gaimglass'); // dont bother with waiting for a result
+  }
+
   function changeAlpha(e) {
     const rawString = e.target.value.trim();
     let updateKey = false; // force an update on the input field too
@@ -530,7 +535,14 @@ function App() {
                               [styles.enabled]: ledOn
                           })} onClick={toggleLEDOn}>
                             <PowerSwitch className={styles.powerIcon}></PowerSwitch>
-                            <span className={styles.ledText}>LED: {ledOn ? " ON " : "OFF"}</span>
+                            <span className={styles.powerText}>LED: {ledOn ? " ON " : "OFF"}</span>
+                          </button>
+                          <button title="test" className={classNames({
+                              [styles.calibrate]: true,
+                          })} onClick={()=>{
+                            handleCalibrate();
+                          }}>
+                            <Crosshairs className={styles.crosshairIcon}></Crosshairs>
                           </button>
                         
                         
@@ -567,7 +579,7 @@ function App() {
         </div>
       }
       { !isConnected &&
-        <div className={styles.disconnected}><span>Gaimglass connecting...</span></div>
+        <div className={styles.disconnected}><span>Gaimglass not connected</span></div>
       }
     </div>
   );

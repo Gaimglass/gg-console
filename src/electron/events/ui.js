@@ -1,6 +1,12 @@
 const electron = require('electron');
+const path = require('path');
+const url = require('url');
+
 const { getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 const { checkForUpdates, updateAndRestart } = require('../updates')
+const { toggleCalibrateWindow } = require('../calibrateWindow')
+
+const BrowserWindow = electron.BrowserWindow;
 
 function registerUIEvents(mainWindow, app, isDev) {
   //
@@ -87,6 +93,19 @@ function registerUIEvents(mainWindow, app, isDev) {
   });
 
 
+  electron.ipcMain.on('restart-and-update-app', async (event) => {
+    try {
+      updateAndRestart(app);
+    } catch(err) {
+      console.warn(err)
+    }
+    event.returnValue = 'okay';
+  });
+
+  //
+  // Non-blocking handlers
+  //
+
   electron.ipcMain.handle('check-for-updates', async (event) => {
     try {
       console.log("check for updates...")
@@ -102,14 +121,10 @@ function registerUIEvents(mainWindow, app, isDev) {
     }
   });
 
-  electron.ipcMain.on('restart-and-update-app', async (event) => {
-    try {
-      updateAndRestart(app);
-    } catch(err) {
-      console.warn(err)
-    }
-    event.returnValue = 'okay';
+  electron.ipcMain.handle('calibrate-gaimglass', async (event) => {
+    toggleCalibrateWindow()
   });
+
 }
 
 module.exports = {

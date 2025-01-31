@@ -114,7 +114,8 @@
   height: 100vh;
   display: flex;
   align-items: center;
-  color: #ccc
+  color: #ccc;
+  justify-content: center;
 }
 
 .powerIcon {
@@ -122,17 +123,34 @@
   position: relative;
   top: 2px;
   fill: #888;
-
 }
+
+.crosshairIcon {
+  width: 30px;
+  height: 30px;
+  position: relative;
+  top: 2px;
+  fill: #FFF;
+  stroke: #FFF;
+}
+
 .power {
   margin: 0;
   margin-bottom: 1em;
   background-color: #222;
-  width: 100%;
-  color: #888;
+  width: 80%;
   border: 1px solid black;
   border-radius: 8px;
-  
+  color: #888;
+  margin-right: 0.5em;
+}
+.calibrate {
+  margin: 0;
+  margin-bottom: 1em;
+  background-color: #222;
+  width: 20%;
+  border: 1px solid black;
+  border-radius: 8px;
 }
 
 .enabled {
@@ -145,7 +163,7 @@
   fill: #fff;
 }
 
-.ledText {
+.powerText {
   width: 100px;
   display: inline-block;
   position: relative;
@@ -153,11 +171,14 @@
   text-align: left;
   margin-left: 1em;
 }
+
 .powerButtonRow {
 
 }
+
 .mainControls {
   width: 100%;
+  display: flex;
 }
 
 .rgbInputs {
