@@ -4,6 +4,7 @@
   text-align: center;
   display: flex;
   justify-content: space-between;
+  background-color: rgba(0,0,0,0.2);
 }
 
 .container.restartRequired {
