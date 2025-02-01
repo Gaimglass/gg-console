@@ -12,8 +12,11 @@ canvas {
   background-color: transparent;
   position: fixed;
   right: 0;
-  
 }
+.close svg:hover {
+  fill: rgba(255,255,255,1);
+}
+
 .close svg {
   width: 2em;
   height: 2em;
