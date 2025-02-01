@@ -21,6 +21,7 @@ function DefaultColors(props) {
       // cancel out of editing swatches if unmounting
       props.onSetEditSwatch(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   
   useEffect(() => {
