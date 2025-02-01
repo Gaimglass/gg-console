@@ -20,7 +20,7 @@ In a separate tab after react start, run
 yarn electron-dev
 ```
 
-## Build for production
+## Build for production (locally)
 
 ### 1. To build the frontend for production
 ```
@@ -42,3 +42,15 @@ the `develop` branch to main `main`. The release is then built from the publish 
 If the app looks good, then the release needs to be manually edited out of draft and tagged in github. 
 
 > note: The publish workflow uses `publish-gg` script from `package.json`
+
+
+## Release a new production version online
+
+1. bump the version in package.json
+2. make a commit to `develop`
+3. create a PR `develop` -> `main` and then merge
+
+_A new draft release will be built by the action `publish.yaml`_
+
+4. Convert the draft release to final.
+
