@@ -169,8 +169,19 @@ async function connectUsb(mainWindow, isDev) {
 
 async function disconnectUsb(options, mainWindow, isDev) {
   if (port) {
-    port.close((err) => {}, options);
+    console.log("port found, attempting to close port")
+    port.close((error) => {
+      if (error) {
+        console.log("port on close error: ", error)
+        setTimeout(()=>{
+          connectUsb(mainWindow, isDev);
+        }, options.delay)
+      } else {
+        console.log("port closed successfully")
+      }
+    });
   } else if(options.reconnect) {
+    console.log("port not found on close")
     setTimeout(()=>{
       connectUsb(mainWindow, isDev);
     }, options.delay);

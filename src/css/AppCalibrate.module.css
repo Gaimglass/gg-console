@@ -1,0 +1,21 @@
+canvas {
+  overflow: none;
+}
+
+.bodyCalibrate {
+  margin: 0;
+  overflow: hidden!important;
+  background-color: #111;
+}
+
+.close {
+  background-color: transparent;
+  position: fixed;
+  right: 0;
+  
+}
+.close svg {
+  width: 2em;
+  height: 2em;
+  fill: rgba(255,255,255,0.6);
+}

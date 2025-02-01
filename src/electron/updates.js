@@ -7,7 +7,8 @@ async function checkForUpdates(currentVersion, isDev) {
     if (isDev) {
       setTimeout(()=>{
         resolve({
-          updateAvailable: true,
+          //updateAvailable: true,
+          updateAvailable: false,
           releaseNotes:'test', 
           releaseName: '1.2.3'
         })

@@ -1,4 +1,5 @@
 const {app, globalShortcut} = require('electron')
+const { toggleCalibrateWindow } = require('../calibrateWindow')
 
 // https://www.electronjs.org/docs/latest/api/accelerator
 
@@ -20,6 +21,11 @@ function registerKeyboardShortcuts(mainWindow) {
   globalShortcut.register('CommandOrControl+num0', () => {
     mainWindow.webContents.send('shortcut-toggle-led');
   })
+
+  globalShortcut.register('CommandOrControl+numdec', () => {
+    toggleCalibrateWindow();
+  })
+  
 
   for(let i = 0; i < 9; i++) {
     globalShortcut.register(`CommandOrControl+num${i}`, () => {
