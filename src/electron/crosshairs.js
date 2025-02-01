@@ -1,4 +1,6 @@
-var TrailLineWidth = 2;
+var TrailLineWidth = 1;
+
+// default color
 var LineColor = {
     r: 200,
     g: 40,
@@ -158,7 +160,7 @@ class Pulse {
     ctx.ellipse(this.dx, this.dy, this.width, this.height, 0, 0, 360);
 
     //ctx.lineWidth=1.5;
-    ctx.fillStyle=`rgba(${LineColor.r},${LineColor.g},${LineColor.b},1)`;
+    ctx.fillStyle=`rgba(${LineColor.r},${LineColor.g},${LineColor.b}, 1)`;
     ctx.filter = 'blur(5px)';
     ctx.fill();
     ctx.filter = 'blur(15px)';
@@ -180,7 +182,8 @@ class Ripple {
     this.x = startPos.x
     this.y = startPos.y
     this.size = props.startRadius;
-    this.opacity = rgb.a;
+    this.opacity = 0.4 //rgb.a;
+
     this.fadeFactor = props.fadeFactor;
     this.speed = props.speed;
     this.onDone = callback;
@@ -195,7 +198,7 @@ class Ripple {
     this.ctx.beginPath()
     this.ctx.ellipse(this.x, this.y, this.size, this.size, 0, 0, 360);
     this.ctx.lineWidth=4;
-    this.ctx.strokeStyle=`rgba(${this.rgb.r},${this.rgb.g},${this.rgb.b},${this.opacity})`;
+    this.ctx.strokeStyle=`rgba(${this.rgb.r},${this.rgb.g},${this.rgb.b},${this.opacity*0.25})`;
     this.ctx.filter = `blur(${this.width}px`;
     this.ctx.stroke();
     
@@ -246,16 +249,20 @@ class LineSegment {
 }
 class Crosshairs {
 
-  constructor(ctx) {
+  constructor(ctx, color) {
     this.ctx = ctx;
     this.activeIndex = 1;
     this.pulses = {};
     this.ripples = {};
-    this.pulseDeployDelay = 1100;
+    this.pulseDeployDelay = 900;
     this.lastPulseDeploy = 0;
     this.allHidden = false;
     ctx.canvas.width = window.innerWidth;
     ctx.canvas.height = window.innerHeight;
+    LineColor.r = color.r;
+    LineColor.g = color.g;
+    LineColor.b = color.b;
+    LineColor.a = color.a;
   }
   deletePulse(p) {
     delete this.pulses[p.index];
@@ -265,11 +272,20 @@ class Crosshairs {
   }
   spawnRipple(){
       //this.ripples[this.activeIndex] = new Ripple(this.ctx, {x: window.innerWidth/2, y: window.innerHeight/2}, LineColor, {fadeFactor:1, startRadius:2, speed:1}, this.deleteRipple.bind(this))
-      this.ripples[this.activeIndex] = new Ripple(this.ctx, {x: this.ctx.canvas.width/2, y: this.ctx.canvas.height/2}, LineColor, {fadeFactor:1, startRadius:2, speed:1}, this.deleteRipple.bind(this))
+      this.ripples[this.activeIndex] = new Ripple(this.ctx, {x: this.ctx.canvas.width/2, y: this.ctx.canvas.height/2}, LineColor, {fadeFactor:1, startRadius:2, speed:2}, this.deleteRipple.bind(this))
       this.ripples[this.activeIndex].index = this.activeIndex;
       this.activeIndex += 1;
   }
   draw(dt, time) {
+    // props for pulse
+    var pulseProps = {interval: 20, fadeFactor:1.5};
+    var speed = 2500;
+
+    var size = {
+      length: 20,
+      width: 3,
+    }
+
 
     var ctx = this.ctx
 
@@ -277,8 +293,8 @@ class Crosshairs {
     ctx.canvas.height = window.innerHeight;
     
     // basic x hairs
-    renderLine(ctx,{x0:window.innerWidth/2, y0: 0, x1:window.innerWidth/2, y1: window.innerHeight}, {r:255,g:255,b:255}, 0.1, 1);
-    renderLine(ctx,{x0:0, y0: window.innerHeight/2, x1:window.innerWidth, y1: window.innerHeight/2}, {r:255,g:255,b:255}, 0.1, 1);
+    renderLine(ctx,{x0:window.innerWidth/2, y0: 0, x1:window.innerWidth/2, y1: window.innerHeight}, {r:255,g:255,b:255}, 0.2, 1);
+    renderLine(ctx,{x0:0, y0: window.innerHeight/2, x1:window.innerWidth, y1: window.innerHeight/2}, {r:255,g:255,b:255}, 0.2, 1);
 
 
 
@@ -295,14 +311,7 @@ class Crosshairs {
         this.ripples[index].draw(dt, time);
     }
 
-    // props for pulse
-    var pulseProps = {interval: 20, fadeFactor: 1.5};
-    var speed = 2500;
-
-    var size = {
-      length: 40,
-      width: 3,
-    }
+    
 
     if(this.lastPulseDeploy < time && this.allHidden === false) {
     //if (keys.length==0) {
