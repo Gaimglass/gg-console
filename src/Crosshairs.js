@@ -398,7 +398,7 @@ class Spinner {
   }
 }
 
-module.exports = {
+export {
   Spinner,
   Crosshairs
 }
