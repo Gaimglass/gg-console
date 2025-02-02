@@ -2,7 +2,7 @@ const electron = require('electron');
 const path = require('path');
 const BrowserWindow = electron.BrowserWindow;
 
-
+const url = require('url');
 var calibrateWindow = null;
 
 function toggleCalibrateWindow() {
@@ -38,23 +38,23 @@ function toggleCalibrateWindow() {
       calibrateWindow = null
     })
     
-    /*if (isDev) {
-      calibrateWindow.webContents.openDevTools({mode: 'detach'});
-    }*/
+    
+    //calibrateWindow.webContents.openDevTools({mode: 'detach'});
+    
 
     const startUrl = process.env.ELECTRON_START_URL || url.format({
       pathname: path.join(__dirname, '../../build/index.html'),
       protocol: 'file:',
       slashes: true
     });
-    const url  = new URL(startUrl);
-    url.search = new URLSearchParams({app: "calibrate"}); // let the UI know to render the calibrate page
-    calibrateWindow.loadURL(url.toString());
+    const urlObject  = new URL(startUrl);
+    urlObject.search = new URLSearchParams({app: "calibrate"}); // let the UI know to render the calibrate page
+    calibrateWindow.loadURL(urlObject.toString());
     calibrateWindow.maximize();
     calibrateWindow.setFullScreen(true)
-
     return "ok";
   } catch(err) {
+    console.error(err);
     return {
       error: err.message
     };
