@@ -1,5 +1,5 @@
 import React from 'react';
-import App from "./AppColorPicker";
+import AppColorPicker from "./AppColorPicker";
 import AppCalibrate from "./AppCalibrate";
 
 
@@ -8,13 +8,7 @@ export default function AppMain() {
   const isCalibrate = params.get('app') === 'calibrate'
   return (
     <>
-    {
-      isCalibrate && <AppCalibrate></AppCalibrate>
-
-    }
-    {
-      !isCalibrate && <App></App>
-    }
+      {isCalibrate ? <AppCalibrate></AppCalibrate> : <AppColorPicker></AppColorPicker>}
     </>
     
   )

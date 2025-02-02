@@ -20,7 +20,7 @@ const ipcRenderer  = electron.ipcRenderer;
 let timer;
 let latestFunc;
 
-function App() {
+function AppColorPicker() {
 
   const [color, setColor] = useState({r:255,g:255,b:255,a:0});
   const [defaultColors, setDefaultColors] = useState([]);
@@ -586,5 +586,5 @@ function App() {
 }
 
 
-export default App;
+export default AppColorPicker;
 
