@@ -537,7 +537,7 @@ function App() {
                             <PowerSwitch className={styles.powerIcon}></PowerSwitch>
                             <span className={styles.powerText}>LED: {ledOn ? " ON " : "OFF"}</span>
                           </button>
-                          <button title="test" className={classNames({
+                          <button className={classNames({
                               [styles.calibrate]: true,
                           })} onClick={()=>{
                             handleCalibrate();
