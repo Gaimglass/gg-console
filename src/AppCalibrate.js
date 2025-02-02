@@ -3,8 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import styles from './css/AppCalibrate.module.css'
 import {ReactComponent as Close} from './assets/xmark-solid.svg';
 import  { getMessageResult } from './Utils'
-
-var crosshairs = require('./electron/crosshairs');
+import { Crosshairs } from './Crosshairs';
 
 const electron = window.require('electron');
 const ipcRenderer  = electron.ipcRenderer;
@@ -45,7 +44,7 @@ export default function AppCalibrate() {
 
   function initXhairs(color) {
     const ctx = canvasRef.current.getContext("2d");
-    xhairs = new crosshairs.Crosshairs(ctx, color);
+    xhairs = new Crosshairs(ctx, color);
     renderQueue.push(xhairs);
     window.requestAnimationFrame(render.bind(this, ctx, renderQueue, 0));
   }

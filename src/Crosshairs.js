@@ -345,11 +345,6 @@ class Crosshairs {
      }
   }
 }
-module.exports.Crosshairs = Crosshairs;
-
-
-
-
 
 class Spinner {
 
@@ -402,4 +397,8 @@ class Spinner {
      }
   }
 }
-module.exports.Spinner = Spinner;
+
+export {
+  Spinner,
+  Crosshairs
+}
