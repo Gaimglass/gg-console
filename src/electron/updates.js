@@ -38,7 +38,7 @@ async function checkForUpdates(currentVersion, isDev) {
       })
     }
     const updateError = function(message) {
-      console.error('update error', message)
+      console.log('update error', message)
       cleanUpEvents();
       reject({
         message
@@ -67,7 +67,7 @@ async function checkForUpdates(currentVersion, isDev) {
 
     electron.autoUpdater.setFeedURL(feed)
     electron.autoUpdater.checkForUpdates();
-    
+
   })
 }
 
