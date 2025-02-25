@@ -173,6 +173,7 @@ async function disconnectUsb(options, mainWindow, isDev) {
     port.close((error) => {
       if (error) {
         console.log("port on close error: ", error)
+        port = null;
         setTimeout(()=>{
           connectUsb(mainWindow, isDev);
         }, options.delay)
