@@ -5,7 +5,7 @@ const fs = require('fs');
 
 const { registerUIEvents } = require('./events/ui');
 //const { registerMouseEvents } = require('./events/mouse');
-const { connectUsb,  disconnectUsb } = require('./usb/usb');
+const { initializeUsb,  disconnectUsb } = require('./usb/usb');
 const { registerKeyboardShortcuts } = require('./events/shortcuts');
 const { setLEDOn } = require('./usb/serial-commands');
 
@@ -93,7 +93,7 @@ if (!gotTheLock) {
     });
     electron.powerMonitor.on("resume", () => {
       // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
-      connectUsb(mainWindow);
+      disconnectUsb();
     });
     
     process.argv.forEach(arg=>{
@@ -202,7 +202,7 @@ async function createWindow() {
     }
   }
 
-  connectUsb(mainWindow, isDev);
+  initializeUsb(mainWindow, app, isDev);
   // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
       pathname: path.join(__dirname, '../../build/index.html'),

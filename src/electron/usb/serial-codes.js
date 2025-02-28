@@ -14,8 +14,8 @@ const SERIAL_COMMANDS = {
   GET_DEVICE_INFO: '130',
   
   // when a button is pushed on the GG and we need to update the UI
-  UPDATE_MAIN_LED: '130',
-  UPDATE_DEFAULT_LEDS: '131',
+  UPDATE_MAIN_LED: '200',
+  UPDATE_DEFAULT_LEDS: '201',
 }
 
 module.exports = {

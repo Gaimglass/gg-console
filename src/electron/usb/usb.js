@@ -16,6 +16,7 @@ const serialMessageResults = {
   [SERIAL_COMMANDS.GET_DEVICE_INFO]: null,
 };
 
+//let electronApp;
 let port = null;
 let parser = null;
 let deviceInfo = {}
@@ -27,15 +28,9 @@ let isDev = false;
 // let serialReady = ()=>(console.error("Promise not created"));
 
 // Connect to the serial port of the Arduino Uno USB device
-async function initializeUsb(mainWindow, _isDev) {
+async function connectUsb(mainWindow, _isDev) {
   isDev = _isDev;
-  if (port) {
-    console.log("port found, closing port")
-    // do not try to connect twice to an open port, this will cause an Access defined error
-    disconnectUsb({
-      reconnect: true,
-      delay: 800,
-    }, mainWindow, isDev);
+  if (port?.isOpen) {
     return;
   }
   const ports =  await SerialPort.list();
@@ -54,21 +49,15 @@ async function initializeUsb(mainWindow, _isDev) {
     }
   }
   if (path) {
+    console.log("path found, connecting to port: ", path)
     port = new SerialPort({
       path,
       baudRate: 115200,
     })
 
     port.on('error', (e) => {
-      console.log("port error")
-      console.log(e.message)
-      setTimeout(()=>{
-        disconnectUsb({
-          reconnect: true,
-          delay: 800,
-        }, mainWindow, isDev);
-      }, 800)
-      
+      console.log("[port error]", e.message)
+      disconnectUsb();
     })
 
     // todo, is this \n or \r\n ?
@@ -94,8 +83,12 @@ async function initializeUsb(mainWindow, _isDev) {
     });
 
     // Read the port data
-    port.on("open", async () => {
+    port.on("open", async (o) => {
       try {
+        console.log("PORT OPEN", port.isOpen, {o})
+        if (!port.isOpen) {
+          throw new Error('Port did not open correctly')
+        }
         const result = await getDeviceInfo();
         const [name, version] = result.split('&');
         deviceInfo.name = name.split('=')[1]
@@ -105,11 +98,8 @@ async function initializeUsb(mainWindow, _isDev) {
           throw new Error(`Invalid device name, expected "ggpro" and found ${deviceInfo.name}`);
         }
       } catch(err) {
-        console.error(err)
-        disconnectUsb({
-          reconnect: true,
-          delay: 800,
-          }, mainWindow);
+        console.log("on port open error", err)
+        disconnectUsb();
         return;
       }
       // send previous state to GG if there was any
@@ -118,29 +108,10 @@ async function initializeUsb(mainWindow, _isDev) {
     });
 
     port.on("close", (options) => {
-      console.log('Serial port closed');
-      let mergedOptions = {
-        reconnect: true,
-        delay: 800,
-        ...options
-      }
-      port = null;
+      console.log('Serial port closed successfully');
       mainWindow.webContents.send('usb-disconnected');
-      if (mergedOptions.reconnect) {
-        setTimeout(()=>{
-          connectUsb(mainWindow, isDev);
-        }, mergedOptions.delay);
-      }
     });
     return true
-    
-  } else {
-    setTimeout(()=>{
-      // retry after a short delay
-      connectUsb(mainWindow, isDev);
-    }, 800);
-    return false;
-    
   }
 }
 
@@ -163,30 +134,35 @@ function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
 }
 
 // Attempt to connect to the USB device
-async function connectUsb(mainWindow, isDev) {
-  return initializeUsb(mainWindow, isDev);
+async function initializeUsb(mainWindow, app, isDev) {
+  //electronApp = app;
+  // set up connection loop.
+  startConnectThink(mainWindow, isDev)
 }
 
-async function disconnectUsb(options, mainWindow, isDev) {
-  if (port) {
+async function startConnectThink(mainWindow, isDev) {
+  setInterval(()=>{
+    // check the connection every 800ms and reconnect if needed
+    connectUsb(mainWindow, isDev);
+  }, 800);
+}
+
+async function disconnectUsb() {
+  if (port?.isOpen) {
     console.log("port found, attempting to close port")
-    port.close((error) => {
+    port?.close((error) => {
       if (error) {
-        console.log("port on close error: ", error)
-        port = null;
-        setTimeout(()=>{
-          connectUsb(mainWindow, isDev);
-        }, options.delay)
+        // this is when we get into a bricked port error. I dont know how to recover
+        // and it does not appear we are holding a port connection. For now, just
+        // restart the app and it will reset. This has only happened when the GG has been disconnected
+        // for several hours and attempting to reconnect causing a Access denied error over and over
+        console.log(">>>> port closed ERROR <<<< restarting app....")
+        //electronApp.relaunch();
+        //electronApp.exit();
       } else {
         console.log("port closed successfully")
       }
     });
-  } else if(options.reconnect) {
-    console.log("port not found on close")
-    setTimeout(()=>{
-      connectUsb(mainWindow, isDev);
-    }, options.delay);
-    
   }
 }
 
@@ -199,7 +175,9 @@ async function disconnectUsb(options, mainWindow, isDev) {
 async function writeCommand(command, commandStr='') {
   
   if (!port || !port.port?.fd) {
-     return Promise.reject(new Error('Port has closed'));
+      console.log("port.isOpen", port?.isOpen)
+      console.log("wireCommand", {command}, {commandStr})
+     return Promise.reject(new Error('>>> Port has closed', {port}, {"port.port": port.port}));
   }
 
   const serialTimeout = new Promise((_, reject) => {
@@ -225,8 +203,7 @@ async function writeCommand(command, commandStr='') {
 
 
 module.exports = {
-  connectUsb,
+  initializeUsb,
   writeCommand,
   disconnectUsb,
-  initializeUsb,
 }

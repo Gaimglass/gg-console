@@ -184,11 +184,13 @@ function AppColorPicker() {
 
 
   function sendMainLEDStatus(color, ledOn) {
-    getMessageResult(ipcRenderer.sendSync('set-led-state', {
-      color,
-      brightness: color.a,
-      ledOn
-    }));
+    if (isConnected) {
+      getMessageResult(ipcRenderer.sendSync('set-led-state', {
+        color,
+        brightness: color.a,
+        ledOn
+      }));
+    }
   }
 
   function sendDefaultColors(dc) {
