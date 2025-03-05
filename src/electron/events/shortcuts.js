@@ -3,37 +3,94 @@ const { toggleCalibrateWindow } = require('../calibrateWindow')
 
 // https://www.electronjs.org/docs/latest/api/accelerator
 
-// TODO make these customizable from the UI
+// [{<accelerator>, <command>}, ...]
+let registeredCommands = []
 
-function registerKeyboardShortcuts(mainWindow) {
-  globalShortcut.register('CommandOrControl+numsub', () => {
-    mainWindow.webContents.send('shortcut-decrease-brightness');
-  })
 
-  globalShortcut.register('CommandOrControl+numadd', () => {
-    mainWindow.webContents.send('shortcut-increase-brightness');
-  })
+function enableShortcuts(mainWindow, bindings) {
+  // https://www.electronjs.org/docs/latest/api/accelerator
+  for (const [command, value] of Object.entries(bindings)) {
+    let accelerator = '';
+    const modifiers = value.split('+');
+    const button = modifiers.pop();
+    const electronModifiers = [];
+    for (let i = 0; i < modifiers.length; i++) {
+      switch (modifiers[i]) {
+        case "Control":
+          electronModifiers.push('CommandOrControl')
+          break;
+        default:
+          electronModifiers.push(modifiers[i])
+      }
+    }
+    const modifiersStr = electronModifiers.join("+");
+    accelerator = [modifiersStr, button].join('+')
+    registeredCommands.push([accelerator, command]);
+  }
 
-  globalShortcut.register('CommandOrControl+num1', () => {
-    mainWindow.webContents.send('shortcut-switch-color', 1);
-  })
+  for (let i = 0; i < registeredCommands.length; i++) {
+    const registeredCommand = registeredCommands[i]
+    const accelerator = registeredCommand[0]
+    const command = registeredCommand[1];
+    const action = getActionForCommand(command);
 
-  globalShortcut.register('CommandOrControl+num0', () => {
-    mainWindow.webContents.send('shortcut-toggle-led');
-  })
-
-  globalShortcut.register('CommandOrControl+numdec', () => {
-    toggleCalibrateWindow();
-  })
-  
-
-  for(let i = 0; i < 9; i++) {
-    globalShortcut.register(`CommandOrControl+num${i}`, () => {
-      mainWindow.webContents.send('shortcut-switch-color', i);
-    })
+    if(action) {
+      try{
+        globalShortcut.register(accelerator, () => {
+          action(mainWindow, command);
+        })
+      } 
+      catch(e) {
+        console.warn("Invalid accelerator", e.message)
+      }
+    }
   }
 }
 
+function getActionForCommand(command) {
+  switch(command) {
+    case "brightness-":
+      return (mainWindow)=>{
+        mainWindow.webContents.send('shortcut-decrease-brightness');
+      }
+    case "brightness+":
+      return (mainWindow)=>{
+        mainWindow.webContents.send('shortcut-increase-brightness');
+      }
+    case "led":
+      return (mainWindow)=>{
+        mainWindow.webContents.send('shortcut-toggle-led');
+      }
+    case "s1":
+    case "s2":
+    case "s3":
+    case "s4":
+    case "s5":
+    case "s6":
+    case "s7":
+    case "s8":
+      return (mainWindow, command)=>{
+        mainWindow.webContents.send('shortcut-switch-color', command[1]);
+      }
+    case "calibrate":
+      return ()=>{
+        toggleCalibrateWindow();
+      }
+    default:
+      console.warn(`Unknown command name: ${command}`)
+      return null;
+  }
+}
+
+function disableShortcuts() {
+  
+  for(let i = 0; i < registeredCommands.length; i++) {
+    const accelerator = registeredCommands[i][0];
+    globalShortcut.unregister(accelerator)
+  }
+  registeredCommands = [];
+}
 module.exports = {
-  registerKeyboardShortcuts
+  disableShortcuts,
+  enableShortcuts,
 }

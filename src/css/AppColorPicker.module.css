@@ -16,7 +16,6 @@
 .tabContainer {
   display: flex;
   flex-direction: column;
-  align-items: center;
   width: 100%;
 }
 .tabControls {
@@ -40,6 +39,9 @@
   background-color: transparent;
 }
 
+.tabCalibrate {
+  align-self: center;
+}
 
 .mainContent {
   display: flex;
@@ -137,7 +139,7 @@
 .power {
   margin: 0;
   margin-bottom: 1em;
-  background-color: #222;
+  background-color: #1b1d23;
   width: 80%;
   border: 1px solid black;
   border-radius: 8px;
@@ -147,7 +149,7 @@
 .calibrate {
   margin: 0;
   margin-bottom: 1em;
-  background-color: #222;
+  background-color: #1b1d23;
   width: 20%;
   border: 1px solid black;
   border-radius: 8px;
@@ -191,7 +193,7 @@
 .rgbInputs input {
   width: 2.0em;
   border: none;
-  background-color: #222;
+  background-color: #1b1d23;
   margin-right: 5px;
   padding: 0.5em;
   color: #ccc;

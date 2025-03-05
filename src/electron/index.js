@@ -6,7 +6,6 @@ const fs = require('fs');
 const { registerUIEvents } = require('./events/ui');
 //const { registerMouseEvents } = require('./events/mouse');
 const { initializeUsb,  disconnectUsb } = require('./usb/usb');
-const { registerKeyboardShortcuts } = require('./events/shortcuts');
 const { setLEDOn } = require('./usb/serial-commands');
 
 // Module to control application life.
@@ -84,7 +83,6 @@ if (!gotTheLock) {
     createWindow();
     registerUIEvents(mainWindow, app, isDev)
     //registerMouseEvents(mainWindow)
-    registerKeyboardShortcuts(mainWindow);
     /*electron.powerMonitor.on("lock-screen", () => {
     });*/
     electron.powerMonitor.on("suspend", () => {
@@ -153,7 +151,7 @@ async function createWindow() {
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 720,
-    height: 500,
+    height: 585,
     frame: false,
     show: false,
     icon: path.join(__dirname, '../assets/gg_icon.png'),

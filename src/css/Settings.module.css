@@ -1,0 +1,42 @@
+.container {
+  display: flex;
+  color:#ccc;
+  
+  padding: 1em 2em 1em 2em;
+}
+.bindings {
+  display: flex;
+  flex-direction: column;
+}
+.bindings h3 {
+  margin: 0;
+  margin-bottom: 1em;
+  font-size: 1em;
+}
+.keybindingsTableWrapper {
+  
+  
+}
+.keybindingsTable {
+  font-size: 0.8em;
+  border-collapse: collapse;
+}
+
+.keybindingsTable td {
+  padding: 0.15em;
+}
+
+.keyboard {
+  fill: white;
+  width: 1.5em;
+  vertical-align: bottom;
+  margin-right: 0.5em;
+}
+
+.bindings input {
+  background-color: #1b1d23;
+  border: none;
+  padding: 0.5em;
+  margin-left: 1em;
+  
+}

@@ -46,7 +46,7 @@ button {
   -moz-appearance: none;
 
   
-  background-color: #222;
+  background-color: #1b1d23;
   border: none;
 /*   box-shadow: 0 0 5px 0 #00000070; */
   border-radius: 0.25em;
@@ -61,7 +61,7 @@ button:hover {
 }
 
 #root .react-colorful {
-  height: 200px;
+  height: 240px;
   width: 300px;
 }
 
@@ -80,7 +80,7 @@ a:hover {
 }
 
 select {
-  background-color: #222;
+  background-color: #1b1d23;
   border: none;
   padding: 0 1em 0 0;
   margin: 0;
@@ -90,4 +90,13 @@ select {
   cursor: inherit;
   line-height: inherit;
   color: white;
+}
+
+input {
+  border: none;
+  background-color: #1b1d23;
+  margin-right: 5px;
+  padding: 0.5em;
+  color: #ccc;
+  font-size: 1.1em;
 }
