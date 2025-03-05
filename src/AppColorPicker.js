@@ -7,11 +7,11 @@ import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import UpdatesTabWrapper from './UpdatesTabWrapper'
 import Settings from './Settings'
 
-import styles from './css/App.module.css'
+import styles from './css/AppColorPicker.module.css'
 
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
 import {ReactComponent as Crosshairs} from './assets/crosshair.svg';
-import  { getMessageResult } from './Utils'
+import  { getMessageResult, getKeyBindings } from './Utils'
 //import logo from './assets/logo.png';
 import './css/globalStyles.css';
 
@@ -43,6 +43,7 @@ function AppColorPicker() {
     // TODO do we really need these here too?
     loadMainLedFromGG();
     loadDefaultColorsFromGG();
+    sendAppSettings();
     // 
     
     // Receive uninitiated messages from the gg device
@@ -96,6 +97,7 @@ function AppColorPicker() {
     ipcRenderer.on('shortcut-increase-brightness', increaseBrightnessShortcut);
     ipcRenderer.on('shortcut-decrease-brightness', decreaseBrightnessShortcut);
     ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
+    
     
 
     /* // mouse 2 events
@@ -169,6 +171,10 @@ function AppColorPicker() {
     };
   }
 
+  function sendAppSettings() {
+    const bindings = getKeyBindings();
+    ipcRenderer.invoke('set-enable-shortcuts', bindings);
+  }
 
   function getAppState() {
     getMessageResult(ipcRenderer.sendSync('get-app-state'), (result)=>{
@@ -527,7 +533,7 @@ function AppColorPicker() {
                     <Tab tabIndex="-1"><button>Settings</button></Tab>
                   </TabList>
                 </UpdatesTabWrapper>
-                <TabPanel>
+                <TabPanel className={styles.tabCalibrate}>
                   <div className={styles.mainContent}>
                     <div className={styles.main}>
                       <div className={styles.mainControls}>

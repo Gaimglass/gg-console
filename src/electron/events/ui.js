@@ -5,6 +5,7 @@ const url = require('url');
 const { getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 const { checkForUpdates, updateAndRestart } = require('../updates')
 const { toggleCalibrateWindow } = require('../calibrateWindow')
+const { disableShortcuts, enableShortcuts } = require('./shortcuts')
 
 const BrowserWindow = electron.BrowserWindow;
 
@@ -123,6 +124,14 @@ function registerUIEvents(mainWindow, app, isDev) {
 
   electron.ipcMain.handle('calibrate-gaimglass', async (event) => {
     toggleCalibrateWindow()
+  });
+
+  electron.ipcMain.handle('set-enable-shortcuts', async (event, bindings) => {
+    enableShortcuts(mainWindow, bindings)
+  });
+
+  electron.ipcMain.handle('set-disable-shortcuts', async (event) => {
+    disableShortcuts();
   });
 
 }

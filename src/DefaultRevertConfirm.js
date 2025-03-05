@@ -1,10 +1,14 @@
 import styles from './css/DefaultRevertConfirm.module.css'
 
-function DefaultRevertConfirm(props) {
+function DefaultRevertConfirm({
+  onReset, 
+  resetName="Reset to Default",
+  onDelete, 
+  id}) {
   return   <div className={styles.confirmWrapper}>
       <div className={styles.confirm}>
-        <button onClick={props.onReset} className={styles.reset}>Reset to Default</button>
-        <button onClick={props.onDelete} className={styles.delete}>Delete Slot</button>
+        {onReset && <button onClick={onReset.bind(id)} className={styles.reset}>{resetName}</button>}
+        {  onDelete && <button onClick={onDelete.bind(id)} className={styles.delete}>Delete Slot</button>}
       </div> 
     </div>
 }
