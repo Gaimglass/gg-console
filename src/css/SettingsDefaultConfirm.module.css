@@ -13,11 +13,14 @@
   padding: 0.5em;
 }
 
-.confirm button {
+.confirmWrapper button {
   margin-left: 1em; 
   width: 10em;
 }
 
+.reset {
+  background-color: #2948c4;
+}
 .delete {
   background-color: rgb(122 37 37);
 }

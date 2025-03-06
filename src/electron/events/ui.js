@@ -1,13 +1,10 @@
 const electron = require('electron');
-const path = require('path');
-const url = require('url');
 
 const { getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 const { checkForUpdates, updateAndRestart } = require('../updates')
 const { toggleCalibrateWindow } = require('../calibrateWindow')
-const { disableShortcuts, enableShortcuts } = require('./shortcuts')
+const { disableShortcuts, enableShortcuts, enableShortcut } = require('./shortcuts')
 
-const BrowserWindow = electron.BrowserWindow;
 
 function registerUIEvents(mainWindow, app, isDev) {
   //
@@ -127,7 +124,11 @@ function registerUIEvents(mainWindow, app, isDev) {
   });
 
   electron.ipcMain.handle('set-enable-shortcuts', async (event, bindings) => {
-    enableShortcuts(mainWindow, bindings)
+    return enableShortcuts(mainWindow, bindings)
+  });
+
+  electron.ipcMain.handle('set-enable-shortcut', async (event, command, value) => {
+    return enableShortcut(mainWindow, command, value)
   });
 
   electron.ipcMain.handle('set-disable-shortcuts', async (event) => {
