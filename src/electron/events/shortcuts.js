@@ -1,51 +1,97 @@
-const {app, globalShortcut} = require('electron')
-const { toggleCalibrateWindow } = require('../calibrateWindow')
+const { globalShortcut} = require('electron')
+const { toggleCalibrateWindow } = require('../calibrateWindow');
 
 // https://www.electronjs.org/docs/latest/api/accelerator
 
-// [{<accelerator>, <command>}, ...]
-let registeredCommands = []
-
-
-function enableShortcuts(mainWindow, bindings) {
-  // https://www.electronjs.org/docs/latest/api/accelerator
-  for (const [command, value] of Object.entries(bindings)) {
-    let accelerator = '';
-    const modifiers = value.split('+');
-    const button = modifiers.pop();
-    const electronModifiers = [];
-    for (let i = 0; i < modifiers.length; i++) {
-      switch (modifiers[i]) {
-        case "Control":
-          electronModifiers.push('CommandOrControl')
-          break;
-        default:
-          electronModifiers.push(modifiers[i])
-      }
+function getAccelerator(value) {
+  let accelerator = '';
+  const modifiers = value.split('+');
+  const button = modifiers.pop();
+  const electronModifiers = [];
+  for (let i = 0; i < modifiers.length; i++) {
+    switch (modifiers[i]) {
+      case "Control":
+        electronModifiers.push('CommandOrControl')
+        break;
+      default:
+        electronModifiers.push(modifiers[i])
     }
-    const modifiersStr = electronModifiers.join("+");
-    accelerator = [modifiersStr, button].join('+')
-    registeredCommands.push([accelerator, command]);
   }
+  const modifiersStr = electronModifiers.join("+");
+  if (modifiersStr.length > 0) {
+    accelerator = `${modifiersStr}+${button}`
+  } else {
+    accelerator = button;
+  }
+  return accelerator;
+}
 
-  for (let i = 0; i < registeredCommands.length; i++) {
-    const registeredCommand = registeredCommands[i]
-    const accelerator = registeredCommand[0]
-    const command = registeredCommand[1];
+/**
+ * Note Duplicates must be detected client side before calling this function
+ * 
+ * @param {*} mainWindow 
+ * @param {*} command 
+ * @param {*} value 
+ * @returns 
+ */
+function enableShortcut(mainWindow, command, value) {
+  let error = null
+  const accelerator = getAccelerator(value);
+  if (accelerator.trim()==='') {
+    // not bound to any buttons
+    return null;
+  }
+  const action = getActionForCommand(command);
+  if (action) {
+    try{
+      const result = globalShortcut.register(accelerator, () => {
+        action(mainWindow, command);
+      })
+      if (!result) {
+        error = 'This key binding is already in use'
+      }
+    } 
+    catch(e) {
+      console.warn("Invalid accelerator", e.message)
+      error = 'Invalid key binding2'
+    }
+  }
+  return error;
+}
+
+/**
+ * 
+ * @param {*} mainWindow 
+ * @param {*} bindings {<command>: accelerator>, ...}
+ * @returns 
+ */
+function enableShortcuts(mainWindow, bindings) {
+  disableShortcuts();
+  const errors = {};
+  for (const [command, accelerator] of Object.entries(bindings)) {
     const action = getActionForCommand(command);
-
-    if(action) {
+    if (accelerator.trim()==='') {
+      // not bound to any buttons
+      continue;
+    }
+    if (action) {
       try{
-        globalShortcut.register(accelerator, () => {
+        const result = globalShortcut.register(accelerator, () => {
           action(mainWindow, command);
         })
+        if(!result) {
+          errors[command] = 'This key binding is already in use'
+        }
       } 
       catch(e) {
-        console.warn("Invalid accelerator", e.message)
+        console.warn("Invalid accelerator", e.message, {accelerator})
+        errors[command] = 'Invalid key binding4'
       }
     }
   }
+  return errors;
 }
+
 
 function getActionForCommand(command) {
   switch(command) {
@@ -83,14 +129,11 @@ function getActionForCommand(command) {
 }
 
 function disableShortcuts() {
-  
-  for(let i = 0; i < registeredCommands.length; i++) {
-    const accelerator = registeredCommands[i][0];
-    globalShortcut.unregister(accelerator)
-  }
-  registeredCommands = [];
+  globalShortcut.unregisterAll();
 }
+
 module.exports = {
   disableShortcuts,
+  enableShortcut,
   enableShortcuts,
 }
