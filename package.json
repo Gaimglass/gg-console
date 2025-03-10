@@ -23,26 +23,27 @@
     "publish-gg": "electron-forge publish"
   },
   "dependencies": {
-    "@reduxjs/toolkit": "^1.7.1",
-    "@testing-library/jest-dom": "^5.16.1",
-    "@testing-library/react": "^12.1.2",
-    "@testing-library/user-event": "^13.5.0",
-    "classnames": "^2.3.2",
+    "@electron/rebuild": "^3.7.1",
+    "@reduxjs/toolkit": "^2.6.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
+    "classnames": "^2.5.1",
     "cross-env": "^7.0.3",
     "electron-log": "^5.3.2",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.1",
     "prop-types": "^15.8.1",
-    "purecss": "^2.1.0",
-    "react": "^18.0.2",
-    "react-colorful": "^5.5.1",
-    "react-dom": "^18.0.2",
-    "react-redux": "^7.2.6",
+    "purecss": "^3.0.0",
+    "react": "^19.0.0",
+    "react-colorful": "^5.6.1",
+    "react-dom": "^19.0.0",
+    "react-redux": "^9.2.0",
     "react-scripts": "5.0.1",
     "react-tabs": "^6.1.0",
-    "serialport": "^12.0.0",
-    "usb": "^2.9.0",
-    "web-vitals": "^2.1.2"
+    "serialport": "^13.0.0",
+    "usb": "^2.15.0",
+    "web-vitals": "^4.2.4"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.7.0",
@@ -52,8 +53,7 @@
     "@electron-forge/maker-zip": "^7.7.0",
     "@electron-forge/plugin-auto-unpack-natives": "^7.7.0",
     "@electron-forge/publisher-github": "^7.7.0",
-    "electron": "^35.0.1",
-    "electron-rebuild": "^3.2.9"
+    "electron": "^35.0.1"
   },
   "main": "./src/electron/index.js",
   "eslintConfig": {
