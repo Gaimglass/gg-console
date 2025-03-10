@@ -11,6 +11,37 @@ async function getMessageResult(promise, cb) {
   }
 }
 
+function getPrettyTextFromCommand(command) {
+  switch(command) {
+    case 'brightness+':
+      return "Increase Brightness";
+    case 'brightness1':
+      return 'Decrease Brightness';
+    case 'calibrate':
+      return 'Quick Calibrate';
+    case 'led':
+      return 'LED on/off';
+    case 's1':
+      return 'Color slot 1';
+    case 's2':
+      return 'Color slot 2';
+    case 's3':
+      return 'Color slot 3';
+    case 's4':
+      return 'Color slot 4';
+    case 's5':
+      return 'Color slot 5';
+    case 's6':
+      return 'Color slot 6';
+    case 's7':
+      return 'Color slot 7';
+    case 's8':
+      return 'Color slot 8';
+    default:
+      return '';
+  }
+  
+}
 function defaultAppSettings() {
   return {
     keyBindings: {
@@ -64,5 +95,6 @@ export {
   saveAppSettings,
   loadAppSettings,
   getKeyBindings,
+  getPrettyTextFromCommand
 
 }
