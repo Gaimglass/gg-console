@@ -21,6 +21,8 @@ let port = null;
 let parser = null;
 let deviceInfo = {}
 let isDev = false;
+let intervalId = null;
+
 
 // Hack to delay sending data until the arduino is ready. When connecting
 // to the serial port through the arduino's USB port, it causes a restart and 1 second delay.
@@ -89,6 +91,13 @@ async function connectUsb(mainWindow, _isDev) {
         if (!port.isOpen) {
           throw new Error('Port did not open correctly')
         }
+        /*setTimeout(()=>{
+          // bootloader test. Connect at baud 1200 then disconnect to observe ATMega reboot
+          clearInterval(intervalId);
+          intervalId = null;
+          disconnectUsb();
+        },100)*/
+        
         const result = await getDeviceInfo();
         const [name, version] = result.split('&');
         deviceInfo.name = name.split('=')[1]
@@ -141,7 +150,7 @@ async function initializeUsb(mainWindow, app, isDev) {
 }
 
 async function startConnectThink(mainWindow, isDev) {
-  setInterval(()=>{
+  intervalId = setInterval(()=>{
     // check the connection every 800ms and reconnect if needed
     connectUsb(mainWindow, isDev);
   }, 800);

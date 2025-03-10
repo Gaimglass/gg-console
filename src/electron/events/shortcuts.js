@@ -85,7 +85,7 @@ function enableShortcuts(mainWindow, bindings) {
       } 
       catch(e) {
         console.warn("Invalid accelerator", e.message, {accelerator})
-        errors[command] = 'Invalid key binding4'
+        errors[command] = 'Invalid key binding'
       }
     }
   }

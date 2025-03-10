@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import styles from './css/Settings.module.css'
 
 import {ReactComponent as Keyboard} from './assets/keyboard-solid.svg';
-import  { loadAppSettings, defaultAppSettings, saveAppSettings } from './Utils'
+import  { loadAppSettings, defaultAppSettings, saveAppSettings, getPrettyTextFromCommand } from './Utils'
 import SettingsDefaultConfirm from './SettingsDefaultConfirm'
 
 const electron = window.require('electron');
@@ -12,7 +12,7 @@ export default function Settings() {
 
   const [settings, setSettings] = useState(loadAppSettings())
   const [errors, setErrors] = useState({})
-  
+
   function translateKey(key, code) {
     if (code.startsWith('Numpad')) {
       switch(code) {
@@ -78,7 +78,7 @@ export default function Settings() {
         continue;
       }      
       if (v.toLowerCase() === accelerator.toLowerCase()) {
-        return `"${k}" is using this binding`
+        return `"${getPrettyTextFromCommand(k)}" is using this binding`
       }
     }
     return null;
