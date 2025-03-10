@@ -1,5 +1,5 @@
 const electron = require('electron');
-const Store = require('electron-store');
+//const Store = require('electron-store');
 const log = require('electron-log/main');
 const fs = require('fs');
 
@@ -18,10 +18,6 @@ const BrowserWindow = electron.BrowserWindow;
 
 const path = require('path');
 const url = require('url');
-
-// Electron store for persistent data after app closes.
-// TODO: Use this for custom keyboard shortcuts.
-const store = new Store();
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
