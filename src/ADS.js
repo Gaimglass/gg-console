@@ -122,7 +122,7 @@ export default function ADS() {
           className={styles.slider}
           thumbClassName={styles.thumb}
           renderTrack={(props, state) => {
-            const {key, style, ...rest} = props;
+            const {key, style} = props;
             const mergedStyle = {
               ...style,
               backgroundColor: `hsl(${hue}deg 50% 50%)`
