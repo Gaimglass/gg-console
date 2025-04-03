@@ -1,5 +1,15 @@
-/* let mouseEvents = {
+// This works only on WINDOWS
+
+let mouseEvents = {
   on: ()=>{} // stub
+}
+
+let adsSettings = {
+  enabled: false,
+  color: {},
+  speed: 0,
+  adsMouseButton: '',
+  adsControllerButton: '',
 }
 
 try {
@@ -10,28 +20,30 @@ try {
 }
 
 // These events can be used for mouse2 effects such as dimming when pressing ADS.
-// Note: We currently don't have a way to do this for controllers.
-function registerMouseEvents(mainWindow) {
+function registerMouseEvents(mainWindow, mouseState) {
   mouseEvents.on("mouseup", event => {
-    if (event.button === 2) {
-      if (mouseState.down) {
-        mainWindow.webContents.send('update-mouse-up', event);
-        mouseState.down = false;
-      }
-    }
+  if (mouseState.down && adsSettings.adsMouseButton === event.button) {
+    mainWindow.webContents.send('update-ads-inactive', adsSettings);
+    mouseState.down = false;
+  }
   });
 
   mouseEvents.on("mousedown", event => {
-    // { x: 2962, y: 483, button: 1 }
-    if (event.button === 2) {
-      if (!mouseState.down) {
-        mainWindow.webContents.send('update-mouse-down', event);
+    if (!mouseState.down) {
+      if(adsSettings.adsMouseButton === event.button && adsSettings.enabled) {
+        mainWindow.webContents.send('update-ads-active', adsSettings);
         mouseState.down = true;
       }
     }
   });
 }
 
+function setADS(mainWindow, ads) {
+  adsSettings = {...ads};
+}
+
+
 module.exports = {
-  registerMouseEvents
-} */
+  registerMouseEvents,
+  setADS, 
+}

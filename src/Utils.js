@@ -44,7 +44,7 @@ function getPrettyTextFromCommand(command) {
 }
 function defaultAppSettings() {
   return {
-    keyBindings: {
+    'keyBindings': {
       'brightness+': 'Control+numadd',
       'brightness-': 'Control+numsub',
       'calibrate': 'Control+numdec',
@@ -58,29 +58,29 @@ function defaultAppSettings() {
       's7': 'Control+num7',
       's8': 'Control+num8',
     },
-    'adsMouse': {
+    'ads': {
       'enabled': false,
-      'button': 'mouse2'
-    },
-    'adsController': {
-      'enabled': false,
-      'button': ''
+      'color': {r: 0, g: 255, b:100},
+      'speed': 100,
+      'adsMouseButton': 2,
+      'adsControllerButton': 'button1',
     }
+    
   }
 }
+
 function saveAppSettings(settings) {
+  /** note, in dev mode, if you exit from the terminal, this won't always persist across instances */
   localStorage.setItem("settings", JSON.stringify(settings));
 }
 
 function loadAppSettings() {
-  let settings = localStorage.getItem("settings");
-  if(!settings) {
-    console.log("settings not found")
-    return defaultAppSettings();
-  } else {
-    //
+  const userSettings = localStorage.getItem("settings");
+  const settings = {
+    ...defaultAppSettings(),
+    ...JSON.parse(userSettings)
   }
-  return JSON.parse(settings);
+  return settings;
 }
 
 function getKeyBindings() {
@@ -88,13 +88,41 @@ function getKeyBindings() {
   return bindings;
 }
 
+function getADSSettings() {
+  const ads = loadAppSettings().ads;
+  return ads;
+}
+
+function throttle(func, timeout = 50){
+  let timer;
+  let latestFunc;
+  return (...args) => {
+    if (!timer) {
+      func.apply(this, args);
+      timer = setTimeout(() => {
+        timer = undefined;
+        if(latestFunc) {
+          // ensures the last one always proceeds
+          latestFunc.apply(this, args);
+          latestFunc = undefined;
+        }
+      }, timeout);
+    } else {
+      latestFunc = () => {
+        func.apply(this, args);
+      }
+    }
+  };
+}
 
 export {
+  throttle,
   getMessageResult,
   defaultAppSettings,
   saveAppSettings,
   loadAppSettings,
   getKeyBindings,
+  getADSSettings,
   getPrettyTextFromCommand
 
 }

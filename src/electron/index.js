@@ -4,7 +4,7 @@ const log = require('electron-log/main');
 const fs = require('fs');
 
 const { registerUIEvents } = require('./events/ui');
-//const { registerMouseEvents } = require('./events/mouse');
+const { registerMouseEvents } = require('./events/mouse');
 const { initializeUsb,  disconnectUsb } = require('./usb/usb');
 const { setLEDOn } = require('./usb/serial-commands');
 
@@ -28,7 +28,7 @@ console.log(process.env.NODE_ENV, "process.env.NODE_ENV")
 var tray = 1;
 
 
-var mouseState = {
+const mouseState = {
   down: false
 }
 
@@ -78,7 +78,7 @@ if (!gotTheLock) {
   app.on('ready', ()=>{
     createWindow();
     registerUIEvents(mainWindow, app, isDev)
-    //registerMouseEvents(mainWindow)
+    registerMouseEvents(mainWindow, mouseState)
     /*electron.powerMonitor.on("lock-screen", () => {
     });*/
     electron.powerMonitor.on("suspend", () => {

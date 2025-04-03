@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback  } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
 import classNames from 'classnames';
 import DefaultColors from './DefaultColors'
@@ -6,20 +6,19 @@ import WindowControls from './WindowsControls'
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import UpdatesTabWrapper from './UpdatesTabWrapper'
 import Settings from './Settings'
+import ADS from './ADS'
 
 import styles from './css/AppColorPicker.module.css'
 
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
 import {ReactComponent as Crosshairs} from './assets/crosshair.svg';
-import  { getMessageResult, getKeyBindings } from './Utils'
+import  { throttle, getMessageResult } from './Utils'
 //import logo from './assets/logo.png';
 import './css/globalStyles.css';
 
+
 const electron = window.require('electron');
 const ipcRenderer  = electron.ipcRenderer;
-
-let timer;
-let latestFunc;
 
 function AppColorPicker() {
 
@@ -33,7 +32,17 @@ function AppColorPicker() {
   const [isConnected, setIsConnected] = useState(false);
   const [editSwatch, setEditSwatch] = useState(null);
   const [inputColorKey, setInputColorKey] = useState({});
-  const [adsActive] = useState(false);
+
+
+  // ads vars
+  let prevTime = undefined;
+  let currentTransitionColor = {...color}
+  let finalTransitionColor = {}
+  let adsFlags = 0
+  const RED = 1;
+  const GREEN = 2;
+  const BLUE = 4;
+  const ALL_COLORS = RED | GREEN | BLUE;
 
 
   useEffect(()=>{
@@ -43,7 +52,6 @@ function AppColorPicker() {
     // TODO do we really need these here too?
     loadMainLedFromGG();
     loadDefaultColorsFromGG();
-    sendAppSettings();
     // 
     
     // Receive uninitiated messages from the gg device
@@ -80,6 +88,7 @@ function AppColorPicker() {
     ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
     // special event when suspending PC to turn off GG
     ipcRenderer.on('deactivate-led', deactivateLED);
+    currentTransitionColor = {...color} // always update this to match color from UI or GG
 
     return ()=>{
       ipcRenderer.removeListener('shortcut-toggle-led', deactivateLED);
@@ -90,40 +99,25 @@ function AppColorPicker() {
 
   useEffect(()=>{
     if (ledOn && isConnected) {
-      sendMainLEDStatus(color, !adsActive);
+      sendMainLEDStatus(color, true);
     }
 
     // shortcuts need update state values, so these hooks need to be trigger
     ipcRenderer.on('shortcut-increase-brightness', increaseBrightnessShortcut);
     ipcRenderer.on('shortcut-decrease-brightness', decreaseBrightnessShortcut);
     ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
+    ipcRenderer.on('update-ads-active', onADSDown);
+    ipcRenderer.on('update-ads-inactive', onADSUp);
     
     
-
-    /* // mouse 2 events
-    ipcRenderer.on('update-mouse-down', function (evt, message) {
-      setAdsActive(true);
-     });
-
-     ipcRenderer.on('update-mouse-up', function (evt, message) {
-      setAdsActive(false);
-    }); */
-
-    /*
-    ipcRenderer.on('update-mouse-up', function (evt, message) {
-      if (adsActive && message.button === 2) {
-        setAdsActive(false);
-        
-        sendMainLEDStatus(color, true);
-      }
-    });*/
-
     return ()=>{
       ipcRenderer.removeListener('shortcut-increase-brightness', increaseBrightnessShortcut);
       ipcRenderer.removeListener('shortcut-decrease-brightness', decreaseBrightnessShortcut);
       ipcRenderer.removeListener('shortcut-switch-color', switchColorShortcut);
+      ipcRenderer.removeListener('update-ads-active', onADSDown);
+      ipcRenderer.removeListener('update-ads-inactive', onADSUp);
     }
-  }, [adsActive, ledOn, color, defaultColors]);
+  }, [ledOn, color, defaultColors]);
   
   function createDefaultColors() {
     return [
@@ -150,31 +144,8 @@ function AppColorPicker() {
     // these are the colors that will be rendered if no GG is connected
     setDefaultColors(defaults);
   }
-  
-  function throttle(func, timeout = 50){ 
-    return (...args) => {
-      if (!timer) {
-        func.apply(this, args);
-        timer = setTimeout(() => {
-          timer = undefined;
-          if(latestFunc) {
-            // ensures the last one always proceeds
-            latestFunc.apply(this, args);
-            latestFunc = undefined;
-          }
-        }, timeout);
-      } else {
-        latestFunc = () => {
-          func.apply(this, args);
-        }
-      }
-    };
-  }
 
-  function sendAppSettings() {
-    const bindings = getKeyBindings();
-    ipcRenderer.invoke('set-enable-shortcuts', bindings);
-  }
+
 
   function getAppState() {
     getMessageResult(ipcRenderer.sendSync('get-app-state'), (result)=>{
@@ -258,6 +229,10 @@ function AppColorPicker() {
     setInputColorKey(newColor)
   }
 
+  function handleADSColorChange(_newColor) {
+    //
+  }
+
   function handleColorChange(_newColor, defaultIndex = -1,) {
   
     // defaults don't have an alpha so use the current value
@@ -287,8 +262,79 @@ function AppColorPicker() {
       dc[editSwatch] = c;
       setDefaultColors(dc);
     }
-    
   };
+
+
+  /** 
+   * For ADS transitions only 
+  */
+  function changeColorTo(speed) {
+    const multiplier = 35; // adjust as needed
+    function step(timestamp) {
+      if (prevTime === undefined) {
+        prevTime = timestamp;
+      }
+      const dt = (timestamp - prevTime)/1000;
+      prevTime = timestamp;
+
+      const rs = finalTransitionColor.r > currentTransitionColor.r ? 1: -1
+      const gs = finalTransitionColor.g > currentTransitionColor.g ? 1: -1
+      const bs = finalTransitionColor.b > currentTransitionColor.b ? 1: -1
+
+      currentTransitionColor.r = currentTransitionColor.r + speed * dt * rs * multiplier;
+      currentTransitionColor.g = currentTransitionColor.g + speed * dt * gs * multiplier;
+      currentTransitionColor.b = currentTransitionColor.b + speed * dt * bs * multiplier;
+
+      if (rs === -1 && currentTransitionColor.r <= finalTransitionColor.r || rs === 1 && currentTransitionColor.r >= finalTransitionColor.r) {
+        adsFlags = adsFlags | RED
+        currentTransitionColor.r = finalTransitionColor.r;
+      }
+      if (gs === -1 && currentTransitionColor.g <= finalTransitionColor.g || gs === 1 && currentTransitionColor.g >= finalTransitionColor.g) {
+        adsFlags = adsFlags | GREEN
+        currentTransitionColor.g = finalTransitionColor.g;
+      }
+      if (bs === -1 && currentTransitionColor.b <= finalTransitionColor.b || bs === 1 && currentTransitionColor.b >= finalTransitionColor.b) {
+        adsFlags = adsFlags | BLUE
+        currentTransitionColor.b = finalTransitionColor.b;
+      }
+      sendMainLEDStatus(
+        {
+          r: Math.round(currentTransitionColor.r),
+          g: Math.round(currentTransitionColor.g),
+          b: Math.round(currentTransitionColor.b),
+          a: currentTransitionColor.a
+        }, ledOn);
+      if (adsFlags !== ALL_COLORS) {
+        requestAnimationFrame(step);
+      } else {
+        // end
+        prevTime = undefined
+      }
+    }
+    if (prevTime === undefined) {
+      requestAnimationFrame(step);
+    }
+  }
+
+  function onADSDown(event, ads) {
+    /*
+      enabled: false,
+      color: {},
+      speed: 0,
+      adsMouseButton: '',
+      adsControllerButton: '',
+    */
+    adsFlags = 0;
+    finalTransitionColor = {...ads.color};
+    changeColorTo(ads.speed);
+  }
+
+  function onADSUp(event, ads) {
+    adsFlags = 0;
+    finalTransitionColor = {...color};
+    changeColorTo(ads.speed);
+    
+  }
 
   function deactivateLED() {
     setLEDOn(_on=>{
@@ -506,6 +552,10 @@ function AppColorPicker() {
     }
   }
 
+  const handleColorChangeThrottled = useCallback(throttle(handleColorChange, 50), [
+    color // useCallback is probably not helping at all here bc colors changes too much
+  ])
+
   return (
     <div className={styles.App}>
       <header className={styles.header}>
@@ -530,6 +580,7 @@ function AppColorPicker() {
                 <UpdatesTabWrapper>
                   <TabList className={styles.tabControls}>
                     <Tab tabIndex="-1"><button onClick={handleChangeToCalibrateTab}>Calibrate</button></Tab>
+                    <Tab tabIndex="-1"><button>ADS</button></Tab>
                     <Tab tabIndex="-1"><button>Settings</button></Tab>
                   </TabList>
                 </UpdatesTabWrapper>
@@ -559,7 +610,7 @@ function AppColorPicker() {
                       
                       <RgbaColorPicker
                         color={color}
-                        onChange={ throttle(handleColorChange, 50) }
+                        onChange={ handleColorChangeThrottled }
                       ></RgbaColorPicker>
                       <div className={styles.rgbInputs}>
                           <label>R</label><input key={'red_' + inputColorKey.r} onChange={(e)=>(changeRgb(e, 'r'))} defaultValue={color.r} type="text"></input>
@@ -582,6 +633,11 @@ function AppColorPicker() {
                       ></DefaultColors>
                     </div>
                   </div>
+                </TabPanel>
+                <TabPanel>
+                  <ADS
+                    handleColorChange={handleADSColorChange}
+                    ></ADS>
                 </TabPanel>
                 <TabPanel>
                   <Settings></Settings>
