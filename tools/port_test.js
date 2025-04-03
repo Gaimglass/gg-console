@@ -19,16 +19,18 @@ async function main() {
     // first one found so you must only connect one at a time.
     
     if (productId === '5400' && vendorId === '2341') {
-      //console.log({productId, vendorId})
+      console.log({productId, vendorId})
       path = ports[i]?.path;
       break;
+    }
+    else {
     }
   }
   if (path) {
     console.log("path found, connecting to port: ", path)
     port = new SerialPort({
       path,
-      baudRate: 115200,
+      baudRate: 1200//115200,
     })
 
     port.on('error', (e) => {
@@ -42,6 +44,13 @@ async function main() {
     // Read the port data
     port.on("open", async () => {
       
+      setTimeout(()=>{
+        // bootloader test. Connect at baud 1200 then disconnect to observe ATMega reboot
+        clearInterval(intervalId);
+        intervalId = null;
+        disconnectUsb();
+      },100)
+
       console.log("PORT OPEN", port.isOpen)
       if (!port.isOpen) {
         throw new Error('Port did not open correctly')

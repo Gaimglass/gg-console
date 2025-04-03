@@ -91,12 +91,6 @@ async function connectUsb(mainWindow, _isDev) {
         if (!port.isOpen) {
           throw new Error('Port did not open correctly')
         }
-        /*setTimeout(()=>{
-          // bootloader test. Connect at baud 1200 then disconnect to observe ATMega reboot
-          clearInterval(intervalId);
-          intervalId = null;
-          disconnectUsb();
-        },100)*/
         
         const result = await getDeviceInfo();
         const [name, version] = result.split('&');
