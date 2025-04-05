@@ -1,0 +1,77 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  padding: 0 2em;
+  color:#ccc;
+}
+
+.switchContainer {
+  margin: 2em 0 3em 0;
+  display: flex;
+  align-items: center;
+}
+.switch {
+  margin-right: 1em;
+
+}
+
+.adsControls {
+  display: flex;
+  flex-direction: row;
+}
+
+.adsControls p {
+  font-size: 0.8em;
+}
+
+.speedLabelContainer {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5em;
+}
+.noMarginTop {
+  margin-top: 0;
+}
+.mouseBindingsTable {
+  font-size: 0.8em;
+  border-collapse: collapse;
+}
+
+.mouseBindingsTable td {
+  padding: 0.15em;
+}
+
+.rightControls {
+  margin-left: 2em;
+}
+
+.adsControls input {
+  background-color: #1b1d23;
+  border: none;
+  padding: 0.5em;
+  margin-left: 1em;
+}
+
+.slider {
+  width: 15em;
+  height: 30px;
+  /*background-color: rgb(84, 64, 64);*/
+}
+
+.thumb {
+  background-color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 30px;
+  box-shadow: 1px 5px 15px rgba(0, 0, 0, 0.6)
+}
+
+.track {
+  width: 10px;
+  height: 1em;
+}
+
+.trackInner {
+  height: 30px;
+  border-radius: 20px;
+}
