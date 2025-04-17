@@ -45,12 +45,6 @@
   margin-left: 2em;
 }
 
-.adsControls input {
-  background-color: #1b1d23;
-  border: none;
-  padding: 0.5em;
-  margin-left: 1em;
-}
 
 .slider {
   width: 15em;
@@ -74,4 +68,25 @@
 .trackInner {
   height: 30px;
   border-radius: 20px;
+}
+
+
+.adsControls input {
+  width: 2em;
+  background-color: #1b1d23;
+  border: none;
+  padding: 0.5em;
+}
+
+.adsControls label {
+  margin-right: 3px;
+  color: #777;
+}
+
+.rgbInputs {
+  margin-top: 1em;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
 }

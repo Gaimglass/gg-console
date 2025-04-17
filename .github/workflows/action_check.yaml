@@ -1,0 +1,10 @@
+name: Do Github actions work
+
+on: push
+
+jobs:
+  check_my_action:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "The job was automatically triggered by a ${{ github.event_name }} event."
+    
