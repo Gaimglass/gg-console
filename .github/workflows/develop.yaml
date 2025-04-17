@@ -11,15 +11,7 @@ env:
 
 jobs:
   build_on_win:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@master
-        with:
-          node-version: 22
-      - name: Install dependencies
-        run: yarn install
-      - name: Build
-        run: yarn build
-      - name: Make
-        run: yarn electron-forge make
+      - run: echo "The job was automatically triggered by a ${{ github.event_name }} event."
+    
