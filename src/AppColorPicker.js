@@ -31,7 +31,6 @@ function AppColorPicker() {
   const [isMac, setMac] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [editSwatch, setEditSwatch] = useState(null);
-  const [inputColorKey, setInputColorKey] = useState({});
 
 
   // ads vars
@@ -226,7 +225,6 @@ function AppColorPicker() {
     sendDefaultColors(dc);
     const newColor = {r: c.color.r, g: c.color.g, b: c.color.b, a: color.a};
     setColor(newColor);
-    setInputColorKey(newColor)
   }
 
   function handleADSColorChange(_newColor) {
@@ -250,7 +248,6 @@ function AppColorPicker() {
       // button on the device start from where this default color is.
       sendDefaultIndex(defaultIndex); 
     }
-    setInputColorKey(newColor);
      
     if (editSwatch !== null) {
       // when editing a default color, update that color in real time
@@ -311,6 +308,7 @@ function AppColorPicker() {
         prevTime = undefined
       }
     }
+    
     if (prevTime === undefined) {
       requestAnimationFrame(step);
     }
@@ -326,14 +324,17 @@ function AppColorPicker() {
     */
     adsFlags = 0;
     finalTransitionColor = {...ads.color};
-    changeColorTo(ads.speed);
+    if (ledOn) {
+      changeColorTo(ads.speed);
+    }
   }
 
   function onADSUp(event, ads) {
     adsFlags = 0;
     finalTransitionColor = {...color};
-    changeColorTo(ads.speed);
-    
+    if (ledOn) {
+      changeColorTo(ads.speed);
+    }
   }
 
   function deactivateLED() {
@@ -363,7 +364,6 @@ function AppColorPicker() {
       }
       setColor(newColor);
       sendMainLEDStatus(newColor, true);
-      setInputColorKey(newColor);
       // update the index position on the device so that the left and right color 
       // button on the device start from where this default color is.
       sendDefaultIndex(index);
@@ -383,7 +383,6 @@ function AppColorPicker() {
           a: newAlpha
         }
         sendMainLEDStatus(newColor, true);
-        setInputColorKey(newColor);
         return newColor;
       })
       
@@ -401,7 +400,6 @@ function AppColorPicker() {
           a: newAlpha
         }
         sendMainLEDStatus(newColor, true);
-        setInputColorKey(newColor);
         return newColor;
       })
     }
@@ -456,7 +454,6 @@ function AppColorPicker() {
     });
     setColor(c);
     setLEDOn(led);
-    setInputColorKey({...c});
   }
   
 
@@ -613,11 +610,11 @@ function AppColorPicker() {
                         onChange={ handleColorChangeThrottled }
                       ></RgbaColorPicker>
                       <div className={styles.rgbInputs}>
-                          <label>R</label><input key={'red_' + inputColorKey.r} onChange={(e)=>(changeRgb(e, 'r'))} defaultValue={color.r} type="text"></input>
-                          <label>G</label><input key={'green_' + inputColorKey.g} onChange={(e)=>(changeRgb(e, 'g'))} defaultValue={color.g} type="text"></input>
-                          <label>B</label><input key={'blue_' + inputColorKey.b} onChange={(e)=>(changeRgb(e, 'b'))} defaultValue={color.b} type="text"></input>
-                          <label>A</label><input key={'alpha_' + inputColorKey.a} onChange={changeAlpha} defaultValue={color.a} type="text"></input>
-                        </div>
+                        <label>R</label><input onChange={(e)=>(changeRgb(e, 'r'))} value={color.r} type="text"></input>
+                        <label>G</label><input onChange={(e)=>(changeRgb(e, 'g'))} value={color.g} type="text"></input>
+                        <label>B</label><input  onChange={(e)=>(changeRgb(e, 'b'))} value={color.b} type="text"></input>
+                        <label>A</label><input  onChange={changeAlpha} value={color.a} type="text"></input>
+                      </div>
                     </div>
                     <div className={styles.colors}>
                       <DefaultColors
