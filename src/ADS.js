@@ -13,7 +13,7 @@ const ipcRenderer  = electron.ipcRenderer;
 
 export default function ADS() {
   const [settings, setSettings] = useState(loadAppSettings())
-  
+
   const hue = useMemo(()=>{
     const h = (settings.ads.speed/100)*100;
     return Number.parseInt(h)
@@ -63,6 +63,42 @@ export default function ADS() {
     ipcRenderer.invoke('set-enable-ads', newSettings.ads);
   }
 
+  function changeRgb(e, colorComponent) {
+    const rawString = e.target.value.trim();
+    let updateKey = false; // force an update on the input field too
+    let newColorComponent = parseInt(rawString);
+    if (isNaN(newColorComponent)) {
+      return;
+    } else if(newColorComponent > 255) {
+      newColorComponent = 255;
+      updateKey = true;
+    } else if(newColorComponent < 0) {
+      newColorComponent = 0;
+      updateKey = true;
+    }
+
+    const newColor = {
+      ...settings.ads.color,
+      [colorComponent]: newColorComponent
+    }
+    const newSettings = {
+      ...settings,
+      ads: {
+        ...settings.ads,
+        color: newColor
+      }
+    }
+    
+    if(updateKey) {
+      e.target.value = newColorComponent
+    }
+
+    setSettings(newSettings);
+    saveAppSettings(newSettings)
+    
+    ipcRenderer.invoke('set-enable-ads', newSettings.ads);
+  }
+
   return <div className={styles.container}>
     <div className={styles.switchContainer}>
       <Switch
@@ -89,6 +125,11 @@ export default function ADS() {
             color={settings.ads.color}
             onChange={ throttle(handleColorChange, 100) }
           />
+          <div className={styles.rgbInputs}>
+            <label>R</label><input  onChange={(e)=>(changeRgb(e, 'r'))} value={settings.ads.color.r} type="text"></input>
+            <label>G</label><input  onChange={(e)=>(changeRgb(e, 'g'))} value={settings.ads.color.g} type="text"></input>
+            <label>B</label><input  onChange={(e)=>(changeRgb(e, 'b'))} value={settings.ads.color.b} type="text"></input>
+          </div>
       </div>
       <div className={styles.rightControls}>
         <div>
