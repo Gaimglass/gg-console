@@ -46,11 +46,22 @@ If the app looks good, then the release needs to be manually edited out of draft
 
 ## Release a new production version online
 
-1. bump the version in package.json
+1. bump the version in `package.json`
 2. make a commit to `develop`
 3. create a PR `develop` -> `main` and then merge
 
 _A new draft release will be built by the action `publish.yaml`_
 
-4. Convert the draft release to final.
+4. Navigate to [releases](https://github.com/Gaimglass/gg-console/releases) and publish the drafted release if needed
 
+### Alternatively to make a release locally
+
+1. Set your `GITHUB_TOKEN` to an env variable 
+2. bump the version in `package.json`
+
+```
+yarn build
+yarn publish-gg
+```
+
+3. Navigate to [releases](https://github.com/Gaimglass/gg-console/releases) and publish the drafted release if needed
