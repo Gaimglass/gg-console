@@ -116,7 +116,7 @@ export default function ADS() {
         id="material-switch"
         onChange={handleChange} 
         checked={settings.ads.enabled} />
-      <label>Enable ADS Toggle Color</label>
+      <label>Enable ADS Hold Color</label>
     </div>
 
     <div className={styles.adsControls}>
@@ -133,7 +133,7 @@ export default function ADS() {
       </div>
       <div className={styles.rightControls}>
         <div>
-          <h3 className={styles.noMarginTop}>ADS Toggle Bindings</h3>
+          <h3 className={styles.noMarginTop}>ADS Hold Bindings</h3>
           <p><em>Note: These button binding must match your games'</em></p>
           <table className={styles.mouseBindingsTable}>
             <tbody>
