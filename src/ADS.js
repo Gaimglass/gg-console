@@ -5,13 +5,16 @@ import styles from './css/ADS.module.css'
 import { RgbColorPicker } from 'react-colorful';
 import Switch from "react-switch";
 
-import  { throttle, loadAppSettings, saveAppSettings } from './Utils'
+import  { useThrottle, loadAppSettings, saveAppSettings } from './Utils'
 
 
 const electron = window.require('electron');
 const ipcRenderer  = electron.ipcRenderer;
 
 export default function ADS() {
+
+  const handleColorChangeThrottled = useThrottle(handleColorChange, 50);
+
   const [settings, setSettings] = useState(loadAppSettings())
 
   const hue = useMemo(()=>{
@@ -123,7 +126,7 @@ export default function ADS() {
       <div>
         <RgbColorPicker
             color={settings.ads.color}
-            onChange={ throttle(handleColorChange, 100) }
+            onChange={ handleColorChangeThrottled }
           />
           <div className={styles.rgbInputs}>
             <label>R</label><input  onChange={(e)=>(changeRgb(e, 'r'))} value={settings.ads.color.r} type="text"></input>

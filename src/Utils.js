@@ -1,3 +1,5 @@
+import {useRef, useCallback } from 'react'
+
 
 async function getMessageResult(promise, cb) {
   const result = await promise;
@@ -93,30 +95,40 @@ function getADSSettings() {
   return ads;
 }
 
-function throttle(func, timeout = 50){
-  let timer;
-  let latestFunc;
-  return (...args) => {
-    if (!timer) {
+/**
+ * Leading and trailing edge throttle function. Always fire right away,
+ * then fire again after a delay. Always fire one last time after the last delay to ensure the last 
+ * value was set. This is used for color changes and its important to record the last one but not all the 
+ * middle ones.
+ * @param {*} func 
+ * @param {*} timeout 
+ * @returns 
+ */
+function useThrottle (func, timeout = 50) {
+  const timer = useRef(undefined);
+  const latestFunc = useRef(undefined);
+  const throttledFunction = useCallback((...args) => {
+    if (!timer.current) {
       func.apply(this, args);
-      timer = setTimeout(() => {
-        timer = undefined;
-        if(latestFunc) {
+      timer.current = setTimeout(() => {
+        timer.current = undefined;
+        if(latestFunc.current) {
           // ensures the last one always proceeds
-          latestFunc.apply(this, args);
-          latestFunc = undefined;
+          latestFunc.current.apply(this, args);
+          latestFunc.current = undefined;
         }
       }, timeout);
     } else {
-      latestFunc = () => {
+      latestFunc.current = () => {
         func.apply(this, args);
       }
     }
-  };
+  }, [func, timeout])
+  return throttledFunction;
 }
 
 export {
-  throttle,
+  useThrottle,
   getMessageResult,
   defaultAppSettings,
   saveAppSettings,
