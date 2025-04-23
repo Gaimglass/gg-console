@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback  } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
 import classNames from 'classnames';
 import DefaultColors from './DefaultColors'
@@ -12,7 +12,7 @@ import styles from './css/AppColorPicker.module.css'
 
 import {ReactComponent as PowerSwitch} from './assets/power-off-solid.svg';
 import {ReactComponent as Crosshairs} from './assets/crosshair.svg';
-import  { throttle, getMessageResult } from './Utils'
+import  { useThrottle, getMessageResult } from './Utils'
 //import logo from './assets/logo.png';
 import './css/globalStyles.css';
 
@@ -44,6 +44,12 @@ function AppColorPicker() {
   const ALL_COLORS = RED | GREEN | BLUE;
 
 
+  const handleColorChangeThrottled = useThrottle(handleColorChange, 50);
+
+  const handleUpdateGGThrottled = useThrottle((message)=>{
+    parseMainLedFromGG(message);
+  }, 50);
+
   useEffect(()=>{
     //const result = ipcRenderer.sendSync('get-app-state'); // non-blocking
     getAppState();
@@ -51,15 +57,13 @@ function AppColorPicker() {
     // TODO do we really need these here too?
     loadMainLedFromGG();
     loadDefaultColorsFromGG();
-    // 
+    //
     
     // Receive uninitiated messages from the gg device
     // these messages are prefixed with "update-" for organization
 
     ipcRenderer.on('update-main-led-state-from-gg', function (evt, message) {
-      (throttle(()=>{
-        parseMainLedFromGG(message) 
-      }, 100))();
+      handleUpdateGGThrottled(message);
     });
 
     ipcRenderer.on('update-default-colors-from-gg', function (evt, message) {
@@ -81,7 +85,7 @@ function AppColorPicker() {
       ipcRenderer.removeAllListeners();
     }
     
-  },  /* eslint-disable */ [])
+  },  /* eslint-disable */ [useThrottle])
   
   useEffect(()=>{
     ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
@@ -549,9 +553,6 @@ function AppColorPicker() {
     }
   }
 
-  const handleColorChangeThrottled = useCallback(throttle(handleColorChange, 50), [
-    color // useCallback is probably not helping at all here bc colors changes too much
-  ])
 
   return (
     <div className={styles.App}>
