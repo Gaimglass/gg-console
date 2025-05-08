@@ -34,13 +34,14 @@ function AppColorPicker() {
 
 
   // ads vars
-  let prevTime = undefined;
+  let changeInterval = undefined
   let currentTransitionColor = {...color}
   let finalTransitionColor = {}
   let adsFlags = 0
   const RED = 1;
   const GREEN = 2;
   const BLUE = 4;
+  const TRANS_MULTIPLIER = 35;
   const ALL_COLORS = RED | GREEN | BLUE;
 
 
@@ -270,11 +271,15 @@ function AppColorPicker() {
    * For ADS transitions only 
   */
   function changeColorTo(speed) {
-    const multiplier = 35; // adjust as needed
-    function step(timestamp) {
-      if (prevTime === undefined) {
-        prevTime = timestamp;
-      }
+    if (changeInterval) {
+      clearInterval(changeInterval)
+    }
+
+    let prevTime = (new Date()).getTime();
+    changeInterval = setInterval(step, 1)
+
+    function step() {
+      let timestamp = (new Date()).getTime();
       const dt = (timestamp - prevTime)/1000;
       prevTime = timestamp;
 
@@ -282,9 +287,9 @@ function AppColorPicker() {
       const gs = finalTransitionColor.g > currentTransitionColor.g ? 1: -1
       const bs = finalTransitionColor.b > currentTransitionColor.b ? 1: -1
 
-      currentTransitionColor.r = currentTransitionColor.r + speed * dt * rs * multiplier;
-      currentTransitionColor.g = currentTransitionColor.g + speed * dt * gs * multiplier;
-      currentTransitionColor.b = currentTransitionColor.b + speed * dt * bs * multiplier;
+      currentTransitionColor.r = currentTransitionColor.r + speed * dt * rs * TRANS_MULTIPLIER;
+      currentTransitionColor.g = currentTransitionColor.g + speed * dt * gs * TRANS_MULTIPLIER;
+      currentTransitionColor.b = currentTransitionColor.b + speed * dt * bs * TRANS_MULTIPLIER;
 
       if (rs === -1 && currentTransitionColor.r <= finalTransitionColor.r || rs === 1 && currentTransitionColor.r >= finalTransitionColor.r) {
         adsFlags = adsFlags | RED
@@ -305,16 +310,10 @@ function AppColorPicker() {
           b: Math.round(currentTransitionColor.b),
           a: currentTransitionColor.a
         }, ledOn);
-      if (adsFlags !== ALL_COLORS) {
-        requestAnimationFrame(step);
-      } else {
-        // end
-        prevTime = undefined
+      if (adsFlags === ALL_COLORS) {
+        clearInterval(changeInterval)
+        changeInterval = null;
       }
-    }
-    
-    if (prevTime === undefined) {
-      requestAnimationFrame(step);
     }
   }
 

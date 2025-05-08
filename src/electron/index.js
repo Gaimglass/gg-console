@@ -90,7 +90,14 @@ if (!gotTheLock) {
       disconnectUsb();
     });
     
-    mainWindow.show();
+    process.argv.forEach(arg=>{
+      console.log("arg: ", arg)
+      if (arg.indexOf('hidden')>-1) {
+        console.log("hiding app")
+        mainWindow.setSkipTaskbar(true);
+        mainWindow.hide();
+      }
+    })
   });
 
   // Quit when all windows are closed.
@@ -206,15 +213,7 @@ async function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => {
-    process.argv.forEach(arg=>{
-      if (arg.indexOf('hidden')>-1) {
-        console.log("hiding app")
-        mainWindow.setSkipTaskbar(true);
-        setTimeout(()=>{
-          mainWindow.hide(); 
-        },500)
-      }
-    })
+    mainWindow.show()
   })
 
   // Emitted when the window is closed.
