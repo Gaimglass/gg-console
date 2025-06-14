@@ -1,6 +1,6 @@
 {
   "name": "Gaimglass",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": false,
   "license": "BUSL-1.1",
   "author": "Gaimglass",
@@ -21,6 +21,7 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish-gg": "electron-forge publish"
+
   },
   "dependencies": {
     "@electron/rebuild": "^3.7.1",
