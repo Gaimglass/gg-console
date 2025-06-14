@@ -68,6 +68,22 @@ function createTray() {
 const additionalData = {}
 const gotTheLock = app.requestSingleInstanceLock(additionalData)
 
+function checkStartHidden() {
+  let hideOnStart = false;
+  process.argv.forEach(arg=>{
+    console.log("arg: ", arg)
+    if (arg.indexOf('hidden')>-1) {
+      console.log("hiding app")
+      mainWindow.setSkipTaskbar(true);
+      mainWindow.hide();
+      hideOnStart = true;
+    }
+  })
+  if (!hideOnStart) {
+    console.log("showing app")
+    mainWindow.show();
+  };
+}
 
 if (!gotTheLock) {
   app.quit()
@@ -89,15 +105,7 @@ if (!gotTheLock) {
       // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
       disconnectUsb();
     });
-    
-    process.argv.forEach(arg=>{
-      console.log("arg: ", arg)
-      if (arg.indexOf('hidden')>-1) {
-        console.log("hiding app")
-        mainWindow.setSkipTaskbar(true);
-        mainWindow.hide();
-      }
-    })
+    checkStartHidden();
   });
 
   // Quit when all windows are closed.
@@ -211,10 +219,6 @@ async function createWindow() {
   if (process.platform !== 'darwin') {
     tray = createTray();
   }
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show()
-  })
 
   // Emitted when the window is closed.
   mainWindow.on('close', function (e) {
