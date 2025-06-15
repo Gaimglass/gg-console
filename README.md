@@ -59,6 +59,11 @@ _A new draft release will be built by the action `publish.yaml`_
 1. Set your `GITHUB_TOKEN` to an env variable 
 2. bump the version in `package.json`
 
+_If you get 401 Bad credentials error within Forge, try directly setting
+the `authToken: 'YOUR_VALID_GITHUB_TOKEN_HERE'` value in `forge.config.js`. The octokit lib may be
+using the wrong key._
+
+
 ```
 yarn build
 yarn publish-gg
