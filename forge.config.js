@@ -9,9 +9,11 @@ module.exports = {
       name: '@electron-forge/maker-squirrel',
       config: {
         setupIcon: './src/assets/gg_icon.ico',
+        loadingGif: './src/assets/splash.gif',
 
       },
     },
+    /*https://github.com/electron/fiddle/blob/main/forge.config.ts*/
     /*{
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
@@ -40,7 +42,7 @@ module.exports = {
           name: 'gg-console'
         },
         prerelease: false,
-        draft: true
+        draft: true,
       }
     }
   ]
