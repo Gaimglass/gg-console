@@ -144,6 +144,10 @@ async function initializeUsb(mainWindow, app, isDev) {
 }
 
 async function startConnectThink(mainWindow, isDev) {
+  if (intervalId) {
+    clearInterval(intervalId)
+    console.warn("startConnectThink called twice")
+  }
   intervalId = setInterval(()=>{
     // check the connection every 800ms and reconnect if needed
     connectUsb(mainWindow, isDev);
