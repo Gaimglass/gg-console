@@ -38,7 +38,6 @@ async function checkForUpdates(currentVersion, isDev) {
       })
     }
     const updateError = function(message) {
-      console.log('update error', message)
       cleanUpEvents();
       reject({
         message
