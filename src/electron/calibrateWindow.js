@@ -24,6 +24,7 @@ function toggleCalibrateWindow() {
         nodeIntegration: true,
         enableRemoteModule: true,
         contextIsolation: false,
+        additionalArguments: ['--window-type=calibrate'],
       }
     });
 
@@ -47,9 +48,7 @@ function toggleCalibrateWindow() {
       protocol: 'file:',
       slashes: true
     });
-    const urlObject  = new URL(startUrl);
-    urlObject.search = new URLSearchParams({app: "calibrate"}); // let the UI know to render the calibrate page
-    calibrateWindow.loadURL(urlObject.toString());
+    calibrateWindow.loadURL(startUrl);
     calibrateWindow.maximize();
     calibrateWindow.setFullScreen(true)
     return "ok";

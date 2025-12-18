@@ -40,16 +40,17 @@ export default function AppMain() {
     
   }
 
-  useEffect(()=>{
+  useEffect(() => {
     sendAppSettings();
   }, [])
 
-  const params = new URLSearchParams(window.location.search);
-  const isCalibrate = params.get('app') === 'calibrate'
+  // Read window type from Electron's additionalArguments
+  const windowType = process.argv.find(arg => arg.startsWith('--window-type='))?.split('=')[1];
+  const isCalibrate = windowType === 'calibrate';
+  
   return (
     <>
-      {isCalibrate ? <AppCalibrate></AppCalibrate> : <AppColorPicker></AppColorPicker>}
+      {isCalibrate ? <AppCalibrate /> : <AppColorPicker />}
     </>
-    
-  )
+  );
 }

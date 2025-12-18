@@ -106,24 +106,36 @@ function getADSSettings() {
  */
 function useThrottle (func, timeout = 50) {
   const timer = useRef(undefined);
-  const latestFunc = useRef(undefined);
+  const latestArgs = useRef(undefined);
+  const funcRef = useRef(func);
+  
+  // Always keep the latest function reference
+  funcRef.current = func;
+  
   const throttledFunction = useCallback((...args) => {
     if (!timer.current) {
-      func.apply(this, args);
+      funcRef.current(...args);
       timer.current = setTimeout(() => {
         timer.current = undefined;
-        if(latestFunc.current) {
+        if (latestArgs.current) {
           // ensures the last one always proceeds
-          latestFunc.current.apply(this, args);
-          latestFunc.current = undefined;
+          funcRef.current(...latestArgs.current);
+          latestArgs.current = undefined;
         }
       }, timeout);
     } else {
-      latestFunc.current = () => {
-        func.apply(this, args);
-      }
+      latestArgs.current = args;
     }
-  }, [func, timeout])
+  }, [timeout]);
+  
+  throttledFunction.cancel = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = undefined;
+      latestArgs.current = undefined;
+    }
+  };
+  
   return throttledFunction;
 }
 

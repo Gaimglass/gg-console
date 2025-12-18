@@ -1,4 +1,5 @@
 const electron = require('electron');
+const { BrowserWindow } = require('electron');
 
 const { getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 const { checkForUpdates, updateAndRestart } = require('../updates')
@@ -16,7 +17,10 @@ function registerUIEvents(mainWindow, app, isDev) {
       const result = await getMainLED();
       event.returnValue = result;
     } catch(err) {
-      event.returnValue = err;
+      // Return empty string when port not ready, UI will use defaults. 
+      // This ensures we don't log an error in the browser console because we don't always expect the port to be ready
+      // and we don't need to wait for it. The client has a fallback on usb-connected event.
+      event.returnValue = '';
     }
   });
   
@@ -27,6 +31,17 @@ function registerUIEvents(mainWindow, app, isDev) {
     } catch(err) {
       event.returnValue = err;
     }
+  });
+
+  // Broadcast color changes to other windows (not sender)
+  electron.ipcMain.on('broadcast-color-sync', (event, color, ledOn) => {
+    const senderWebContentsId = event.sender.id;
+    const allWindows = BrowserWindow.getAllWindows();
+    allWindows.forEach(win => {
+      if (win.webContents.id !== senderWebContentsId) {
+        win.webContents.send('color-sync-from-other-window', color, ledOn);
+      }
+    });
   });
   
   electron.ipcMain.on('set-default-index', async (event, index) => {
