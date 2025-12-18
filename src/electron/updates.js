@@ -1,8 +1,10 @@
 const electron = require('electron');
 
+var updateCheckLock = false;
 
 async function checkForUpdates(currentVersion, isDev) {
 
+  
   return new Promise((resolve, reject)=>{
     if (isDev) {
       setTimeout(()=>{
@@ -15,6 +17,12 @@ async function checkForUpdates(currentVersion, isDev) {
       },1000)
       return
     }
+
+    if(updateCheckLock) {
+      // don't check updates twice in a row
+      resolve({updateAvailable: false})
+    }
+    updateCheckLock = true;
 
     const checkingForUpdate = function(event, releaseNotes, releaseName) {
       console.log('checking for updates...')
@@ -38,7 +46,6 @@ async function checkForUpdates(currentVersion, isDev) {
       })
     }
     const updateError = function(message) {
-      console.log('update error', message)
       cleanUpEvents();
       reject({
         message
@@ -53,6 +60,7 @@ async function checkForUpdates(currentVersion, isDev) {
       electron.autoUpdater.removeListener('update-downloaded', updateDownloaded)
       electron.autoUpdater.removeListener('error', updateError)
       console.log("listeners removed")
+      updateCheckLock = false
     }
 
     const server = 'https://update.electronjs.org'

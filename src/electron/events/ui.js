@@ -113,7 +113,8 @@ function registerUIEvents(mainWindow, app, isDev) {
         ...result
       };
     } catch(err) {
-      console.error("check for updates error: ", err.message)
+      //console.error("check for updates error: ", err.message)
+      // Update
       return {
         error: err.message
       };
