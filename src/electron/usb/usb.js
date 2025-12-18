@@ -2,6 +2,7 @@ const { SerialPort } = require('serialport')
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { SERIAL_COMMANDS } = require('./serial-codes');
 
+let failCount = 0;
 // Serial result promise resolvers
 //  <message ID> : {
 //    resolve,
@@ -18,6 +19,8 @@ const serialMessageResults = {
 
 //let electronApp;
 let port = null;
+let portConnected = false;
+let portAccessErrorCount = 0;
 let parser = null;
 let deviceInfo = {}
 let isDev = false;
@@ -30,9 +33,9 @@ let intervalId = null;
 // let serialReady = ()=>(console.error("Promise not created"));
 
 // Connect to the serial port of the Arduino Uno USB device
-async function connectUsb(mainWindow, _isDev) {
+async function connectUsb(mainWindow, _isDev, app) {
   isDev = _isDev;
-  if (port?.isOpen) {
+  if (port?.isOpen || port?.closing) {
     return;
   }
   const ports =  await SerialPort.list();
@@ -52,14 +55,27 @@ async function connectUsb(mainWindow, _isDev) {
   }
   if (path) {
     console.log("path found, connecting to port: ", path)
+    if (portConnected) {
+      console.error("port already connected", port)
+      app.exit();
+    }
     port = new SerialPort({
       path,
       baudRate: 115200,
     })
+    
 
     port.on('error', (e) => {
       console.log("[port error]", e.message)
-      disconnectUsb();
+      /*if (e.message.includes("Access denied")) {
+        portAccessErrorCount+=1;
+        if (portAccessErrorCount > 10) {
+          console.log(">>>> port closed ERROR <<<< restarting app....")
+          app.relaunch();
+          app.exit();
+        }
+      }*/
+      disconnectUsb(app);
     })
 
     // todo, is this \n or \r\n ?
@@ -91,7 +107,7 @@ async function connectUsb(mainWindow, _isDev) {
         if (!port.isOpen) {
           throw new Error('Port did not open correctly')
         }
-        
+        portConnected = true;
         const result = await getDeviceInfo();
         const [name, version] = result.split('&');
         deviceInfo.name = name.split('=')[1]
@@ -102,7 +118,7 @@ async function connectUsb(mainWindow, _isDev) {
         }
       } catch(err) {
         console.log("on port open error", err)
-        disconnectUsb();
+        disconnectUsb(app);
         return;
       }
       // send previous state to GG if there was any
@@ -111,7 +127,8 @@ async function connectUsb(mainWindow, _isDev) {
     });
 
     port.on("close", (options) => {
-      console.log('Serial port closed successfully');
+      console.log('Serial port closed successfully', options);
+      portConnected = false;
       mainWindow.webContents.send('usb-disconnected');
     });
     return true
@@ -140,21 +157,22 @@ function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
 async function initializeUsb(mainWindow, app, isDev) {
   //electronApp = app;
   // set up connection loop.
-  startConnectThink(mainWindow, isDev)
+  startConnectThink(mainWindow, app, isDev)
 }
 
-async function startConnectThink(mainWindow, isDev) {
+async function startConnectThink(mainWindow, app, isDev) {
   if (intervalId) {
     clearInterval(intervalId)
     console.warn("startConnectThink called twice")
+
   }
   intervalId = setInterval(()=>{
-    // check the connection every 800ms and reconnect if needed
-    connectUsb(mainWindow, isDev);
+    // check the connection evyarnery 800ms and reconnect if needed
+    connectUsb(mainWindow, isDev, app);
   }, 800);
 }
 
-async function disconnectUsb() {
+async function disconnectUsb(electronApp) {
   if (port?.isOpen) {
     console.log("port found, attempting to close port")
     port?.close((error) => {
@@ -164,12 +182,25 @@ async function disconnectUsb() {
         // restart the app and it will reset. This has only happened when the GG has been disconnected
         // for several hours and attempting to reconnect causing a Access denied error over and over
         console.log(">>>> port closed ERROR <<<< restarting app....")
-        //electronApp.relaunch();
-        //electronApp.exit();
+        electronApp.relaunch();
+        electronApp.exit();
       } else {
         console.log("port closed successfully")
       }
     });
+  }
+  else {
+    // DODO: This is where we get into the error
+    /*failCount+=1;
+    if(failCount>10) {
+      console.log(`exit`);
+      electronApp.exit();
+    }*/
+    console.log(`disconnectUsb: portConnected: ${portConnected}; port: ${port}; open: ${port?.isOpen}`);
+    if(port) {
+      // try closing anyway
+      port.close();
+    }
   }
 }
 
