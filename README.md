@@ -1,5 +1,6 @@
 # Gaimglass console app
 
+<img src="https://github.com/user-attachments/assets/748354a0-eb1a-43d7-bd22-c1629d4105cd" width="600px">
 
 ### Initial step
 
