@@ -1,36 +1,89 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 
-import styles from './css/AppCalibrate.module.css'
-import {ReactComponent as Close} from './assets/xmark-solid.svg';
-import  { getMessageResult } from './Utils'
+import styles from './css/AppCalibrate.module.css';
+import { ReactComponent as Close } from './assets/xmark-solid.svg';
+import { useThrottle } from './Utils';
 import { Crosshairs } from './Crosshairs';
 
 const electron = window.require('electron');
 const ipcRenderer  = electron.ipcRenderer;
 
 export default function AppCalibrate() {
-  
   const canvasRef = useRef(null);
+  const prevTimeRef = useRef(0);
+  const renderQueueRef = useRef([]);
+  const xhairsRef = useRef(null);
+
+  // Copied from AppColorPicker
+  function parseMainLedFromGG(message) {
+    if (!message || typeof message !== 'string') {
+      console.error('parseMainLedFromGG: Invalid message', message);
+      return { r: 80, g: 255, b: 40, a: 1 }; // Return default color
+    }
+    console.log('CALIBRATE parseMainLedFromGG message:', message);
+    const params = message.split('&');
+    const c = {};
+    params.forEach((param) => {
+      const [key, value] = param.split('=');
+      switch (key) {
+        case 'color': {
+          const [r, g, b] = value.split(',');
+          c.r = Number(r);
+          c.g = Number(g);
+          c.b = Number(b);
+          break;
+        }
+        case 'brightness':
+          c.a = Number(value);
+          break;
+        default:
+          break;
+      }
+    });
+    return c;
+  }
+
+  const handleUpdateColor = useCallback((message) => {
+    const color = parseMainLedFromGG(message);
+    if (xhairsRef.current) {
+      xhairsRef.current.setColor(color);
+    }
+  }, []);
+
+  const handleUpdateColorThrottled = useThrottle(handleUpdateColor, 50);
   
-  var prevTime = 0;
-  var renderQueue = []; // might be state, not sure
-  var xhairs;
-    
-  useEffect(()=>{
-    document.getElementsByTagName('body')[0].classList.add(styles.bodyCalibrate) // remove margin
+  useEffect(() => {
+    document.getElementsByTagName('body')[0].classList.add(styles.bodyCalibrate);
     document.addEventListener('keydown', handleClick);
 
-    document.getElementById("canvas").style.display = '';
+    const canvas = document.getElementById('canvas');
+    if (canvas) {
+      canvas.style.display = '';
+    }
 
-    
     loadMainLedFromGG();
 
-    return ()=>{
-      document.removeEventListener("keydown", handleClick);
-      document.getElementsByTagName('body')[0].classList.remove(styles.bodyCalibrate)
-    }
+    // Listen for real-time color updates from the device
+    ipcRenderer.on('update-main-led-state-from-gg', (evt, message) => {
+      handleUpdateColorThrottled(message);
+    });
+
+    // Listen for color changes from other windows (e.g., AppColorPicker)
+    ipcRenderer.on('color-sync-from-other-window', (evt, color, ledOn) => {
+      if (xhairsRef.current && ledOn) {
+        xhairsRef.current.setColor(color);
+      }
+    });
+
+    return () => {
+      document.removeEventListener('keydown', handleClick);
+      document.getElementsByTagName('body')[0].classList.remove(styles.bodyCalibrate);
+      ipcRenderer.removeAllListeners('update-main-led-state-from-gg');
+      ipcRenderer.removeAllListeners('color-sync-from-other-window');
+      handleUpdateColorThrottled.cancel?.(); // Cancel any pending throttled calls
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []);
 
   function close() {
     window.close();
@@ -38,71 +91,49 @@ export default function AppCalibrate() {
 
   function handleClick(event) {
     if (event.key === 'Escape' || event.keyCode === 27) {
-        close();
-      }
+      close();
+    }
   }
 
   function initXhairs(color) {
-    const ctx = canvasRef.current.getContext("2d");
-    xhairs = new Crosshairs(ctx, color);
-    renderQueue.push(xhairs);
-    window.requestAnimationFrame(render.bind(this, ctx, renderQueue, 0));
+    const ctx = canvasRef.current.getContext('2d');
+    xhairsRef.current = new Crosshairs(ctx, color);
+    renderQueueRef.current.push(xhairsRef.current);
+    window.requestAnimationFrame(render);
   }
 
-  function render(ctx, renderQueue, preTime, time) {
-    if(prevTime === 0) {
-        prevTime = time;
+  function render(time) {
+    if (prevTimeRef.current === 0) {
+      prevTimeRef.current = time;
     }
-    var dt = time - prevTime;
-    ctx.save();
-    renderQueue.forEach((r)=>{
+    const dt = time - prevTimeRef.current;
+    const ctx = canvasRef.current?.getContext('2d');
+    
+    if (ctx) {
+      ctx.save();
+      renderQueueRef.current.forEach((r) => {
         r.draw(dt, time);
-    });
-    ctx.restore();
-    prevTime = time;
-    window.requestAnimationFrame(render.bind(this, ctx, renderQueue, prevTime));
+      });
+      ctx.restore();
+    }
+    
+    prevTimeRef.current = time;
+    window.requestAnimationFrame(render);
   }
 
-  // copied from AppGaimglass
-  function parseMainLedFromGG(message) { 
-    const params = message.split('&');
-    let c = {};
-    //let led;
-    params.forEach(param => {
-      const [key, value] = param.split('=');
-      // eslint-disable-next-line default-case
-      switch(key) {
-        case 'color':
-          const [r,g,b] = value.split(',');
-          c.r = Number(r);
-          c.g = Number(g);
-          c.b = Number(b);
-          break;
-        /*case 'ledOn':
-          led = Boolean(Number(value));
-          break;*/
-        case 'brightness':
-          c.a = Number(value);
-          break;
-      }
-    });
-    return c;
-  }
-  
-  // copied from AppGaimglass
-  async function loadMainLedFromGG() { 
-    getMessageResult(ipcRenderer.sendSync('get-led-state'), (result) => {
-      const color = parseMainLedFromGG(result);
-      initXhairs(color);
-    });
+  // Copied from AppColorPicker
+  function loadMainLedFromGG() {
+    const result = window.require('electron').ipcRenderer.sendSync('get-led-state');
+    const color = parseMainLedFromGG(result);
+    initXhairs(color);
   }
 
   return (
     <div id="container">
-      <button onClick={close} class={styles.close}>
-        <Close></Close>
+      <button onClick={close} className={styles.close}>
+        <Close />
       </button>
-      <canvas ref={canvasRef} width="1" height="1" id="canvas"></canvas>
+      <canvas ref={canvasRef} width="1" height="1" id="canvas" />
     </div>
-    )
+  );
 }

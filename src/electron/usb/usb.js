@@ -1,6 +1,7 @@
 const { SerialPort } = require('serialport')
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { SERIAL_COMMANDS } = require('./serial-codes');
+const { BrowserWindow } = require('electron');
 
 // Serial result promise resolvers
 //  <message ID> : {
@@ -34,6 +35,7 @@ async function connectUsb(mainWindow, _isDev, app) {
     return;
   }
   isConnecting = true;
+  
   try {
   const ports =  await SerialPort.list();
   let path = '';
@@ -49,7 +51,6 @@ async function connectUsb(mainWindow, _isDev, app) {
     }
   }
   if (path) {
-    console.log("path found, connecting to port: ", path)
     if (port?.isOpen) {
       console.error("port already connected", port)
       isConnecting = false;
@@ -92,7 +93,6 @@ async function connectUsb(mainWindow, _isDev, app) {
     // Read the port data
     port.on("open", async (o) => {
       try {
-        console.log("PORT OPEN", port.isOpen, {o})
         if (!port.isOpen) {
           throw new Error('Port did not open correctly')
         }
@@ -114,7 +114,6 @@ async function connectUsb(mainWindow, _isDev, app) {
       }
       // send previous state to GG if there was any
       mainWindow.webContents.send('usb-connected');
-      console.log('Seral port open');
     });
 
     port.on("close", (error) => {
@@ -147,11 +146,18 @@ function getDeviceInfo() {
 // press for example
 function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
   // Uninitiated messages. When a user presses a button on the device
+  // Broadcast to all windows, not just main window
+  const allWindows = BrowserWindow.getAllWindows();
+  
   if ( SERIAL_COMMANDS.UPDATE_MAIN_LED === messageId) {
-    mainWindow.webContents.send('update-main-led-state-from-gg', ggResponse);
+    allWindows.forEach(win => {
+      win.webContents.send('update-main-led-state-from-gg', ggResponse);
+    });
   }
   if ( SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS === messageId) {
-    mainWindow.webContents.send('update-default-colors-from-gg', ggResponse);
+    allWindows.forEach(win => {
+      win.webContents.send('update-default-colors-from-gg', ggResponse);
+    }); 
   }
 }
 
@@ -228,11 +234,9 @@ async function disconnectUsb(electronApp) {
  * requested or it simply may be an "okay" status when new state has been received.
  */
 async function writeCommand(command, commandStr='') {
-  
   if (!port || !port.isOpen || port.destroyed) {
-      console.log("port.isOpen", port?.isOpen)
-      console.log("wireCommand", {command}, {commandStr})
-     return Promise.reject(new Error('>>> Port not available'));
+    // Silent fail - UI will retry on usb-connected event
+    return Promise.reject(new Error('Port not available'));
   }
 
   const serialTimeout = new Promise((_, reject) => {
