@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import ReactSlider from 'react-slider'
 
 import styles from './css/ADS.module.css'
@@ -13,9 +13,22 @@ const ipcRenderer  = electron.ipcRenderer;
 
 export default function ADS() {
 
-  const handleColorChangeThrottled = useThrottle(handleColorChange, 50);
-
   const [settings, setSettings] = useState(loadAppSettings())
+
+  const handleColorChange = useCallback((_newColor) => {
+    const newSettings = {
+      ...settings,
+      ads: {
+        ...settings.ads,
+        color: {..._newColor}
+      }
+    }
+    setSettings(newSettings);
+    saveAppSettings(newSettings)
+    ipcRenderer.invoke('set-enable-ads', newSettings.ads);
+  }, [settings]);
+
+  const handleColorChangeThrottled = useThrottle(handleColorChange, 50);
 
   const hue = useMemo(()=>{
     const h = (settings.ads.speed/100)*100;
@@ -51,19 +64,6 @@ export default function ADS() {
     saveAppSettings(newSettings)
     ipcRenderer.invoke('set-enable-ads', newSettings.ads);
 
-  }
-
-  function handleColorChange(_newColor) {
-    const newSettings = {
-      ...settings,
-      ads: {
-        ...settings.ads,
-        color: {..._newColor}
-      }
-    }
-    setSettings(newSettings);
-    saveAppSettings(newSettings)
-    ipcRenderer.invoke('set-enable-ads', newSettings.ads);
   }
 
   function changeRgb(e, colorComponent) {
