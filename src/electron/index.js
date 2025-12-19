@@ -103,7 +103,7 @@ if (!gotTheLock) {
     });
     electron.powerMonitor.on("resume", () => {
       // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
-      disconnectUsb();
+      disconnectUsb(app);
     });
     checkStartHidden();
   });
