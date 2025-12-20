@@ -605,7 +605,7 @@ function AppColorPicker() {
                     <Tab tabIndex="-1"><button onClick={handleChangeToCalibrateTab}>Calibrate</button></Tab>
                     <Tab tabIndex="-1"><button>ADS</button></Tab>
                     <Tab tabIndex="-1"><button>Ambient</button></Tab>
-                    <Tab tabIndex="-1"><button>Settings</button></Tab>
+                    <Tab tabIndex="-1"><button>Shortcuts</button></Tab>
                   </TabList>
                 </UpdatesTabWrapper>
                 <TabPanel className={styles.tabCalibrate}>
