@@ -78,13 +78,24 @@ function saveAppSettings(settings) {
   localStorage.setItem("settings", JSON.stringify(settings));
 }
 
+function deepMerge(target, source) {
+  const result = { ...target };
+  for (const key in source) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      result[key] = deepMerge(target[key] || {}, source[key]);
+    } else {
+      result[key] = source[key];
+    }
+  }
+  return result;
+}
+
 function loadAppSettings() {
   const userSettings = localStorage.getItem("settings");
-  const settings = {
-    ...defaultAppSettings(),
-    ...JSON.parse(userSettings)
+  if (!userSettings) {
+    return defaultAppSettings();
   }
-  return settings;
+  return deepMerge(defaultAppSettings(), JSON.parse(userSettings));
 }
 
 function getKeyBindings() {
@@ -148,6 +159,7 @@ function getAmbientSettings() {
 
 export {
   useThrottle,
+  deepMerge,
   getMessageResult,
   defaultAppSettings,
   saveAppSettings,

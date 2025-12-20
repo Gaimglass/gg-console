@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import styles from './css/Settings.module.css'
+import styles from './css/KeyBindings.module.css'
 
 import {ReactComponent as Keyboard} from './assets/keyboard-solid.svg';
 import  { loadAppSettings, defaultAppSettings, saveAppSettings, getPrettyTextFromCommand } from './Utils'

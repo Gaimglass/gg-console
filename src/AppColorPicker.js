@@ -5,7 +5,7 @@ import DefaultColors from './DefaultColors';
 import WindowControls from './WindowsControls';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import UpdatesTabWrapper from './UpdatesTabWrapper';
-import Settings from './Settings';
+import KeyBindings from './KeyBindings';
 import ADS from './ADS';
 import Ambient from './Ambient';
 
@@ -665,7 +665,7 @@ function AppColorPicker() {
               <Ambient />
             </TabPanel>
             <TabPanel>
-              <Settings />
+              <KeyBindings />
             </TabPanel>
           </Tabs>
         </div>
