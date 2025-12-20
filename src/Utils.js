@@ -66,8 +66,10 @@ function defaultAppSettings() {
       'speed': 100,
       'adsMouseButton': 2,
       'adsControllerButton': 'button1',
+    },
+    'ambient': {
+      'enabled': false,
     }
-    
   }
 }
 
@@ -139,6 +141,11 @@ function useThrottle (func, timeout = 50) {
   return throttledFunction;
 }
 
+function getAmbientSettings() {
+  const settings = loadAppSettings();
+  return settings.ambient || { enabled: false };
+}
+
 export {
   useThrottle,
   getMessageResult,
@@ -147,6 +154,7 @@ export {
   loadAppSettings,
   getKeyBindings,
   getADSSettings,
+  getAmbientSettings,
   getPrettyTextFromCommand
 
 }

@@ -7,6 +7,7 @@ import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import UpdatesTabWrapper from './UpdatesTabWrapper';
 import Settings from './Settings';
 import ADS from './ADS';
+import Ambient from './Ambient';
 
 import styles from './css/AppColorPicker.module.css';
 
@@ -157,6 +158,7 @@ function AppColorPicker() {
     ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
     ipcRenderer.on('update-ads-active', onADSDown);
     ipcRenderer.on('update-ads-inactive', onADSUp);
+    ipcRenderer.on('ambient-brightness-value', handleAmbientBrightness);
     
     return () => {
       ipcRenderer.removeListener('shortcut-increase-brightness', increaseBrightnessShortcut);
@@ -164,6 +166,7 @@ function AppColorPicker() {
       ipcRenderer.removeListener('shortcut-switch-color', switchColorShortcut);
       ipcRenderer.removeListener('update-ads-active', onADSDown);
       ipcRenderer.removeListener('update-ads-inactive', onADSUp);
+      ipcRenderer.removeListener('ambient-brightness-value', handleAmbientBrightness);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ledOn, color, defaultColors]);
@@ -343,6 +346,11 @@ function AppColorPicker() {
     }
   }
 
+  function handleAmbientBrightness(event, brightness) {
+    // TODO: Implement smooth brightness adjustment in Step 4
+    console.log('Ambient brightness:', brightness);
+  }
+
   function deactivateLED() {
     setLEDOn(() => {
       sendMainLEDStatus(color, false);
@@ -478,8 +486,8 @@ function AppColorPicker() {
     const result = ipcRenderer.sendSync('get-default-colors');
     if (result) {
       parseDefaultColors(result);
+      setIsConnected(true); // we just need to set this once on a successful response
     }
-    setIsConnected(true);
   }
 
   function changeRgb(e, colorComponent) {
@@ -596,6 +604,7 @@ function AppColorPicker() {
                   <TabList className={styles.tabControls}>
                     <Tab tabIndex="-1"><button onClick={handleChangeToCalibrateTab}>Calibrate</button></Tab>
                     <Tab tabIndex="-1"><button>ADS</button></Tab>
+                    <Tab tabIndex="-1"><button>Ambient</button></Tab>
                     <Tab tabIndex="-1"><button>Settings</button></Tab>
                   </TabList>
                 </UpdatesTabWrapper>
@@ -651,6 +660,9 @@ function AppColorPicker() {
             </TabPanel>
             <TabPanel>
               <ADS />
+            </TabPanel>
+            <TabPanel>
+              <Ambient />
             </TabPanel>
             <TabPanel>
               <Settings />

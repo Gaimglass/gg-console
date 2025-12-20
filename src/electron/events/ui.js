@@ -43,6 +43,11 @@ function registerUIEvents(mainWindow, app, isDev) {
       }
     });
   });
+
+  // Relay ambient brightness updates to main window
+  electron.ipcMain.on('ambient-brightness-update', (event, brightness) => {
+    mainWindow.webContents.send('ambient-brightness-value', brightness);
+  });
   
   electron.ipcMain.on('set-default-index', async (event, index) => {
     try {
@@ -59,6 +64,7 @@ function registerUIEvents(mainWindow, app, isDev) {
       const ledStateStr = await getDefaultLEDs();
       event.returnValue = ledStateStr;
     } catch(err) {
+      // todo return '' if port is nullish, this causes an error on first load
       event.returnValue = err;
     }
   });
@@ -155,6 +161,20 @@ function registerUIEvents(mainWindow, app, isDev) {
 
   electron.ipcMain.handle('set-enable-ads', async (event, ads) => {
     return setADS(mainWindow, ads)
+  });
+
+  electron.ipcMain.handle('get-screen-sources', async (event) => {
+    try {
+      const { desktopCapturer } = electron;
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: 320, height: 180 }
+      });
+      return sources;
+    } catch (error) {
+      console.error('Error getting screen sources:', error);
+      return [];
+    }
   });
 
 }

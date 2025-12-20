@@ -1,10 +1,8 @@
 import React, { useEffect } from 'react';
 import AppColorPicker from "./AppColorPicker";
 import AppCalibrate from "./AppCalibrate";
-import  { getKeyBindings, getADSSettings } from './Utils'
-
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
+import BrightnessMonitor from './BrightnessMonitor';
+import { SettingsProvider, useSettings } from './SettingsProvider';
 
 /*
 let gp;
@@ -28,21 +26,8 @@ setInterval(()=>{
   }
 },10)*/
 
-
-export default function AppMain() {
-
-  function sendAppSettings() {
-    const bindings = getKeyBindings();
-    ipcRenderer.invoke('set-enable-shortcuts', bindings);
-
-    const ads = getADSSettings();
-    ipcRenderer.invoke('set-enable-ads', ads);
-    
-  }
-
-  useEffect(() => {
-    sendAppSettings();
-  }, [])
+function AppMainContent() {
+  const { ambientSettings } = useSettings();
 
   // Read window type from Electron's additionalArguments
   const windowType = process.argv.find(arg => arg.startsWith('--window-type='))?.split('=')[1];
@@ -51,6 +36,16 @@ export default function AppMain() {
   return (
     <>
       {isCalibrate ? <AppCalibrate /> : <AppColorPicker />}
+      {/* Brightness monitor runs independently, enabled by settings */}
+      {!isCalibrate && <BrightnessMonitor enabled={ambientSettings.enabled} />}
     </>
+  );
+}
+
+export default function AppMain() {
+  return (
+    <SettingsProvider>
+      <AppMainContent />
+    </SettingsProvider>
   );
 }
