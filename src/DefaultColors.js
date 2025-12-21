@@ -147,10 +147,10 @@ function DefaultColors(props) {
         
       </div>
       { (props.editSwatch !== null) &&
-        <DefaultRevertConfirm onDelete={()=>{
+        <DefaultRevertConfirm onDelete={props.editSwatch !== 0 ? ()=>{
           props.onDeleteDefaultColor()
           props.onSetEditSwatch(null);
-          }
+          } : null
         } onReset={()=>{
           props.onResetDefaultColor()
           props.onSetEditSwatch(null);
