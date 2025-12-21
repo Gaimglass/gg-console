@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactSlider from 'react-slider';
 import Switch from "react-switch";
 import styles from './css/Ambient.module.css';
 import { useSettings } from './SettingsProvider';
@@ -10,6 +11,13 @@ export default function Ambient() {
     updateAmbientSettings({
       ...ambientSettings,
       enabled: enabled
+    });
+  }
+
+  function handleRegionChange(value) {
+    updateAmbientSettings({
+      ...ambientSettings,
+      captureRegion: value
     });
   }
 
@@ -33,6 +41,37 @@ export default function Ambient() {
         <label className={styles.label}>Enable Ambient Brightness</label>
       </div>
       <p><em>Automatically adjusts LED brightness based on screen content.</em></p>
+      
+      <div className={styles.regionControl}>
+        <label className={styles.label}>
+          Capture Region: {ambientSettings?.captureRegion || 100}%
+        </label>
+        <ReactSlider
+          onChange={handleRegionChange}
+          value={ambientSettings?.captureRegion || 100}
+          min={10}
+          max={100}
+          step={5}
+          className={styles.slider}
+          thumbClassName={styles.thumb}
+          renderTrack={(props, state) => {
+            const {key, style} = props;
+            const region = ambientSettings?.captureRegion || 100;
+            // Color changes from blue (10%) to green (100%)
+            const hue = 200 + ((region - 10) / 90) * 80; // 200 to 280 degrees
+            const mergedStyle = {
+              ...style,
+              backgroundColor: `hsl(${hue}deg 50% 50%)`
+            }
+            return <div style={mergedStyle} key={key} className={styles.trackInner} />
+          }}
+          renderThumb={(props, state) => {
+            const {key, ...rest} = props;
+            return <div key={key} {...rest}></div>
+          }}
+        />
+        <p><em>Center {ambientSettings?.captureRegion || 100}% of screen (100% = full screen, 10% = small center area)</em></p>
+      </div>
     </div>
   );
 }

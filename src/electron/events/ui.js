@@ -43,11 +43,6 @@ function registerUIEvents(mainWindow, app, isDev) {
       }
     });
   });
-
-  // Relay ambient brightness updates to main window
-  electron.ipcMain.on('ambient-brightness-update', (event, brightness) => {
-    mainWindow.webContents.send('ambient-brightness-value', brightness);
-  });
   
   electron.ipcMain.on('set-default-index', async (event, index) => {
     try {

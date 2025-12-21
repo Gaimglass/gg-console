@@ -13,16 +13,16 @@ const ipcRenderer = electron.ipcRenderer;
 const SettingsContext = createContext();
 
 export function SettingsProvider({ children }) {
-  const [settings, setSettings] = useState(loadAppSettings());
+  const initialSettings = loadAppSettings();
+  console.log('[SettingsProvider] Initial settings:', initialSettings);
+  console.log('[SettingsProvider] Initial ADS:', initialSettings.ads);
+  const [settings, setSettings] = useState(initialSettings);
 
-  // Send settings to Electron when they change
+  // Persist settings to localStorage whenever they change
   useEffect(() => {
-    const bindings = getKeyBindings();
-    ipcRenderer.invoke('set-enable-shortcuts', bindings);
-
-    const ads = getADSSettings();
-    ipcRenderer.invoke('set-enable-ads', ads);
-  }, []);
+    console.log('[SettingsProvider] Settings changed, persisting to localStorage:', settings);
+    saveAppSettings(settings);
+  }, [settings]);
 
   // Send settings to Electron when they change
   useEffect(() => {
@@ -39,10 +39,13 @@ export function SettingsProvider({ children }) {
   };
 
   const updateADSSettings = (adsSettings) => {
+    console.log('[SettingsProvider] updateADSSettings called with:', adsSettings);
+    console.log('[SettingsProvider] Current settings:', settings);
     const newSettings = {
       ...settings,
       ads: adsSettings
     };
+    console.log('[SettingsProvider] Calling updateSettings with:', newSettings);
     updateSettings(newSettings);
   };
 

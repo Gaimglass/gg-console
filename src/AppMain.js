@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import AppColorPicker from "./AppColorPicker";
 import AppCalibrate from "./AppCalibrate";
-import BrightnessMonitor from './BrightnessMonitor';
-import { SettingsProvider, useSettings } from './SettingsProvider';
+import { SettingsProvider } from './SettingsProvider';
 
 /*
 let gp;
@@ -27,8 +26,6 @@ setInterval(()=>{
 },10)*/
 
 function AppMainContent() {
-  const { ambientSettings } = useSettings();
-
   // Read window type from Electron's additionalArguments
   const windowType = process.argv.find(arg => arg.startsWith('--window-type='))?.split('=')[1];
   const isCalibrate = windowType === 'calibrate';
@@ -36,8 +33,6 @@ function AppMainContent() {
   return (
     <>
       {isCalibrate ? <AppCalibrate /> : <AppColorPicker />}
-      {/* Brightness monitor runs independently, enabled by settings */}
-      {!isCalibrate && <BrightnessMonitor enabled={ambientSettings.enabled} />}
     </>
   );
 }

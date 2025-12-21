@@ -8,6 +8,7 @@ import UpdatesTabWrapper from './UpdatesTabWrapper';
 import KeyBindings from './KeyBindings';
 import ADS from './ADS';
 import Ambient from './Ambient';
+import BrightnessMonitor from './BrightnessMonitor';
 
 import styles from './css/AppColorPicker.module.css';
 
@@ -35,13 +36,15 @@ function AppColorPicker() {
   const currentTransitionColorRef = useRef({ ...color });
   const finalTransitionColorRef = useRef({});
   const adsFlagsRef = useRef(0);
+  const colorRgbRef = useRef({ r: color.r, g: color.g, b: color.b });
   
-  // ADS constants
+  // Transition constants
   const RED = 1;
   const GREEN = 2;
   const BLUE = 4;
+  const ALPHA = 8;
   const TRANS_MULTIPLIER = 35;
-  const ALL_COLORS = RED | GREEN | BLUE;
+  const ALL_COLORS = RED | GREEN | BLUE | ALPHA; // 15
 
   const sendMainLEDStatus = useCallback((color, ledOn) => {
     if (isConnected) {
@@ -93,6 +96,111 @@ function AppColorPicker() {
   const handleColorChangeThrottled = useThrottle(handleColorChangeStable, 50);
   const handleUpdateGGThrottled = useThrottle(handleUpdateGGStable, 50);
 
+  // Event handler callbacks - defined before useEffects that reference them
+  const handleAmbientBrightness = useCallback((brightness) => {
+    if (!ledOn || !isConnected) {
+      return;
+    }
+
+    // Map screen brightness (0.0-1.0) to LED brightness (0.075-1.0)
+    // Using minimum of 0.075 to match device minimum
+    const minBrightness = 0.075;
+    const mappedBrightness = minBrightness + (brightness * (1.0 - minBrightness)); // todo add a strength multiplier 
+    
+    // Clamp to valid range
+    const targetAlpha = Math.max(minBrightness, Math.min(1.0, mappedBrightness));
+
+    // Debug: Log brightness values
+    console.log('[Ambient] Screen brightness:', brightness.toFixed(3), '-> LED alpha:', targetAlpha.toFixed(3));
+
+    // Direct update - use ref to get current RGB without recreating callback
+    sendMainLEDStatus({ ...colorRgbRef.current, a: targetAlpha }, true);
+
+  }, [ledOn, isConnected, sendMainLEDStatus]);
+
+  const deactivateLED = useCallback(() => {
+    setLEDOn(() => {
+      sendMainLEDStatus(color, false);
+      return false;
+    });
+  }, [color, sendMainLEDStatus]);
+
+  const toggleLEDOn = useCallback(() => {
+    setLEDOn((on) => {
+      sendMainLEDStatus(color, !on);
+      return !on;
+    });
+  }, [color, sendMainLEDStatus]);
+
+  const switchColorShortcut = useCallback((event, index) => {
+    if (ledOn) {
+      const colorIndex = Number(index - 1);
+      if (colorIndex < 0) {
+        return;
+      }
+      const newColor = {
+        ...defaultColors[colorIndex].color,
+        a: color.a,
+      };
+      setColor(newColor);
+      sendMainLEDStatus(newColor, true);
+      sendDefaultIndex(colorIndex);
+    }
+  }, [ledOn, defaultColors, color.a, sendMainLEDStatus]);
+
+  const decreaseBrightnessShortcut = useCallback(() => {
+    if (ledOn) {
+      setColor((c) => {
+        let newAlpha = c.a - 0.05;
+        if (newAlpha < 0.075) {
+          newAlpha = 0.075;
+        }
+        const newColor = {
+          ...c,
+          a: newAlpha,
+        };
+        sendMainLEDStatus(newColor, true);
+        return newColor;
+      });
+    }
+  }, [ledOn, sendMainLEDStatus]);
+
+  const increaseBrightnessShortcut = useCallback(() => {
+    if (ledOn) {
+      setColor((c) => {
+        let newAlpha = c.a + 0.05;
+        if (newAlpha > 1) {
+          newAlpha = 1;
+        }
+        const newColor = {
+          ...c,
+          a: newAlpha,
+        };
+        sendMainLEDStatus(newColor, true);
+        return newColor;
+      });
+    }
+  }, [ledOn, sendMainLEDStatus]);
+
+  const onADSDown = useCallback((event, ads) => {
+    adsFlagsRef.current = 0;
+    finalTransitionColorRef.current = { 
+      ...ads.color,
+      a: color.a // ads does not control brightness, just match the current value
+    };
+    if (ledOn) {
+      changeColorTo(ads.speed);
+    }
+  }, [ledOn]);
+
+  const onADSUp = useCallback((event, ads) => {
+    adsFlagsRef.current = 0;
+    finalTransitionColorRef.current = { ...color };
+    if (ledOn) {
+      changeColorTo(ads.speed);
+    }
+  }, [ledOn, color]);
+
   // Setup once on mount
   useEffect(() => {
     getAppState();
@@ -124,8 +232,6 @@ function AppColorPicker() {
 
   // Separate effect for throttled LED state updates
   useEffect(() => {
-    // Receive uninitiated messages from the gg device
-    // these messages are prefixed with "update-" for organization
     ipcRenderer.on('update-main-led-state-from-gg', (evt, message) => {
       handleUpdateGGThrottled(message);
     });
@@ -134,42 +240,48 @@ function AppColorPicker() {
     };
   }, [handleUpdateGGThrottled]);
   
+  // Update currentTransitionColorRef when color changes
   useEffect(() => {
-    ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
-    // Special event when suspending PC to turn off GG
-    ipcRenderer.on('deactivate-led', deactivateLED);
-    currentTransitionColorRef.current = { ...color }; // Always update to match color from UI or GG
-
-    return () => {
-      ipcRenderer.removeListener('shortcut-toggle-led', toggleLEDOn);
-      ipcRenderer.removeListener('deactivate-led', deactivateLED);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    currentTransitionColorRef.current = { ...color };
+    colorRgbRef.current = { r: color.r, g: color.g, b: color.b };
   }, [color]);
 
+  // Send LED status when ledOn or color changes (while connected)
   useEffect(() => {
     if (ledOn && isConnected) {
+      console.log('1::handleAmbientBrightness')
       sendMainLEDStatus(color, true);
     }
+  }, [ledOn, isConnected, color, sendMainLEDStatus]);
 
-    // Shortcuts need updated state values, so these hooks need to be triggered
+  // Register all IPC listeners once - they use stable useCallback references
+  useEffect(() => {
+    ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
+    ipcRenderer.on('deactivate-led', deactivateLED);
     ipcRenderer.on('shortcut-increase-brightness', increaseBrightnessShortcut);
     ipcRenderer.on('shortcut-decrease-brightness', decreaseBrightnessShortcut);
     ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
     ipcRenderer.on('update-ads-active', onADSDown);
     ipcRenderer.on('update-ads-inactive', onADSUp);
-    ipcRenderer.on('ambient-brightness-value', handleAmbientBrightness);
     
     return () => {
+      ipcRenderer.removeListener('shortcut-toggle-led', toggleLEDOn);
+      ipcRenderer.removeListener('deactivate-led', deactivateLED);
       ipcRenderer.removeListener('shortcut-increase-brightness', increaseBrightnessShortcut);
       ipcRenderer.removeListener('shortcut-decrease-brightness', decreaseBrightnessShortcut);
       ipcRenderer.removeListener('shortcut-switch-color', switchColorShortcut);
       ipcRenderer.removeListener('update-ads-active', onADSDown);
       ipcRenderer.removeListener('update-ads-inactive', onADSUp);
-      ipcRenderer.removeListener('ambient-brightness-value', handleAmbientBrightness);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ledOn, color, defaultColors]);
+  }, [
+    toggleLEDOn,
+    deactivateLED,
+    increaseBrightnessShortcut,
+    decreaseBrightnessShortcut,
+    switchColorShortcut,
+    onADSDown,
+    onADSUp
+  ]);
   
   function createDefaultColors() {
     return [
@@ -274,7 +386,8 @@ function AppColorPicker() {
 
 
   /**
-   * For ADS transitions only
+   * Smooth color/brightness transition
+   * @param {number} speed - Transition speed
    */
   function changeColorTo(speed) {
     if (changeIntervalRef.current) {
@@ -282,6 +395,7 @@ function AppColorPicker() {
     }
 
     let prevTime = Date.now();
+    console.log("SET INTERVAL");
     changeIntervalRef.current = setInterval(step, 1);
 
     function step() {
@@ -295,10 +409,12 @@ function AppColorPicker() {
       const rs = final.r > current.r ? 1 : -1;
       const gs = final.g > current.g ? 1 : -1;
       const bs = final.b > current.b ? 1 : -1;
+      //const as = final.a > current.a ? 1 : -1;
 
       current.r += speed * dt * rs * TRANS_MULTIPLIER;
       current.g += speed * dt * gs * TRANS_MULTIPLIER;
       current.b += speed * dt * bs * TRANS_MULTIPLIER;
+      //current.a += speed * dt * as * TRANS_MULTIPLIER;
 
       if ((rs === -1 && current.r <= final.r) || (rs === 1 && current.r >= final.r)) {
         adsFlagsRef.current |= RED;
@@ -312,6 +428,10 @@ function AppColorPicker() {
         adsFlagsRef.current |= BLUE;
         current.b = final.b;
       }
+      /*if ((as === -1 && current.a <= final.a) || (as === 1 && current.a >= final.a)) {
+        adsFlagsRef.current |= ALPHA;
+        current.a = final.a;
+      }*/
       
       sendMainLEDStatus(
         {
@@ -327,94 +447,6 @@ function AppColorPicker() {
         clearInterval(changeIntervalRef.current);
         changeIntervalRef.current = null;
       }
-    }
-  }
-
-  function onADSDown(event, ads) {
-    adsFlagsRef.current = 0;
-    finalTransitionColorRef.current = { ...ads.color };
-    if (ledOn) {
-      changeColorTo(ads.speed);
-    }
-  }
-
-  function onADSUp(event, ads) {
-    adsFlagsRef.current = 0;
-    finalTransitionColorRef.current = { ...color };
-    if (ledOn) {
-      changeColorTo(ads.speed);
-    }
-  }
-
-  function handleAmbientBrightness(event, brightness) {
-    // TODO: Implement smooth brightness adjustment in Step 4
-    console.log('Ambient brightness:', brightness);
-  }
-
-  function deactivateLED() {
-    setLEDOn(() => {
-      sendMainLEDStatus(color, false);
-      return false;
-    });
-  }
-
-  function toggleLEDOn() {
-    setLEDOn((on) => {
-      sendMainLEDStatus(color, !on);
-      return !on;
-    });
-  }
-
-  function switchColorShortcut(event, index) {
-    if (ledOn) {
-      const colorIndex = Number(index - 1);
-      if (colorIndex < 0) {
-        return;
-      }
-      const newColor = {
-        ...defaultColors[colorIndex].color,
-        a: color.a,
-      };
-      setColor(newColor);
-      sendMainLEDStatus(newColor, true);
-      // Update the index position on the device so that the left and right color
-      // button on the device start from where this default color is
-      sendDefaultIndex(colorIndex);
-    }
-  }
-
-  function decreaseBrightnessShortcut() {
-    if (ledOn) {
-      setColor((c) => {
-        let newAlpha = c.a - 0.05;
-        if (newAlpha < 0.075) {
-          // Minimum alpha - this value matches the value on the device
-          newAlpha = 0.075;
-        }
-        const newColor = {
-          ...c,
-          a: newAlpha,
-        };
-        sendMainLEDStatus(newColor, true);
-        return newColor;
-      });
-    }
-  }
-
-  function increaseBrightnessShortcut() {
-    if (ledOn) {
-      setColor((c) => {
-        let newAlpha = c.a + 0.05;
-        if (newAlpha > 1) {
-          newAlpha = 1;
-        }
-        const newColor = {
-          ...c,
-          a: newAlpha,
-        };
-        sendMainLEDStatus(newColor, true);
-        return newColor;
-      });
     }
   }
 
@@ -444,7 +476,6 @@ function AppColorPicker() {
 
   function parseMainLedFromGG(message) {
     if (!message || typeof message !== 'string') {
-      console.error('parseMainLedFromGG: Invalid message', message);
       return;
     }
     const params = message.split('&');
@@ -674,6 +705,12 @@ function AppColorPicker() {
         <div className={styles.disconnected}>
           <span>Gaimglass not connected</span>
         </div>
+      )}
+      {/* Brightness monitor runs independently when connected */}
+      {isConnected && (
+        <BrightnessMonitor 
+          onBrightnessChange={handleAmbientBrightness}
+        />
       )}
     </div>
   );

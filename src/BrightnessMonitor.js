@@ -1,27 +1,41 @@
 import { useEffect, useRef } from 'react';
+import { useSettings } from './SettingsProvider';
 
 const electron = window.require('electron');
 const ipcRenderer = electron.ipcRenderer;
 
-export default function BrightnessMonitor({ enabled }) {
+export default function BrightnessMonitor({ onBrightnessChange }) {
+  const { ambientSettings } = useSettings();
+  const { enabled, captureRegion } = ambientSettings;
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const glRef = useRef(null);
+  const glLoseContextRef = useRef(null);
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
 
   useEffect(() => {
+    console.log('[BrightnessMonitor] Effect triggered - enabled:', enabled, 'captureRegion:', captureRegion);
+    
     if (!enabled) {
+      console.log('[BrightnessMonitor] Disabled - cleaning up');
       cleanup();
       return;
     }
 
+    // Always cleanup first to restart with new settings
+    cleanup();
     setupBrightnessMonitor();
 
-    return cleanup;
-  }, [enabled]);
+    return () => {
+      console.log('[BrightnessMonitor] Effect cleanup');
+      cleanup();
+    };
+  }, [enabled, captureRegion]);
 
   async function setupBrightnessMonitor() {
+    console.log('[BrightnessMonitor] Starting setup');
+
     try {
       // 1. Request screen sources from main process via IPC
       const sources = await ipcRenderer.invoke('get-screen-sources');
@@ -61,9 +75,10 @@ export default function BrightnessMonitor({ enabled }) {
       videoRef.current = video;
 
       // 3. Setup WebGL canvas for GPU acceleration
+      // Use 16x16 to properly average the capture region
       const canvas = document.createElement('canvas');
-      canvas.width = 1;
-      canvas.height = 1;
+      canvas.width = 16;
+      canvas.height = 16;
       canvasRef.current = canvas;
 
       const gl = canvas.getContext('webgl', { 
@@ -77,6 +92,8 @@ export default function BrightnessMonitor({ enabled }) {
       }
       
       glRef.current = gl;
+      // Get extension to properly dispose context later
+      glLoseContextRef.current = gl.getExtension('WEBGL_lose_context');
 
       // 4. Setup WebGL shaders and program
       const vertexShaderSource = `
@@ -119,6 +136,34 @@ export default function BrightnessMonitor({ enabled }) {
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
+      // Calculate texture coordinates based on capture region percentage
+      // Clamp between 10% and 100%
+      const regionPercent = Math.max(0.1, Math.min(1.0, captureRegion / 100));
+      const halfRegion = regionPercent / 2;
+      const centerX = 0.5;
+      const centerY = 0.5;
+      
+      // Calculate the centered region bounds
+      const minX = centerX - halfRegion;
+      const maxX = centerX + halfRegion;
+      const minY = centerY - halfRegion;
+      const maxY = centerY + halfRegion;
+      
+      // Debug: Log capture region
+      console.log(`[BrightnessMonitor] Capture region: ${captureRegion}% | Coords: (${minX.toFixed(2)}, ${minY.toFixed(2)}) to (${maxX.toFixed(2)}, ${maxY.toFixed(2)})`);
+      
+      // Update texture coordinates to sample only the centered region
+      // Format: [bottom-left, bottom-right, top-left, top-right]
+      const centeredTexCoords = new Float32Array([
+        minX, maxY,  // bottom-left
+        maxX, maxY,  // bottom-right
+        minX, minY,  // top-left
+        maxX, minY   // top-right
+      ]);
+      
+      gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, centeredTexCoords, gl.STATIC_DRAW);
+
       const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
       gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
       gl.enableVertexAttribArray(texCoordLocation);
@@ -137,17 +182,27 @@ export default function BrightnessMonitor({ enabled }) {
         video.addEventListener('loadedmetadata', resolve, { once: true });
       });
 
-      // 6. Start sampling loop at 10fps
+      // Final check - abort if cleanup was called OR if another setup already created interval
+      if (intervalRef.current !== null) {
+        console.log('[BrightnessMonitor] Aborted - interval already exists or cleanup called');
+        return;
+      }
+
+      // 6. Start sampling loop at 2fps for easier debug logging
+      console.log('[BrightnessMonitor] Starting sampling loop');
       intervalRef.current = setInterval(() => {
         if (!video.paused && !video.ended && video.readyState >= 2) {
           const brightness = calculateBrightness(gl, video, texture);
-          // Send to main process
-          ipcRenderer.send('ambient-brightness-update', brightness);
+          // Call callback directly instead of IPC
+          if (onBrightnessChange) {
+            onBrightnessChange(brightness);
+          }
         }
-      }, 100); // 10 times per second
+      }, 50); // 2 times per second
 
     } catch (error) {
       console.error('Error setting up brightness monitor:', error);
+      cleanup();
     }
   }
 
@@ -173,28 +228,50 @@ export default function BrightnessMonitor({ enabled }) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
-    // Draw to 1x1 canvas (GPU downsamples automatically)
-    gl.viewport(0, 0, 1, 1);
+    // Draw to 16x16 canvas (GPU downsamples the selected region)
+    gl.viewport(0, 0, 16, 16);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    // Read single pixel (average brightness)
-    const pixels = new Uint8Array(4);
-    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    // Read all 16x16 pixels and average them for true region sampling
+    const pixels = new Uint8Array(16 * 16 * 4);
+    gl.readPixels(0, 0, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+    // Average all pixels
+    let totalR = 0, totalG = 0, totalB = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      totalR += pixels[i];
+      totalG += pixels[i + 1];
+      totalB += pixels[i + 2];
+    }
+    const pixelCount = 16 * 16;
+    const avgR = totalR / pixelCount;
+    const avgG = totalG / pixelCount;
+    const avgB = totalB / pixelCount;
+
+    // Debug: Log average RGB values
+    console.log(`[BrightnessMonitor] Avg RGB: (${Math.round(avgR)}, ${Math.round(avgG)}, ${Math.round(avgB)})`);
 
     // Calculate brightness (0.0 - 1.0)
-    const brightness = (pixels[0] + pixels[1] + pixels[2]) / 3 / 255;
+    const brightness = (avgR + avgG + avgB) / 3 / 255;
     return brightness;
   }
 
   function cleanup() {
+    console.log('[BrightnessMonitor] Cleanup called');
+    
     if (intervalRef.current) {
+      console.log('[BrightnessMonitor] Clearing interval:', intervalRef.current);
       clearInterval(intervalRef.current);
       intervalRef.current = null;
+      console.log('[BrightnessMonitor] Interval cleared');
+    } else {
+      console.log('[BrightnessMonitor] No interval to clear');
     }
 
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+      console.log('[BrightnessMonitor] Stream stopped');
     }
 
     if (videoRef.current) {
@@ -203,6 +280,11 @@ export default function BrightnessMonitor({ enabled }) {
     }
 
     if (glRef.current) {
+      // Properly dispose WebGL context to prevent "too many contexts" warning
+      if (glLoseContextRef.current) {
+        glLoseContextRef.current.loseContext();
+        glLoseContextRef.current = null;
+      }
       glRef.current = null;
     }
 
