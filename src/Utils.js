@@ -70,6 +70,7 @@ function defaultAppSettings() {
     'ambient': {
       'enabled': false,
       'captureRegion': 100, // Percentage of screen to capture (10-100), centered
+      'exponent': 1.6,
     }
   }
 }
@@ -160,6 +161,45 @@ function useThrottle (func, timeout = 50) {
   return throttledFunction;
 }
 
+/**
+ * Debounce hook - delays calling a function until after a delay period has elapsed
+ * since the last time it was invoked. Useful for expensive operations like API calls
+ * or heavy computations triggered by user input.
+ * @param {Function} func - Function to debounce
+ * @param {number} delay - Delay in milliseconds (default: 300)
+ * @returns {Function} Debounced function
+ */
+function useDebounce(func, delay = 300) {
+  const timerRef = useRef(null);
+  const funcRef = useRef(func);
+  
+  // Keep function reference updated
+  funcRef.current = func;
+  
+  const debouncedFunction = useCallback((...args) => {
+    // Clear existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    
+    // Set new timer
+    timerRef.current = setTimeout(() => {
+      funcRef.current(...args);
+      timerRef.current = null;
+    }, delay);
+  }, [delay]);
+  
+  // Cleanup on unmount
+  debouncedFunction.cancel = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+  
+  return debouncedFunction;
+}
+
 function getAmbientSettings() {
   const settings = loadAppSettings();
   return settings.ambient || { enabled: false };
@@ -167,6 +207,7 @@ function getAmbientSettings() {
 
 export {
   useThrottle,
+  useDebounce,
   deepMerge,
   getMessageResult,
   defaultAppSettings,

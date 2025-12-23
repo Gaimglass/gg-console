@@ -34,6 +34,8 @@
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.1",
     "global-mouse-events": "^1.2.0",
+    "highcharts": "^12.4.0",
+    "highcharts-react-official": "^3.2.3",
     "prop-types": "^15.8.1",
     "purecss": "^3.0.0",
     "react": "^19.0.0",

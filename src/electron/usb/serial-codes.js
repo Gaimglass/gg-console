@@ -8,6 +8,7 @@ const SERIAL_COMMANDS = {
   SET_DEFAULT_LEDS: '002',
   SET_DEFAULT_INDEX: '003',
   SET_LED_ON: '004',
+  SET_AMBIENT: '005', // command to set alpha only, not touch color, helpful when we have multiple parts of the UI managing color and alpha separately, no need to sync
   
   GET_MAIN_LED: '128',
   GET_DEFAULT_LEDS: '129',

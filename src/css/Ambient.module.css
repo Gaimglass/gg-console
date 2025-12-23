@@ -6,7 +6,7 @@
 }
 
 .row {
-  margin: 2em 0 1em 0;
+  margin: 2em 0 0em 0em;
   display: flex;
   align-items: center;
 }
@@ -21,8 +21,8 @@
   flex: 1;
 }
 
-.row p {
-  font-size: 0.9em;
+p {
+  font-size: 0.8em;
   color: #888;
   margin: 0;
 }
@@ -56,3 +56,22 @@
 .thumb:active {
   box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.2);
 }
+
+.region {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.chartRow {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 0.5em;
+}
+
+.exponentChartWrapper {
+  flex: 0 0 50%;
+} 

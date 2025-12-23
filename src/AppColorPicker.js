@@ -9,6 +9,7 @@ import KeyBindings from './KeyBindings';
 import ADS from './ADS';
 import Ambient from './Ambient';
 import BrightnessMonitor from './BrightnessMonitor';
+import { useSettings } from './SettingsProvider';
 
 import styles from './css/AppColorPicker.module.css';
 
@@ -37,14 +38,17 @@ function AppColorPicker() {
   const finalTransitionColorRef = useRef({});
   const adsFlagsRef = useRef(0);
   const colorRgbRef = useRef({ r: color.r, g: color.g, b: color.b });
+  const prevAmbientValueRef = useRef(null);
+
+  const { ambientSettings, updateAmbientSettings } = useSettings();
   
   // Transition constants
   const RED = 1;
   const GREEN = 2;
   const BLUE = 4;
-  const ALPHA = 8;
+  //const ALPHA = 8;
   const TRANS_MULTIPLIER = 35;
-  const ALL_COLORS = RED | GREEN | BLUE | ALPHA; // 15
+  const ALL_COLORS = RED | GREEN | BLUE; // 7
 
   const sendMainLEDStatus = useCallback((color, ledOn) => {
     if (isConnected) {
@@ -58,6 +62,12 @@ function AppColorPicker() {
     }
   }, [isConnected])
 
+  const sendAlphaValue = useCallback((value) => {
+    if (isConnected) {
+      ipcRenderer.sendSync('set-ambient', value, ambientSettings.exponent);
+    }
+  }, [isConnected, ambientSettings.exponent])
+
   // Stable function references for throttling
   const handleColorChangeStable = useCallback((newColor, defaultIndex = -1) => {
     // defaults don't have an alpha so use the current value
@@ -67,6 +77,7 @@ function AppColorPicker() {
       ...newColor,
       a: alpha
     };
+    console.log('handleColorChangeStable:')
     setColor(finalColor);
     setLEDOn(true);
     sendMainLEDStatus(finalColor, true);
@@ -102,21 +113,23 @@ function AppColorPicker() {
       return;
     }
 
-    // Map screen brightness (0.0-1.0) to LED brightness (0.075-1.0)
+    // Map screen brightness (0.0-1.0) to LED brightness (0.075-2.0)
     // Using minimum of 0.075 to match device minimum
     const minBrightness = 0.075;
-    const mappedBrightness = minBrightness + (brightness * (1.0 - minBrightness)); // todo add a strength multiplier 
+    const maxBrightness = 1.0;
+    const mappedBrightness = minBrightness + (brightness * (maxBrightness - minBrightness));
     
     // Clamp to valid range
-    const targetAlpha = Math.max(minBrightness, Math.min(1.0, mappedBrightness));
+    const ambientValue = Math.max(minBrightness, Math.min(maxBrightness, mappedBrightness));
 
-    // Debug: Log brightness values
-    console.log('[Ambient] Screen brightness:', brightness.toFixed(3), '-> LED alpha:', targetAlpha.toFixed(3));
+    // Only send if value changed to reduce USB traffic
+    if (prevAmbientValueRef.current !== ambientValue) {
+      console.log('[Ambient] Screen brightness:', brightness.toFixed(3), '-> LED alpha:', ambientValue.toFixed(3));
+      sendAlphaValue(ambientValue);
+      prevAmbientValueRef.current = ambientValue;
+    }
 
-    // Direct update - use ref to get current RGB without recreating callback
-    sendMainLEDStatus({ ...colorRgbRef.current, a: targetAlpha }, true);
-
-  }, [ledOn, isConnected, sendMainLEDStatus]);
+  }, [ledOn, isConnected, sendAlphaValue]);
 
   const deactivateLED = useCallback(() => {
     setLEDOn(() => {
@@ -282,6 +295,13 @@ function AppColorPicker() {
     onADSDown,
     onADSUp
   ]);
+
+  useEffect(() => {
+    if(!ambientSettings.enabled) {
+      sendAlphaValue(1); // turns off ambient mode
+    }
+  }, [ambientSettings.enabled, sendAlphaValue]) ;
+  
   
   function createDefaultColors() {
     return [
@@ -542,6 +562,7 @@ function AppColorPicker() {
       ...color,
       [colorComponent]: newColorComponent,
     };
+    console.log('RGB change:')
     setColor(c);
     setLEDOn(true);
     sendMainLEDStatus(c, true);
@@ -592,6 +613,7 @@ function AppColorPicker() {
       ...color,
       a: newColorComponent,
     };
+    console.log('alpha change:')
     setColor(c);
     setLEDOn(true);
     sendMainLEDStatus(c, true);
@@ -645,6 +667,7 @@ function AppColorPicker() {
                       <div className={styles.mainControls}>
                         {/* <button onClick={readDefault}>Get Default Color</button> */}
                         
+                          <button onClick={(()=>handleAmbientBrightness(1))}>TEST ALPPHA</button>
                           <button className={classNames({
                               [styles.power]: true,
                               [styles.enabled]: ledOn

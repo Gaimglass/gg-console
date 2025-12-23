@@ -13,6 +13,12 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
   const glLoseContextRef = useRef(null);
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
+  const onBrightnessChangeRef = useRef(onBrightnessChange);
+
+  // Keep callback ref updated to avoid stale closures
+  useEffect(() => {
+    onBrightnessChangeRef.current = onBrightnessChange;
+  }, [onBrightnessChange]);
 
   useEffect(() => {
     console.log('[BrightnessMonitor] Effect triggered - enabled:', enabled, 'captureRegion:', captureRegion);
@@ -177,10 +183,56 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-      // 5. Wait for video to be ready
-      await new Promise((resolve) => {
-        video.addEventListener('loadedmetadata', resolve, { once: true });
-      });
+      // 5. Wait for video to be ready with retry logic
+      let retries = 0;
+      const maxRetries = 2;
+      
+      while (retries <= maxRetries) {
+        try {
+          await new Promise((resolve, reject) => {
+            // If metadata already loaded, resolve immediately
+            if (video.readyState >= 1) {
+              resolve();
+              return;
+            }
+            
+            // Set timeout to prevent hanging forever - don't cleanup here, let outer catch handle it
+            const timeout = setTimeout(() => {
+              reject(new Error('Video metadata loading timed out after 3 seconds'));
+            }, 3000);
+            
+            // Listen for successful metadata load
+            const onLoaded = () => {
+              clearTimeout(timeout);
+              video.removeEventListener('error', onError);
+              resolve();
+            };
+            
+            // Listen for video errors
+            const onError = (e) => {
+              clearTimeout(timeout);
+              video.removeEventListener('loadedmetadata', onLoaded);
+              reject(new Error(`Video error: ${e.message || 'Unknown error'}`));
+            };
+            
+            video.addEventListener('loadedmetadata', onLoaded, { once: true });
+            video.addEventListener('error', onError, { once: true });
+          });
+          
+          // Success - break out of retry loop
+          console.log('[BrightnessMonitor] Video metadata loaded successfully');
+          break;
+          
+        } catch (err) {
+          retries++;
+          if (retries > maxRetries) {
+            throw new Error(`Failed to load video after ${maxRetries} retries: ${err.message}`);
+          }
+          console.warn(`[BrightnessMonitor] Retry ${retries}/${maxRetries} after error:`, err.message);
+          // Wait 500ms before retry
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
 
       // Final check - abort if cleanup was called OR if another setup already created interval
       if (intervalRef.current !== null) {
@@ -193,12 +245,12 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
       intervalRef.current = setInterval(() => {
         if (!video.paused && !video.ended && video.readyState >= 2) {
           const brightness = calculateBrightness(gl, video, texture);
-          // Call callback directly instead of IPC
-          if (onBrightnessChange) {
-            onBrightnessChange(brightness);
+          // Call callback directly instead of IPC - use ref to avoid stale closure
+          if (onBrightnessChangeRef.current) {
+            onBrightnessChangeRef.current(brightness);
           }
         }
-      }, 50); // 2 times per second
+      }, 50); // 20 times per second
 
     } catch (error) {
       console.error('Error setting up brightness monitor:', error);

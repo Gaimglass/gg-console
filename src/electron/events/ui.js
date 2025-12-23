@@ -1,7 +1,7 @@
 const electron = require('electron');
 const { BrowserWindow } = require('electron');
 
-const { getMainLED, getDefaultLEDs, setMainLED, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
+const { getMainLED, getDefaultLEDs, setMainLED, setAlpha, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 const { checkForUpdates, updateAndRestart } = require('../updates')
 const { toggleCalibrateWindow } = require('../calibrateWindow')
 const { disableShortcuts, enableShortcuts, enableShortcut } = require('./shortcuts')
@@ -27,6 +27,15 @@ function registerUIEvents(mainWindow, app, isDev) {
   electron.ipcMain.on('set-led-state', async (event, ledState) => {
     try {
       const result = await setMainLED(ledState.color, ledState.brightness, ledState.ledOn);
+      event.returnValue = result;
+    } catch(err) {
+      event.returnValue = err;
+    }
+  });
+
+  electron.ipcMain.on('set-ambient', async (event, value, exponent) => {
+    try {
+      const result = await setAlpha(value, exponent);
       event.returnValue = result;
     } catch(err) {
       event.returnValue = err;
