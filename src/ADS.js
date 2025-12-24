@@ -10,7 +10,6 @@ import { useSettings } from './SettingsProvider';
 
 export default function ADS() {
   const { adsSettings, updateADSSettings } = useSettings();
-  console.log('[ADS] Component rendered with adsSettings:', adsSettings);
 
   const handleColorChange = useCallback((_newColor) => {
     updateADSSettings({
@@ -28,13 +27,10 @@ export default function ADS() {
   
 
   function handleChange(v) {
-    console.log('[ADS] handleChange called with:', v);
-    console.log('[ADS] Current adsSettings:', adsSettings);
     const newSettings = {
       ...adsSettings,
       enabled: v
     };
-    console.log('[ADS] Calling updateADSSettings with:', newSettings);
     updateADSSettings(newSettings);
   }
   

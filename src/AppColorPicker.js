@@ -77,7 +77,6 @@ function AppColorPicker() {
       ...newColor,
       a: alpha
     };
-    console.log('handleColorChangeStable:')
     setColor(finalColor);
     setLEDOn(true);
     sendMainLEDStatus(finalColor, true);
@@ -124,7 +123,6 @@ function AppColorPicker() {
 
     // Only send if value changed to reduce USB traffic
     if (prevAmbientValueRef.current !== ambientValue) {
-      console.log('[Ambient] Screen brightness:', brightness.toFixed(3), '-> LED alpha:', ambientValue.toFixed(3));
       sendAlphaValue(ambientValue);
       prevAmbientValueRef.current = ambientValue;
     }
@@ -214,6 +212,11 @@ function AppColorPicker() {
     }
   }, [ledOn, color]);
 
+  const loadFromGG = () => { 
+    loadMainLedFromGG();
+    loadDefaultColorsFromGG();
+  }
+
   // Setup once on mount
   useEffect(() => {
     getAppState();
@@ -223,22 +226,16 @@ function AppColorPicker() {
     
     // Receive uninitiated messages from the gg device
     // these messages are prefixed with "update-" for organization
-    ipcRenderer.on('update-default-colors-from-gg', (evt, message) => {
-      parseDefaultColors(message);
-    });
-    
-    ipcRenderer.on('usb-connected', () => {
-      // Initialize values
-      loadMainLedFromGG();
-      loadDefaultColorsFromGG();
-    });
+    ipcRenderer.on('update-default-colors-from-gg', parseDefaultColors);
+    ipcRenderer.on('usb-connected', loadFromGG);
 
     ipcRenderer.on('usb-disconnected', () => {
       setIsConnected(false);
     });
 
     return () => {
-      ipcRenderer.removeAllListeners();
+      ipcRenderer.removeListener('update-default-colors-from-gg', parseDefaultColors);
+      ipcRenderer.removeListener('usb-connected', loadFromGG);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -262,7 +259,6 @@ function AppColorPicker() {
   // Send LED status when ledOn or color changes (while connected)
   useEffect(() => {
     if (ledOn && isConnected) {
-      console.log('1::handleAmbientBrightness')
       sendMainLEDStatus(color, true);
     }
   }, [ledOn, isConnected, color, sendMainLEDStatus]);
@@ -270,7 +266,7 @@ function AppColorPicker() {
   // Register all IPC listeners once - they use stable useCallback references
   useEffect(() => {
     ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
-    ipcRenderer.on('deactivate-led', deactivateLED);
+    ipcRenderer.on('os-suspend', deactivateLED);
     ipcRenderer.on('shortcut-increase-brightness', increaseBrightnessShortcut);
     ipcRenderer.on('shortcut-decrease-brightness', decreaseBrightnessShortcut);
     ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
@@ -279,7 +275,7 @@ function AppColorPicker() {
     
     return () => {
       ipcRenderer.removeListener('shortcut-toggle-led', toggleLEDOn);
-      ipcRenderer.removeListener('deactivate-led', deactivateLED);
+      ipcRenderer.removeListener('os-suspend', deactivateLED);
       ipcRenderer.removeListener('shortcut-increase-brightness', increaseBrightnessShortcut);
       ipcRenderer.removeListener('shortcut-decrease-brightness', decreaseBrightnessShortcut);
       ipcRenderer.removeListener('shortcut-switch-color', switchColorShortcut);
@@ -415,7 +411,6 @@ function AppColorPicker() {
     }
 
     let prevTime = Date.now();
-    console.log("SET INTERVAL");
     changeIntervalRef.current = setInterval(step, 1);
 
     function step() {
@@ -562,7 +557,6 @@ function AppColorPicker() {
       ...color,
       [colorComponent]: newColorComponent,
     };
-    console.log('RGB change:')
     setColor(c);
     setLEDOn(true);
     sendMainLEDStatus(c, true);
@@ -613,7 +607,6 @@ function AppColorPicker() {
       ...color,
       a: newColorComponent,
     };
-    console.log('alpha change:')
     setColor(c);
     setLEDOn(true);
     sendMainLEDStatus(c, true);

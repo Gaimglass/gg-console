@@ -76,11 +76,8 @@ function defaultAppSettings() {
 }
 
 function saveAppSettings(settings) {
-  console.log('[Utils] saveAppSettings called with:', settings);
-  console.log('[Utils] Saving ADS:', settings.ads);
   /** note, in dev mode, if you exit from the terminal, this won't always persist across instances */
   localStorage.setItem("settings", JSON.stringify(settings));
-  console.log('[Utils] Saved to localStorage');
 }
 
 function deepMerge(target, source) {
@@ -98,12 +95,9 @@ function deepMerge(target, source) {
 function loadAppSettings() {
   const userSettings = localStorage.getItem("settings");
   if (!userSettings) {
-    console.log('[Utils] No settings in localStorage, using defaults');
     return defaultAppSettings();
   }
   const result = deepMerge(defaultAppSettings(), JSON.parse(userSettings));
-  //console.log('[Utils] Loaded settings:', result);
-  console.log('[Utils] ADS settings:', result.ads);
   return result;
 }
 

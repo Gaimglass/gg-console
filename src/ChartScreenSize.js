@@ -4,7 +4,6 @@ import { useRef, useMemo } from 'react';
 
 export default function ChartScreenSize({percentSize=25}) {
   const chartRef = useRef(null);
-  console.warn("ScreenSizeChart render with percentSize:", percentSize);
   
   const rectData = {
     x: 5-(percentSize / 10)/2,
