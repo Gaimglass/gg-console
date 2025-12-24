@@ -16,32 +16,48 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
   const onBrightnessChangeRef = useRef(onBrightnessChange);
 
   // Keep callback ref updated to avoid stale closures
+
+  const handleOnOsResume = () => {
+    // Always cleanup first to restart with new settings
+    console.log('[BrightnessMonitor] starting restart on OS resume');
+    cleanup();
+    if (enabled) {
+      setupBrightnessMonitor();
+      console.log('[BrightnessMonitor] Restarted on OS resume');
+    }
+  }
+
+  const handleOnOsSuspend = () => {
+    // Always cleanup first to restart with new settings
+    console.log('[BrightnessMonitor] suspend');
+    cleanup();
+  }
+
   useEffect(() => {
     onBrightnessChangeRef.current = onBrightnessChange;
   }, [onBrightnessChange]);
 
   useEffect(() => {
-    console.log('[BrightnessMonitor] Effect triggered - enabled:', enabled, 'captureRegion:', captureRegion);
-    
     if (!enabled) {
-      console.log('[BrightnessMonitor] Disabled - cleaning up');
       cleanup();
       return;
     }
-
     // Always cleanup first to restart with new settings
     cleanup();
     setupBrightnessMonitor();
 
+    ipcRenderer.on('os-resume', handleOnOsResume);
+    ipcRenderer.on('os-suspend', handleOnOsSuspend);
+
     return () => {
-      console.log('[BrightnessMonitor] Effect cleanup');
       cleanup();
+      ipcRenderer.removeListener('os-resume', handleOnOsResume);
+      ipcRenderer.removeListener('os-suspend', handleOnOsSuspend);
     };
   }, [enabled, captureRegion]);
 
   async function setupBrightnessMonitor() {
-    console.log('[BrightnessMonitor] Starting setup');
-
+    console.log('[BrightnessMonitor] Setting up with region:', captureRegion);
     try {
       // 1. Request screen sources from main process via IPC
       const sources = await ipcRenderer.invoke('get-screen-sources');
@@ -154,10 +170,7 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
       const maxX = centerX + halfRegion;
       const minY = centerY - halfRegion;
       const maxY = centerY + halfRegion;
-      
-      // Debug: Log capture region
-      console.log(`[BrightnessMonitor] Capture region: ${captureRegion}% | Coords: (${minX.toFixed(2)}, ${minY.toFixed(2)}) to (${maxX.toFixed(2)}, ${maxY.toFixed(2)})`);
-      
+
       // Update texture coordinates to sample only the centered region
       // Format: [bottom-left, bottom-right, top-left, top-right]
       const centeredTexCoords = new Float32Array([
@@ -220,7 +233,6 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
           });
           
           // Success - break out of retry loop
-          console.log('[BrightnessMonitor] Video metadata loaded successfully');
           break;
           
         } catch (err) {
@@ -228,7 +240,6 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
           if (retries > maxRetries) {
             throw new Error(`Failed to load video after ${maxRetries} retries: ${err.message}`);
           }
-          console.warn(`[BrightnessMonitor] Retry ${retries}/${maxRetries} after error:`, err.message);
           // Wait 500ms before retry
           await new Promise(resolve => setTimeout(resolve, 500));
         }
@@ -236,12 +247,11 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
 
       // Final check - abort if cleanup was called OR if another setup already created interval
       if (intervalRef.current !== null) {
-        console.log('[BrightnessMonitor] Aborted - interval already exists or cleanup called');
+        console.warn('[BrightnessMonitor] Aborted - interval already exists or cleanup called');
         return;
       }
 
-      // 6. Start sampling loop at 2fps for easier debug logging
-      console.log('[BrightnessMonitor] Starting sampling loop');
+      // 6. Start sampling loop at 20 FPS
       intervalRef.current = setInterval(() => {
         if (!video.paused && !video.ended && video.readyState >= 2) {
           const brightness = calculateBrightness(gl, video, texture);
@@ -250,10 +260,13 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
             onBrightnessChangeRef.current(brightness);
           }
         }
+        else {
+          console.warn('[BrightnessMonitor] Video not ready for sampling', video);
+        }
+
       }, 50); // 20 times per second
 
     } catch (error) {
-      console.error('Error setting up brightness monitor:', error);
       cleanup();
     }
   }
@@ -300,35 +313,29 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
     const avgG = totalG / pixelCount;
     const avgB = totalB / pixelCount;
 
-    // Debug: Log average RGB values
-    console.log(`[BrightnessMonitor] Avg RGB: (${Math.round(avgR)}, ${Math.round(avgG)}, ${Math.round(avgB)})`);
-
     // Calculate brightness (0.0 - 1.0)
     const brightness = (avgR + avgG + avgB) / 3 / 255;
     return brightness;
   }
 
   function cleanup() {
-    console.log('[BrightnessMonitor] Cleanup called');
     
     if (intervalRef.current) {
-      console.log('[BrightnessMonitor] Clearing interval:', intervalRef.current);
       clearInterval(intervalRef.current);
       intervalRef.current = null;
-      console.log('[BrightnessMonitor] Interval cleared');
-    } else {
-      console.log('[BrightnessMonitor] No interval to clear');
+      console.log('cleanup, clear interval');
     }
 
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
-      console.log('[BrightnessMonitor] Stream stopped');
+      console.log('cleanup, clear streamRef');
     }
 
     if (videoRef.current) {
       videoRef.current.srcObject = null;
       videoRef.current = null;
+      console.log('cleanup, clear videoRef');
     }
 
     if (glRef.current) {
@@ -336,11 +343,14 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
       if (glLoseContextRef.current) {
         glLoseContextRef.current.loseContext();
         glLoseContextRef.current = null;
+        console.log('cleanup, lose WebGL context');
       }
       glRef.current = null;
+      console.log('cleanup, glRef');
     }
 
     canvasRef.current = null;
+    console.log('cleanup, canvasRef');
   }
 
   // This component doesn't render anything visible
