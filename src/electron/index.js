@@ -173,6 +173,8 @@ async function createWindow() {
       nodeIntegration: true,
       enableRemoteModule: true,
       contextIsolation: false,
+      // Enable screen capture API
+      enableBlinkFeatures: 'GetDisplayMedia',
     }
   });
 

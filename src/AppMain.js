@@ -1,10 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import AppColorPicker from "./AppColorPicker";
 import AppCalibrate from "./AppCalibrate";
-import  { getKeyBindings, getADSSettings } from './Utils'
-
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
+import { SettingsProvider } from './SettingsProvider';
 
 /*
 let gp;
@@ -28,22 +25,7 @@ setInterval(()=>{
   }
 },10)*/
 
-
-export default function AppMain() {
-
-  function sendAppSettings() {
-    const bindings = getKeyBindings();
-    ipcRenderer.invoke('set-enable-shortcuts', bindings);
-
-    const ads = getADSSettings();
-    ipcRenderer.invoke('set-enable-ads', ads);
-    
-  }
-
-  useEffect(() => {
-    sendAppSettings();
-  }, [])
-
+function AppMainContent() {
   // Read window type from Electron's additionalArguments
   const windowType = process.argv.find(arg => arg.startsWith('--window-type='))?.split('=')[1];
   const isCalibrate = windowType === 'calibrate';
@@ -52,5 +34,13 @@ export default function AppMain() {
     <>
       {isCalibrate ? <AppCalibrate /> : <AppColorPicker />}
     </>
+  );
+}
+
+export default function AppMain() {
+  return (
+    <SettingsProvider>
+      <AppMainContent />
+    </SettingsProvider>
   );
 }

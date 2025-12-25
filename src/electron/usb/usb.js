@@ -78,7 +78,7 @@ async function connectUsb(mainWindow, _isDev, app) {
       const ggResponse = parts[1];
       
       if (isDev) {
-        console.log("Gaimglass:", data);
+        console.log("Gaimglass response:", {data});
       }
       
       if (serialMessageResults[messageId]) {

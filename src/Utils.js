@@ -66,8 +66,12 @@ function defaultAppSettings() {
       'speed': 100,
       'adsMouseButton': 2,
       'adsControllerButton': 'button1',
+    },
+    'ambient': {
+      'enabled': false,
+      'captureRegion': 100, // Percentage of screen to capture (10-100), centered
+      'exponent': 1.6,
     }
-    
   }
 }
 
@@ -76,13 +80,25 @@ function saveAppSettings(settings) {
   localStorage.setItem("settings", JSON.stringify(settings));
 }
 
+function deepMerge(target, source) {
+  const result = { ...target };
+  for (const key in source) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      result[key] = deepMerge(target[key] || {}, source[key]);
+    } else {
+      result[key] = source[key];
+    }
+  }
+  return result;
+}
+
 function loadAppSettings() {
   const userSettings = localStorage.getItem("settings");
-  const settings = {
-    ...defaultAppSettings(),
-    ...JSON.parse(userSettings)
+  if (!userSettings) {
+    return defaultAppSettings();
   }
-  return settings;
+  const result = deepMerge(defaultAppSettings(), JSON.parse(userSettings));
+  return result;
 }
 
 function getKeyBindings() {
@@ -139,14 +155,61 @@ function useThrottle (func, timeout = 50) {
   return throttledFunction;
 }
 
+/**
+ * Debounce hook - delays calling a function until after a delay period has elapsed
+ * since the last time it was invoked. Useful for expensive operations like API calls
+ * or heavy computations triggered by user input.
+ * @param {Function} func - Function to debounce
+ * @param {number} delay - Delay in milliseconds (default: 300)
+ * @returns {Function} Debounced function
+ */
+function useDebounce(func, delay = 300) {
+  const timerRef = useRef(null);
+  const funcRef = useRef(func);
+  
+  // Keep function reference updated
+  funcRef.current = func;
+  
+  const debouncedFunction = useCallback((...args) => {
+    // Clear existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    
+    // Set new timer
+    timerRef.current = setTimeout(() => {
+      funcRef.current(...args);
+      timerRef.current = null;
+    }, delay);
+  }, [delay]);
+  
+  // Cleanup on unmount
+  debouncedFunction.cancel = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+  
+  return debouncedFunction;
+}
+
+function getAmbientSettings() {
+  const settings = loadAppSettings();
+  return settings.ambient || { enabled: false };
+}
+
 export {
   useThrottle,
+  useDebounce,
+  deepMerge,
   getMessageResult,
   defaultAppSettings,
   saveAppSettings,
   loadAppSettings,
   getKeyBindings,
   getADSSettings,
+  getAmbientSettings,
   getPrettyTextFromCommand
 
 }

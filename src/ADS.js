@@ -1,69 +1,52 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import ReactSlider from 'react-slider'
 
 import styles from './css/ADS.module.css'
 import { RgbColorPicker } from 'react-colorful';
 import Switch from "react-switch";
 
-import  { useThrottle, loadAppSettings, saveAppSettings } from './Utils'
-
-
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
+import { useThrottle } from './Utils'
+import { useSettings } from './SettingsProvider';
 
 export default function ADS() {
+  const { adsSettings, updateADSSettings } = useSettings();
+
+  const handleColorChange = useCallback((_newColor) => {
+    updateADSSettings({
+      ...adsSettings,
+      color: { ..._newColor }
+    });
+  }, [adsSettings, updateADSSettings]);
 
   const handleColorChangeThrottled = useThrottle(handleColorChange, 50);
 
-  const [settings, setSettings] = useState(loadAppSettings())
-
   const hue = useMemo(()=>{
-    const h = (settings.ads.speed/100)*100;
+    const h = (adsSettings.speed/100)*100;
     return Number.parseInt(h)
-  }, [settings.ads.speed])
+  }, [adsSettings.speed])
   
 
   function handleChange(v) {
-    const newSettings = {...settings}
-    newSettings.ads.enabled = v;
-    setSettings(newSettings);
-    saveAppSettings(newSettings)
-    ipcRenderer.invoke('set-enable-ads', newSettings.ads);
+    const newSettings = {
+      ...adsSettings,
+      enabled: v
+    };
+    updateADSSettings(newSettings);
   }
+  
   function handleOnChangeMouse(e) {
     const mouseButton = Number.parseInt(e.target.value)
-    const newSettings = {...settings}
-    newSettings.ads.adsMouseButton = mouseButton;
-    setSettings(newSettings);
-    saveAppSettings(newSettings)
-    ipcRenderer.invoke('set-enable-ads', newSettings.ads);
+    updateADSSettings({
+      ...adsSettings,
+      adsMouseButton: mouseButton
+    });
   }
 
   function handleOnChangeSpeed(value) {
-    const newSettings = {
-      ...settings,
-      ads: {
-        ...settings.ads,
-        speed: value
-      }
-    }
-    setSettings(newSettings);
-    saveAppSettings(newSettings)
-    ipcRenderer.invoke('set-enable-ads', newSettings.ads);
-
-  }
-
-  function handleColorChange(_newColor) {
-    const newSettings = {
-      ...settings,
-      ads: {
-        ...settings.ads,
-        color: {..._newColor}
-      }
-    }
-    setSettings(newSettings);
-    saveAppSettings(newSettings)
-    ipcRenderer.invoke('set-enable-ads', newSettings.ads);
+    updateADSSettings({
+      ...adsSettings,
+      speed: value
+    });
   }
 
   function changeRgb(e, colorComponent) {
@@ -81,25 +64,18 @@ export default function ADS() {
     }
 
     const newColor = {
-      ...settings.ads.color,
+      ...adsSettings.color,
       [colorComponent]: newColorComponent
-    }
-    const newSettings = {
-      ...settings,
-      ads: {
-        ...settings.ads,
-        color: newColor
-      }
     }
     
     if(updateKey) {
       e.target.value = newColorComponent
     }
 
-    setSettings(newSettings);
-    saveAppSettings(newSettings)
-    
-    ipcRenderer.invoke('set-enable-ads', newSettings.ads);
+    updateADSSettings({
+      ...adsSettings,
+      color: newColor
+    });
   }
 
   return <div className={styles.container}>
@@ -118,20 +94,20 @@ export default function ADS() {
         
         id="material-switch"
         onChange={handleChange} 
-        checked={settings.ads.enabled} />
+        checked={adsSettings.enabled} />
       <label>Enable ADS Hold Color</label>
     </div>
 
     <div className={styles.adsControls}>
       <div>
         <RgbColorPicker
-            color={settings.ads.color}
+            color={adsSettings.color}
             onChange={ handleColorChangeThrottled }
           />
           <div className={styles.rgbInputs}>
-            <label>R</label><input  onChange={(e)=>(changeRgb(e, 'r'))} value={settings.ads.color.r} type="text"></input>
-            <label>G</label><input  onChange={(e)=>(changeRgb(e, 'g'))} value={settings.ads.color.g} type="text"></input>
-            <label>B</label><input  onChange={(e)=>(changeRgb(e, 'b'))} value={settings.ads.color.b} type="text"></input>
+            <label>R</label><input  onChange={(e) => changeRgb(e, 'r')} value={adsSettings.color.r} type="text"></input>
+            <label>G</label><input  onChange={(e) => changeRgb(e, 'g')} value={adsSettings.color.g} type="text"></input>
+            <label>B</label><input  onChange={(e) => changeRgb(e, 'b')} value={adsSettings.color.b} type="text"></input>
           </div>
       </div>
       <div className={styles.rightControls}>
@@ -143,7 +119,7 @@ export default function ADS() {
               <tr>
                 <td>Mouse Button</td>
                 <td>
-                  <select defaultValue={settings.ads.adsMouseButton} onChange={handleOnChangeMouse} type="text">
+                  <select defaultValue={adsSettings.adsMouseButton} onChange={handleOnChangeMouse} type="text">
                     <option value="1">Mouse 1</option>
                     <option value="2">Mouse 2</option>
                     <option value="3">Mouse 3</option>
@@ -160,7 +136,7 @@ export default function ADS() {
         </div>
         <ReactSlider
           onChange={handleOnChangeSpeed}
-          value={settings.ads.speed}
+          value={adsSettings.speed}
           min={5}
           max={100}
           className={styles.slider}

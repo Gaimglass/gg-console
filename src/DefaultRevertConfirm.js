@@ -2,6 +2,7 @@ import styles from './css/DefaultRevertConfirm.module.css'
 
 function DefaultRevertConfirm({
   onReset, 
+  showDelete, 
   resetName="Reset to Default",
   onDelete, 
   id}) {

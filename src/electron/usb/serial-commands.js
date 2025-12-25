@@ -1,5 +1,6 @@
 const {writeCommand} = require('./usb');
 const {SERIAL_COMMANDS} = require('./serial-codes');
+const { type } = require('@testing-library/user-event/dist/cjs/utility/type.js');
 
 
 // Commands
@@ -12,6 +13,12 @@ function setMainLED(color, brightness, ledOn) {
     `${brightness.toFixed(2)}` +
     Number(ledOn);
     return writeCommand(SERIAL_COMMANDS.SET_MAIN_LED, commandStr);
+}
+
+function setAlpha(ambientValue, exponent) {
+
+  const commandStr = `${ambientValue.toFixed(2)}${exponent.toFixed(1)}` // e.g. "0.851.6" = 85% ambient, exponent 1.6
+  return writeCommand(SERIAL_COMMANDS.SET_AMBIENT, commandStr);
 }
 
 function setDefaultIndex(index) {
@@ -63,6 +70,7 @@ module.exports = {
   getMainLED,
   getDefaultLEDs,
   setMainLED,
+  setAlpha,
   setLEDOn,
   setDefaultColors,
   //setAuxLED,

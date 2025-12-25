@@ -281,7 +281,6 @@ class Crosshairs {
     LineColor.g = color.g;
     LineColor.b = color.b;
     LineColor.a = color.a;
-    console.log("Crosshairs color set: ", LineColor);
   }
   deletePulse(p) {
     delete this.pulses[p.index];

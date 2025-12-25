@@ -17,10 +17,9 @@ export default function AppCalibrate() {
   // Copied from AppColorPicker
   function parseMainLedFromGG(message) {
     if (!message || typeof message !== 'string') {
-      console.error('parseMainLedFromGG: Invalid message', message);
+      console.warn('parseMainLedFromGG: Invalid message', message);
       return { r: 80, g: 255, b: 40, a: 1 }; // Return default color
     }
-    console.log('CALIBRATE parseMainLedFromGG message:', message);
     const params = message.split('&');
     const c = {};
     params.forEach((param) => {
@@ -52,6 +51,12 @@ export default function AppCalibrate() {
 
   const handleUpdateColorThrottled = useThrottle(handleUpdateColor, 50);
   
+  const handleColorSync = useCallback((evt, color, ledOn) => {
+    if (xhairsRef.current && ledOn) {
+      xhairsRef.current.setColor(color);
+    }
+  }, []);
+
   useEffect(() => {
     document.getElementsByTagName('body')[0].classList.add(styles.bodyCalibrate);
     document.addEventListener('keydown', handleClick);
@@ -64,22 +69,16 @@ export default function AppCalibrate() {
     loadMainLedFromGG();
 
     // Listen for real-time color updates from the device
-    ipcRenderer.on('update-main-led-state-from-gg', (evt, message) => {
-      handleUpdateColorThrottled(message);
-    });
+    ipcRenderer.on('update-main-led-state-from-gg', handleUpdateColorThrottled);
 
     // Listen for color changes from other windows (e.g., AppColorPicker)
-    ipcRenderer.on('color-sync-from-other-window', (evt, color, ledOn) => {
-      if (xhairsRef.current && ledOn) {
-        xhairsRef.current.setColor(color);
-      }
-    });
+    ipcRenderer.on('color-sync-from-other-window', handleColorSync);
 
     return () => {
       document.removeEventListener('keydown', handleClick);
       document.getElementsByTagName('body')[0].classList.remove(styles.bodyCalibrate);
-      ipcRenderer.removeAllListeners('update-main-led-state-from-gg');
-      ipcRenderer.removeAllListeners('color-sync-from-other-window');
+      ipcRenderer.removeListener('update-main-led-state-from-gg', handleUpdateColorThrottled);
+      ipcRenderer.removeListener('color-sync-from-other-window', handleColorSync);
       handleUpdateColorThrottled.cancel?.(); // Cancel any pending throttled calls
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
