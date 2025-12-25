@@ -17,10 +17,7 @@ function registerUIEvents(mainWindow, app, isDev) {
       const result = await getMainLED();
       event.returnValue = result;
     } catch(err) {
-      // Return empty string when port not ready, UI will use defaults. 
-      // This ensures we don't log an error in the browser console because we don't always expect the port to be ready
-      // and we don't need to wait for it. The client has a fallback on usb-connected event.
-      event.returnValue = '';
+      event.returnValue = err;
     }
   });
   
@@ -68,7 +65,6 @@ function registerUIEvents(mainWindow, app, isDev) {
       const ledStateStr = await getDefaultLEDs();
       event.returnValue = ledStateStr;
     } catch(err) {
-      // todo return '' if port is nullish, this causes an error on first load
       event.returnValue = err;
     }
   });
@@ -132,14 +128,11 @@ function registerUIEvents(mainWindow, app, isDev) {
 
   electron.ipcMain.handle('check-for-updates', async (event) => {
     try {
-      console.log("check for updates...")
       const result = await checkForUpdates(app.getVersion(), isDev);
       return {
         ...result
       };
     } catch(err) {
-      //console.error("check for updates error: ", err.message)
-      // Update
       return {
         error: err.message
       };

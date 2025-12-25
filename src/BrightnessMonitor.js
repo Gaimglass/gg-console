@@ -19,17 +19,17 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
 
   const handleOnOsResume = () => {
     // Always cleanup first to restart with new settings
-    console.log('[BrightnessMonitor] starting restart on OS resume');
+    //console.log('[BrightnessMonitor] starting restart on OS resume');
     cleanup();
     if (enabled) {
       setupBrightnessMonitor();
-      console.log('[BrightnessMonitor] Restarted on OS resume');
+      //console.log('[BrightnessMonitor] Restarted on OS resume');
     }
   }
 
   const handleOnOsSuspend = () => {
     // Always cleanup first to restart with new settings
-    console.log('[BrightnessMonitor] suspend');
+    //console.log('[BrightnessMonitor] suspend');
     cleanup();
   }
 
@@ -57,13 +57,13 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
   }, [enabled, captureRegion]);
 
   async function setupBrightnessMonitor() {
-    console.log('[BrightnessMonitor] Setting up with region:', captureRegion);
+    //console.log('[BrightnessMonitor] Setting up with region:', captureRegion);
     try {
       // 1. Request screen sources from main process via IPC
       const sources = await ipcRenderer.invoke('get-screen-sources');
 
       if (!sources || sources.length === 0) {
-        console.error('No screen sources available');
+        //console.error('No screen sources available');
         return;
       }
 
@@ -109,7 +109,7 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
       });
       
       if (!gl) {
-        console.error('WebGL not supported');
+        //console.error('WebGL not supported');
         return;
       }
       
@@ -247,7 +247,7 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
 
       // Final check - abort if cleanup was called OR if another setup already created interval
       if (intervalRef.current !== null) {
-        console.warn('[BrightnessMonitor] Aborted - interval already exists or cleanup called');
+        //console.warn('[BrightnessMonitor] Aborted - interval already exists or cleanup called');
         return;
       }
 
@@ -261,7 +261,7 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
           }
         }
         else {
-          console.warn('[BrightnessMonitor] Video not ready for sampling', video);
+          //console.warn('[BrightnessMonitor] Video not ready for sampling', video);
         }
 
       }, 50); // 20 times per second
@@ -323,19 +323,19 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
-      console.log('cleanup, clear interval');
+      //console.log('cleanup, clear interval');
     }
 
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
-      console.log('cleanup, clear streamRef');
+      //console.log('cleanup, clear streamRef');
     }
 
     if (videoRef.current) {
       videoRef.current.srcObject = null;
       videoRef.current = null;
-      console.log('cleanup, clear videoRef');
+      //console.log('cleanup, clear videoRef');
     }
 
     if (glRef.current) {
@@ -343,14 +343,14 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
       if (glLoseContextRef.current) {
         glLoseContextRef.current.loseContext();
         glLoseContextRef.current = null;
-        console.log('cleanup, lose WebGL context');
+        //console.log('cleanup, lose WebGL context');
       }
       glRef.current = null;
-      console.log('cleanup, glRef');
+      //console.log('cleanup, glRef');
     }
 
     canvasRef.current = null;
-    console.log('cleanup, canvasRef');
+    //console.log('cleanup, canvasRef');
   }
 
   // This component doesn't render anything visible

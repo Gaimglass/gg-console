@@ -43,6 +43,7 @@ export default function AppCalibrate() {
   }
 
   const handleUpdateColor = useCallback((message) => {
+    // listen for 'update-main-led-state-from-gg' IPC messages and updates the crosshairs color
     const color = parseMainLedFromGG(message);
     if (xhairsRef.current) {
       xhairsRef.current.setColor(color);
