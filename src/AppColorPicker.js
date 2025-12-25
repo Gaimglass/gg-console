@@ -212,7 +212,7 @@ function AppColorPicker() {
     }
   }, [ledOn, color]);
 
-  const loadFromGG = () => { 
+  const getStateFromGG = () => { 
     loadMainLedFromGG();
     loadDefaultColorsFromGG();
   }
@@ -221,13 +221,15 @@ function AppColorPicker() {
   useEffect(() => {
     getAppState();
     initialDefaults();
-    loadMainLedFromGG();
-    loadDefaultColorsFromGG();
+
+    // this will error on first load bc port is most likely not ready, but we can ignore that
+    // because we also listen for 'usb-connected'
+    getStateFromGG(); 
     
     // Receive uninitiated messages from the gg device
     // these messages are prefixed with "update-" for organization
     ipcRenderer.on('update-default-colors-from-gg', parseDefaultColors);
-    ipcRenderer.on('usb-connected', loadFromGG);
+    ipcRenderer.on('usb-connected', getStateFromGG);
 
     ipcRenderer.on('usb-disconnected', () => {
       setIsConnected(false);
@@ -235,7 +237,7 @@ function AppColorPicker() {
 
     return () => {
       ipcRenderer.removeListener('update-default-colors-from-gg', parseDefaultColors);
-      ipcRenderer.removeListener('usb-connected', loadFromGG);
+      ipcRenderer.removeListener('usb-connected', getStateFromGG);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -466,6 +468,10 @@ function AppColorPicker() {
   }
 
   function parseDefaultColors(message) {
+    if (!message || typeof message !== 'string') {
+      console.warn('parseDefaultColors: ', message?.message);
+      return;
+    }
     const vars = message.split('&');
     const defaults = [];
     for (const v of vars) {
@@ -491,6 +497,7 @@ function AppColorPicker() {
 
   function parseMainLedFromGG(message) {
     if (!message || typeof message !== 'string') {
+      console.warn('parseMainLedFromGG: ', message?.message);
       return;
     }
     const params = message.split('&');

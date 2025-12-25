@@ -4,7 +4,6 @@ var updateCheckLock = false;
 
 async function checkForUpdates(currentVersion, isDev) {
 
-  
   return new Promise((resolve, reject)=>{
     if (isDev) {
       setTimeout(()=>{
@@ -25,19 +24,19 @@ async function checkForUpdates(currentVersion, isDev) {
     updateCheckLock = true;
 
     const checkingForUpdate = function(event, releaseNotes, releaseName) {
-      console.log('checking for updates...')
+      //console.log('checking for updates...')
       // do we want a loader icon in the UI? this is minor.
     }
     const updateAvailable = function(event, releaseNotes, releaseName) {
-      console.log('update-available')
+      //console.log('update-available')
     }
     const updateNotAvailable = function(event, releaseNotes, releaseName) {
-      console.log('update-not-available')
+      //console.log('update-not-available')
       cleanUpEvents();
       resolve({updateAvailable: false})
     }
     const updateDownloaded = function(event, releaseNotes, releaseName) {
-      console.log('updates downloaded')
+      //console.log('updates downloaded')
       cleanUpEvents();
       resolve({
         updateAvailable: true,
@@ -53,13 +52,11 @@ async function checkForUpdates(currentVersion, isDev) {
     }
 
     const cleanUpEvents = function() {
-      console.log("listeners removing....")
       electron.autoUpdater.removeListener('checking-for-update', checkingForUpdate)
       electron.autoUpdater.removeListener('update-not-available', updateNotAvailable)
       electron.autoUpdater.removeListener('update-available', updateAvailable)
       electron.autoUpdater.removeListener('update-downloaded', updateDownloaded)
       electron.autoUpdater.removeListener('error', updateError)
-      console.log("listeners removed")
       updateCheckLock = false
     }
 
@@ -80,7 +77,6 @@ async function checkForUpdates(currentVersion, isDev) {
 }
 
 function updateAndRestart(app) {
-  console.log("updateAndRestart called")
   app.isQuitting = true;
   electron.autoUpdater.quitAndInstall();
 }
