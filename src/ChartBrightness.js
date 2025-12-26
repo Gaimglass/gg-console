@@ -1,11 +1,8 @@
 import Highcharts from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
-import { useRef, useMemo, useCallback } from 'react';
 
 export default function ChartBrightness({exponent}) {
-  const chartRef = useRef(null);
 
-  
   const generateCurveData = (exponent, numPoints=100)=>{
     const data = [];
     for (let i = 0; i <= numPoints; i++) {

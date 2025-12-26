@@ -69,8 +69,8 @@ function defaultAppSettings() {
     },
     'ambient': {
       'enabled': false,
-      'captureRegion': 100, // Percentage of screen to capture (10-100), centered
-      'exponent': 1.6,
+      'captureRegion': 35, // Percentage of screen to capture (10-100), centered
+      'exponent': 1.8,
     }
   }
 }

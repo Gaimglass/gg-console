@@ -99,10 +99,11 @@ if (!gotTheLock) {
     });*/
     electron.powerMonitor.on("suspend", () => {
       // Turn off the LED when sleeping
-      mainWindow.webContents.send('deactivate-led');
+      mainWindow.webContents.send('os-suspend');
     });
     electron.powerMonitor.on("resume", () => {
       // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
+      mainWindow.webContents.send('os-resume');
       disconnectUsb(app);
     });
     checkStartHidden();
@@ -112,7 +113,7 @@ if (!gotTheLock) {
   app.on('window-all-closed', function () {
     // On OS X it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
-    disconnectUsb({reconnect: false});
+    disconnectUsb(app);
     if (process.platform !== 'darwin') { 
       app.quit()
     }
@@ -230,7 +231,6 @@ async function createWindow() {
       mainWindow.setSkipTaskbar(true);
       mainWindow.hide();
     } else {
-      // don't send deactivate-led to the UI here, it won't always work.
       // we are shutting down the app and the UI is not reliable. Just force the LED off
       setLEDOn(0);
     }

@@ -40,7 +40,7 @@ function AppColorPicker() {
   const colorRgbRef = useRef({ r: color.r, g: color.g, b: color.b });
   const prevAmbientValueRef = useRef(null);
 
-  const { ambientSettings, updateAmbientSettings } = useSettings();
+  const { ambientSettings } = useSettings();
   
   // Transition constants
   const RED = 1;
@@ -193,6 +193,7 @@ function AppColorPicker() {
     }
   }, [ledOn, sendMainLEDStatus]);
 
+  
   const onADSDown = useCallback((event, ads) => {
     adsFlagsRef.current = 0;
     finalTransitionColorRef.current = { 
@@ -202,7 +203,8 @@ function AppColorPicker() {
     if (ledOn) {
       changeColorTo(ads.speed);
     }
-  }, [ledOn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [color.a, ledOn]);
 
   const onADSUp = useCallback((event, ads) => {
     adsFlagsRef.current = 0;
@@ -210,9 +212,10 @@ function AppColorPicker() {
     if (ledOn) {
       changeColorTo(ads.speed);
     }
-  }, [ledOn, color]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [color, ledOn]);
 
-  const loadFromGG = () => { 
+  const getStateFromGG = () => { 
     loadMainLedFromGG();
     loadDefaultColorsFromGG();
   }
@@ -221,13 +224,15 @@ function AppColorPicker() {
   useEffect(() => {
     getAppState();
     initialDefaults();
-    loadMainLedFromGG();
-    loadDefaultColorsFromGG();
+
+    // this will error on first load bc port is most likely not ready, but we can ignore that
+    // because we also listen for 'usb-connected'
+    getStateFromGG(); 
     
     // Receive uninitiated messages from the gg device
     // these messages are prefixed with "update-" for organization
     ipcRenderer.on('update-default-colors-from-gg', parseDefaultColors);
-    ipcRenderer.on('usb-connected', loadFromGG);
+    ipcRenderer.on('usb-connected', getStateFromGG);
 
     ipcRenderer.on('usb-disconnected', () => {
       setIsConnected(false);
@@ -235,7 +240,7 @@ function AppColorPicker() {
 
     return () => {
       ipcRenderer.removeListener('update-default-colors-from-gg', parseDefaultColors);
-      ipcRenderer.removeListener('usb-connected', loadFromGG);
+      ipcRenderer.removeListener('usb-connected', getStateFromGG);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -466,6 +471,10 @@ function AppColorPicker() {
   }
 
   function parseDefaultColors(message) {
+    if (!message || typeof message !== 'string') {
+      console.warn('parseDefaultColors: ', message?.message);
+      return;
+    }
     const vars = message.split('&');
     const defaults = [];
     for (const v of vars) {
@@ -491,6 +500,7 @@ function AppColorPicker() {
 
   function parseMainLedFromGG(message) {
     if (!message || typeof message !== 'string') {
+      console.warn('parseMainLedFromGG: ', message?.message);
       return;
     }
     const params = message.split('&');
@@ -660,7 +670,7 @@ function AppColorPicker() {
                       <div className={styles.mainControls}>
                         {/* <button onClick={readDefault}>Get Default Color</button> */}
                         
-                          <button onClick={(()=>handleAmbientBrightness(1))}>TEST ALPPHA</button>
+                          {/* <button onClick={(()=>handleAmbientBrightness(1))}>TEST ALPPHA</button> */}
                           <button className={classNames({
                               [styles.power]: true,
                               [styles.enabled]: ledOn

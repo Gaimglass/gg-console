@@ -4,7 +4,7 @@
 const SERIAL_COMMANDS = {
   // command from the UI to the GG
   SET_MAIN_LED: '000',
-  SET_AUX_LED: '001',
+  SET_AUX_LED: '001', // not used
   SET_DEFAULT_LEDS: '002',
   SET_DEFAULT_INDEX: '003',
   SET_LED_ON: '004',
