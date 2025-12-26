@@ -40,7 +40,7 @@ function AppColorPicker() {
   const colorRgbRef = useRef({ r: color.r, g: color.g, b: color.b });
   const prevAmbientValueRef = useRef(null);
 
-  const { ambientSettings, updateAmbientSettings } = useSettings();
+  const { ambientSettings } = useSettings();
   
   // Transition constants
   const RED = 1;
@@ -193,6 +193,7 @@ function AppColorPicker() {
     }
   }, [ledOn, sendMainLEDStatus]);
 
+  
   const onADSDown = useCallback((event, ads) => {
     adsFlagsRef.current = 0;
     finalTransitionColorRef.current = { 
@@ -202,7 +203,8 @@ function AppColorPicker() {
     if (ledOn) {
       changeColorTo(ads.speed);
     }
-  }, [ledOn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [color.a, ledOn]);
 
   const onADSUp = useCallback((event, ads) => {
     adsFlagsRef.current = 0;
@@ -210,7 +212,8 @@ function AppColorPicker() {
     if (ledOn) {
       changeColorTo(ads.speed);
     }
-  }, [ledOn, color]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [color, ledOn]);
 
   const getStateFromGG = () => { 
     loadMainLedFromGG();
@@ -667,7 +670,7 @@ function AppColorPicker() {
                       <div className={styles.mainControls}>
                         {/* <button onClick={readDefault}>Get Default Color</button> */}
                         
-                          <button onClick={(()=>handleAmbientBrightness(1))}>TEST ALPPHA</button>
+                          {/* <button onClick={(()=>handleAmbientBrightness(1))}>TEST ALPPHA</button> */}
                           <button className={classNames({
                               [styles.power]: true,
                               [styles.enabled]: ledOn

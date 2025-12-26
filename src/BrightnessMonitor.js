@@ -4,6 +4,15 @@ import { useSettings } from './SettingsProvider';
 const electron = window.require('electron');
 const ipcRenderer = electron.ipcRenderer;
 
+/**
+ * The BrightnessMonitor React component captures a region of the user's screen using Electron and WebGL, 
+ * processes the video feed in real time, and calculates the average brightness of the selected area. 
+ * It sets up a hidden video and WebGL canvas, samples the screen at regular intervals, and uses GPU acceleration 
+ * to efficiently downscale and analyze the image. The calculated brightness value is then passed to a callback,
+ * allowing the parent component to react to changes in screen brightness for the ambient lighting adjustment. 
+ * The component manages resource cleanup and responds to system suspend/resume events to ensure robust operation.
+ */
+
 export default function BrightnessMonitor({ onBrightnessChange }) {
   const { ambientSettings } = useSettings();
   const { enabled, captureRegion } = ambientSettings;
@@ -54,6 +63,7 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
       ipcRenderer.removeListener('os-resume', handleOnOsResume);
       ipcRenderer.removeListener('os-suspend', handleOnOsSuspend);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, captureRegion]);
 
   async function setupBrightnessMonitor() {

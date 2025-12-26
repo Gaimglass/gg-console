@@ -5,12 +5,21 @@ import { useRef, useMemo } from 'react';
 export default function ChartScreenSize({percentSize=25}) {
   const chartRef = useRef(null);
   
-  const rectData = {
+  const rectData = useMemo(() => {
+    return {
+      x: 5-(percentSize / 10)/2,
+      y: 5-(percentSize / 10)/2,
+      length: percentSize / 10,
+      width: percentSize / 10,
+    };
+  }, [percentSize]);
+
+  /*const rectData = {
     x: 5-(percentSize / 10)/2,
     y: 5-(percentSize / 10)/2,
     length: percentSize / 10,
     width: percentSize / 10,
-  };
+  };*/
 
   const options = useMemo(() => ({
     chart: {
@@ -56,12 +65,8 @@ export default function ChartScreenSize({percentSize=25}) {
                 tickLength: 5
     },
     yAxis: { min: 0, max: 10 },
-
-    /*series: [{
-      type: 'line',
-      data: [1, 3, 5, 7]
-    }]*/
-  }), [percentSize]);
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [rectData]);
 
   function drawRect(chart) {
     const { x, y, length, width } = rectData;
