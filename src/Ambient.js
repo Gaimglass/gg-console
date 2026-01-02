@@ -80,7 +80,7 @@ export default function Ambient() {
             <ReactSlider
               onChange={handleRegionChange}
               value={localRegion}
-              min={10}
+              min={20}
               max={100}
               step={5}
               className={styles.slider}
@@ -120,7 +120,7 @@ export default function Ambient() {
               })}
               value={exponent}
               min={0.5}
-              max={5}
+              max={2.5}
               step={0.1}
               className={styles.slider}
               thumbClassName={styles.thumb}
