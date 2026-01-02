@@ -6,8 +6,7 @@ import styles from './css/UpdatesTabWrapper.module.css'
 import { ReactComponent as RotateLeft } from './assets/rotate-left-solid.svg';
 
 
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
+const ipcRenderer  = window.ipcRenderer;
 
 export default function UpdatesTabWrapper({ children }) {
   const [updateRequired, setUpdateRequired] = useState(false);

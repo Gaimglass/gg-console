@@ -170,10 +170,11 @@ async function createWindow() {
     titleBarStyle: 'hidden',
     titleBarOverlay: process.platform === 'darwin' ? true : false,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       backgroundThrottling: false,
       nodeIntegration: true,
       enableRemoteModule: true,
-      contextIsolation: false,
+      contextIsolation: true,
       // Enable screen capture API
       enableBlinkFeatures: 'GetDisplayMedia',
     }

@@ -19,8 +19,7 @@ import { useThrottle } from './Utils';
 import './css/globalStyles.css';
 
 
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
+const ipcRenderer  = window.ipcRenderer;
 
 function AppColorPicker() {
   const [color, setColor] = useState({ r: 255, g: 255, b: 255, a: 0 });
@@ -178,6 +177,7 @@ function AppColorPicker() {
 
   const increaseBrightnessShortcut = useCallback(() => {
     if (ledOn) {
+
       setColor((c) => {
         let newAlpha = c.a + 0.05;
         if (newAlpha > 1) {
@@ -734,7 +734,7 @@ function AppColorPicker() {
       )}
       {/* Brightness monitor runs independently when connected */}
       {isConnected && (
-        <BrightnessMonitor 
+        <BrightnessMonitor
           onBrightnessChange={handleAmbientBrightness}
         />
       )}

@@ -20,10 +20,11 @@ function toggleCalibrateWindow() {
       resizable: false,
       backgroundColor: 'black',
       webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
         backgroundThrottling: false,
         nodeIntegration: true,
+        contextIsolation: true,
         enableRemoteModule: true,
-        contextIsolation: false,
         additionalArguments: ['--window-type=calibrate'],
       }
     });
