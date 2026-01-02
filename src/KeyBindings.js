@@ -5,8 +5,7 @@ import {ReactComponent as Keyboard} from './assets/keyboard-solid.svg';
 import  { loadAppSettings, defaultAppSettings, saveAppSettings, getPrettyTextFromCommand } from './Utils'
 import SettingsDefaultConfirm from './SettingsDefaultConfirm'
 
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
+const ipcRenderer  = window.ipcRenderer;
 
 export default function Settings() {
 

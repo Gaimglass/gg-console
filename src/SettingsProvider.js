@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { loadAppSettings,  saveAppSettings } from './Utils';
 
-const electron = window.require('electron');
-const ipcRenderer = electron.ipcRenderer;
+const ipcRenderer = window.ipcRenderer;
 
 const SettingsContext = createContext();
 

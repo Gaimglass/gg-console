@@ -4,14 +4,13 @@ import './index.css';
 import AppMain from './AppMain';
 import reportWebVitals from './reportWebVitals';
 
-const electron = window.require('electron');
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
 
-electron.webFrame.setZoomLevel(0)
+window.webFrame.setZoomLevel(0)
 window.visualViewport.addEventListener("resize", ()=>{
   // do not level users resize text in this app.
-  electron.webFrame.setZoomLevel(0)
+  window.webFrame.setZoomLevel(0)
 });
 
 

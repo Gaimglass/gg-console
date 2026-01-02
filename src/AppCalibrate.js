@@ -5,8 +5,7 @@ import { ReactComponent as Close } from './assets/xmark-solid.svg';
 import { useThrottle } from './Utils';
 import { Crosshairs } from './Crosshairs';
 
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
+const ipcRenderer  = window.ipcRenderer;
 
 export default function AppCalibrate() {
   const canvasRef = useRef(null);
@@ -123,7 +122,7 @@ export default function AppCalibrate() {
 
   // Copied from AppColorPicker
   function loadMainLedFromGG() {
-    const result = window.require('electron').ipcRenderer.sendSync('get-led-state');
+    const result = ipcRenderer.sendSync('get-led-state');
     const color = parseMainLedFromGG(result);
     initXhairs(color);
   }
