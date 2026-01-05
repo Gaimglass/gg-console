@@ -27,7 +27,7 @@ setInterval(()=>{
 
 function AppMainContent() {
   // Read window type from Electron's additionalArguments
-  const windowType = process.argv.find(arg => arg.startsWith('--window-type='))?.split('=')[1];
+  const windowType = window.argv.find(arg => arg.startsWith('--window-type='))?.split('=')[1];
   const isCalibrate = windowType === 'calibrate';
   
   return (

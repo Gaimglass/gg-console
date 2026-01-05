@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useSettings } from './SettingsProvider';
 
-const electron = window.require('electron');
-const ipcRenderer = electron.ipcRenderer;
+const ipcRenderer  = window.ipcRenderer;
 
 /**
  * The BrightnessMonitor React component captures a region of the user's screen using Electron and WebGL, 

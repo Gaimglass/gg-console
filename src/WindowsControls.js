@@ -2,9 +2,7 @@ import styles from './css/WindowsControls.module.css'
 import PropTypes from 'prop-types';
 
 
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
-
+const ipcRenderer  = window.ipcRenderer;
 
 function WindowControls(props) {
 

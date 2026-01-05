@@ -19,8 +19,7 @@ import { useThrottle } from './Utils';
 import './css/globalStyles.css';
 
 
-const electron = window.require('electron');
-const ipcRenderer  = electron.ipcRenderer;
+const ipcRenderer  = window.ipcRenderer;
 
 function AppColorPicker() {
   const [color, setColor] = useState({ r: 255, g: 255, b: 255, a: 0 });
@@ -40,7 +39,7 @@ function AppColorPicker() {
   const colorRgbRef = useRef({ r: color.r, g: color.g, b: color.b });
   const prevAmbientValueRef = useRef(null);
 
-  const { ambientSettings } = useSettings();
+  const { ambientSettings, adsSettings } = useSettings();
   
   // Transition constants
   const RED = 1;
@@ -143,7 +142,7 @@ function AppColorPicker() {
     });
   }, [color, sendMainLEDStatus]);
 
-  const switchColorShortcut = useCallback((event, index) => {
+  const switchColorShortcut = useCallback((index) => {
     if (ledOn) {
       const colorIndex = Number(index - 1);
       if (colorIndex < 0) {
@@ -194,7 +193,7 @@ function AppColorPicker() {
   }, [ledOn, sendMainLEDStatus]);
 
   
-  const onADSDown = useCallback((event, ads) => {
+  const onADSDown = useCallback((ads) => {
     adsFlagsRef.current = 0;
     finalTransitionColorRef.current = { 
       ...ads.color,
@@ -206,7 +205,7 @@ function AppColorPicker() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color.a, ledOn]);
 
-  const onADSUp = useCallback((event, ads) => {
+  const onADSUp = useCallback((ads) => {
     adsFlagsRef.current = 0;
     finalTransitionColorRef.current = { ...color };
     if (ledOn) {
@@ -734,7 +733,7 @@ function AppColorPicker() {
       )}
       {/* Brightness monitor runs independently when connected */}
       {isConnected && (
-        <BrightnessMonitor 
+        <BrightnessMonitor
           onBrightnessChange={handleAmbientBrightness}
         />
       )}
