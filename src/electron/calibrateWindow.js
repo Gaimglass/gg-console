@@ -41,7 +41,7 @@ function toggleCalibrateWindow() {
     })
     
     
-    //calibrateWindow.webContents.openDevTools({mode: 'detach'});
+    calibrateWindow.webContents.openDevTools({mode: 'detach'});
     
 
     const startUrl = process.env.ELECTRON_START_URL || url.format({
