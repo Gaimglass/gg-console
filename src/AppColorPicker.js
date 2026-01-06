@@ -39,7 +39,7 @@ function AppColorPicker() {
   const colorRgbRef = useRef({ r: color.r, g: color.g, b: color.b });
   const prevAmbientValueRef = useRef(null);
 
-  const { ambientSettings, adsSettings } = useSettings();
+  const { ambientSettings } = useSettings();
   
   // Transition constants
   const RED = 1;
