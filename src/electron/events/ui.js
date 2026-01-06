@@ -113,13 +113,14 @@ function registerUIEvents(mainWindow, app, isDev) {
   });
 
 
-  electron.ipcMain.on('restart-and-update-app', async (event) => {
+  electron.ipcMain.handle('restart-and-update-app', async (event) => {
     try {
       updateAndRestart(app);
+      return 'okay';
     } catch(err) {
-      console.warn(err)
+      console.warn(err);
+      return { error: err.message };
     }
-    event.returnValue = 'okay';
   });
 
   //
