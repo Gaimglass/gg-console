@@ -142,7 +142,7 @@ function AppColorPicker() {
     });
   }, [color, sendMainLEDStatus]);
 
-  const switchColorShortcut = useCallback((event, index) => {
+  const switchColorShortcut = useCallback((index) => {
     if (ledOn) {
       const colorIndex = Number(index - 1);
       if (colorIndex < 0) {
@@ -194,7 +194,7 @@ function AppColorPicker() {
   }, [ledOn, sendMainLEDStatus]);
 
   
-  const onADSDown = useCallback((event, ads) => {
+  const onADSDown = useCallback((ads) => {
     adsFlagsRef.current = 0;
     finalTransitionColorRef.current = { 
       ...ads.color,
@@ -206,7 +206,7 @@ function AppColorPicker() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color.a, ledOn]);
 
-  const onADSUp = useCallback((event, ads) => {
+  const onADSUp = useCallback((ads) => {
     adsFlagsRef.current = 0;
     finalTransitionColorRef.current = { ...color };
     if (ledOn) {

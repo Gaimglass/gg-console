@@ -51,7 +51,7 @@ export default function AppCalibrate() {
 
   const handleUpdateColorThrottled = useThrottle(handleUpdateColor, 50);
   
-  const handleColorSync = useCallback((evt, color, ledOn) => {
+  const handleColorSync = useCallback((color, ledOn) => {
     if (xhairsRef.current && ledOn) {
       xhairsRef.current.setColor(color);
     }

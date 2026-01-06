@@ -12,15 +12,6 @@ const ipcRenderer  = window.ipcRenderer;
  * The component manages resource cleanup and responds to system suspend/resume events to ensure robust operation.
  */
 
-/**
- * The BrightnessMonitor React component captures a region of the user's screen using Electron and WebGL, 
- * processes the video feed in real time, and calculates the average brightness of the selected area. 
- * It sets up a hidden video and WebGL canvas, samples the screen at regular intervals, and uses GPU acceleration 
- * to efficiently downscale and analyze the image. The calculated brightness value is then passed to a callback,
- * allowing the parent component to react to changes in screen brightness for the ambient lighting adjustment. 
- * The component manages resource cleanup and responds to system suspend/resume events to ensure robust operation.
- */
-
 export default function BrightnessMonitor({ onBrightnessChange }) {
   const { ambientSettings } = useSettings();
   const { enabled, captureRegion } = ambientSettings;
