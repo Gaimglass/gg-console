@@ -9,6 +9,7 @@ import KeyBindings from './KeyBindings';
 import ADS from './ADS';
 import Ambient from './Ambient';
 import BrightnessMonitor from './BrightnessMonitor';
+import ControllerMonitor from './ControllerMonitor';
 import { useSettings } from './SettingsProvider';
 
 import styles from './css/AppColorPicker.module.css';
@@ -39,7 +40,7 @@ function AppColorPicker() {
   const colorRgbRef = useRef({ r: color.r, g: color.g, b: color.b });
   const prevAmbientValueRef = useRef(null);
 
-  const { ambientSettings } = useSettings();
+  const { ambientSettings, adsSettings } = useSettings();
   
   // Transition constants
   const RED = 1;
@@ -194,26 +195,26 @@ function AppColorPicker() {
   }, [ledOn, sendMainLEDStatus]);
 
   
-  const onADSDown = useCallback((ads) => {
+  const onADSDown = useCallback(() => {
     adsFlagsRef.current = 0;
     finalTransitionColorRef.current = { 
-      ...ads.color,
+      ...adsSettings.color,
       a: color.a // ads does not control brightness, just match the current value
     };
     if (ledOn) {
-      changeColorTo(ads.speed);
+      changeColorTo(adsSettings.speed);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [color.a, ledOn]);
+  }, [color.a, ledOn, adsSettings.speed, adsSettings.color]);
 
-  const onADSUp = useCallback((ads) => {
+  const onADSUp = useCallback(() => {
     adsFlagsRef.current = 0;
     finalTransitionColorRef.current = { ...color };
     if (ledOn) {
-      changeColorTo(ads.speed);
+      changeColorTo(adsSettings.speed);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [color, ledOn]);
+  }, [color, ledOn, adsSettings.speed]);
 
   const getStateFromGG = () => { 
     loadMainLedFromGG();
@@ -734,9 +735,15 @@ function AppColorPicker() {
       )}
       {/* Brightness monitor runs independently when connected */}
       {isConnected && (
+        <>
+        <ControllerMonitor 
+          onADSDown={onADSDown}
+          onADSUp={onADSUp}
+        />
         <BrightnessMonitor
           onBrightnessChange={handleAmbientBrightness}
         />
+        </>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ const fs = require('fs');
 
 const { registerUIEvents } = require('./events/ui');
 const { registerMouseEvents } = require('./events/mouse');
+const {setupController} = require('./events/controller');
 const { initializeUsb,  disconnectUsb } = require('./usb/usb');
 const { setLEDOn } = require('./usb/serial-commands');
 
@@ -95,6 +96,7 @@ if (!gotTheLock) {
     createWindow();
     registerUIEvents(mainWindow, app, isDev)
     registerMouseEvents(mainWindow, mouseState)
+    setupController(mainWindow);
     /*electron.powerMonitor.on("lock-screen", () => {
     });*/
     electron.powerMonitor.on("suspend", () => {

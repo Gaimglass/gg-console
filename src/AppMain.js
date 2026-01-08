@@ -2,6 +2,7 @@ import React from 'react';
 import AppColorPicker from "./AppColorPicker";
 import AppCalibrate from "./AppCalibrate";
 import { SettingsProvider } from './SettingsProvider';
+import { ControllerProvider } from './ControllerProvider';
 
 /*
 let gp;
@@ -40,7 +41,9 @@ function AppMainContent() {
 export default function AppMain() {
   return (
     <SettingsProvider>
-      <AppMainContent />
+      <ControllerProvider>
+        <AppMainContent />
+      </ControllerProvider> 
     </SettingsProvider>
   );
 }

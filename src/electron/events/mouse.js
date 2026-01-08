@@ -23,7 +23,7 @@ try {
 function registerMouseEvents(mainWindow, mouseState) {
   mouseEvents.on("mouseup", event => {
   if (mouseState.down && adsSettings.adsMouseButton === event.button) {
-    mainWindow.webContents.send('update-ads-inactive', adsSettings);
+    mainWindow.webContents.send('update-ads-inactive');
     mouseState.down = false;
   }
   });
@@ -31,7 +31,7 @@ function registerMouseEvents(mainWindow, mouseState) {
   mouseEvents.on("mousedown", event => {
     if (!mouseState.down) {
       if(adsSettings.adsMouseButton === event.button && adsSettings.enabled) {
-        mainWindow.webContents.send('update-ads-active', adsSettings);
+        mainWindow.webContents.send('update-ads-active');
         mouseState.down = true;
       }
     }
@@ -45,5 +45,6 @@ function setADS(mainWindow, ads) {
 
 module.exports = {
   registerMouseEvents,
-  setADS, 
+  setADS,
+  adsSettings // expose for reading only
 }

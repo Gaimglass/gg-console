@@ -81,14 +81,12 @@ contextBridge.exposeInMainWorld("ipcRenderer", {
   on(channel, callback) {
     bindNative(channel);
     subscribers.set(channel, callback); // overwrite existing handler
-    console.log("Set listener for channel", channel);
   },
 
   removeListener(channel, callback) {
     const current = subscribers.get(channel);
     if (current === callback) {
       subscribers.delete(channel);
-      console.log("Cleared listener for channel", channel);
     }
   },
 

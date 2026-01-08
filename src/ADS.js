@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import ReactSlider from 'react-slider'
 
 import styles from './css/ADS.module.css'
@@ -7,9 +7,65 @@ import Switch from "react-switch";
 
 import { useThrottle } from './Utils'
 import { useSettings } from './SettingsProvider';
+import { useController } from './ControllerProvider';
+
+
+const XBOX_MAPPING = {
+  0:  "A",
+  1:  "B",
+  2:  "X",
+  3:  "Y",
+
+  4:  "LB",
+  5:  "RB",
+  6:  "LT",        // Analog (0–1)
+  7:  "RT",        // Analog (0–1)
+
+  8:  "Back",
+  9:  "Start",
+
+  10: "L3",        // Left stick click
+  11: "R3",        // Right stick click
+
+  12: "DPadUp",
+  13: "DPadDown",
+  14: "DPadLeft",
+  15: "DPadRight",
+
+  16: "Home"       // Xbox logo (may not always be exposed)
+};
+/* eslint-disable no-unused-vars */
+const PS5_MAPPING = {
+  0:  "Cross",        // Bottom button (X)
+  1:  "Circle",       // Right
+  2:  "Square",       // Left
+  3:  "Triangle",     // Top
+  
+  4:  "L1",
+  5:  "R1",
+  6:  "L2",           // Analog (value 0–1)
+  7:  "R2",           // Analog (value 0–1)
+
+  8:  "Create",       // Formerly Share
+  9:  "Options",
+
+  10: "L3",           // Left stick click
+  11: "R3",           // Right stick click
+
+  12: "DPadUp",
+  13: "DPadDown",
+  14: "DPadLeft",
+  15: "DPadRight",
+
+  16: "Touchpad",     // Touchpad click
+  17: "PS",           // PlayStation logo (may not always be exposed)
+  // 18 may appear on some firmware: "MicMute"
+};
 
 export default function ADS() {
   const { adsSettings, updateADSSettings } = useSettings();
+  const {type} = useController();
+  const [controllerConnected, setControllerConnected] = React.useState(true);
 
   const handleColorChange = useCallback((_newColor) => {
     updateADSSettings({
@@ -17,6 +73,18 @@ export default function ADS() {
       color: { ..._newColor }
     });
   }, [adsSettings, updateADSSettings]);
+
+  
+  const controllerButtons = useMemo(() => {
+    if (type === 'xinput') {
+      return Object.entries(XBOX_MAPPING)
+    }
+    // todo add hid type check for ps5
+  }, [type]);
+
+  useEffect(() => {
+    setControllerConnected(type !== null)
+  }, [type]);
 
   const handleColorChangeThrottled = useThrottle(handleColorChange, 50);
 
@@ -42,12 +110,22 @@ export default function ADS() {
     });
   }
 
+  function handleOnChangeController(e) {
+    const controllerButton = Number.parseInt(e.target.value)
+    updateADSSettings({
+      ...adsSettings,
+      adsControllerButton: controllerButton
+    });
+  }
+  
+
   function handleOnChangeSpeed(value) {
     updateADSSettings({
       ...adsSettings,
       speed: value
     });
   }
+
 
   function changeRgb(e, colorComponent) {
     const rawString = e.target.value.trim();
@@ -77,7 +155,7 @@ export default function ADS() {
       color: newColor
     });
   }
-
+  
   return <div className={styles.container}>
     <div className={styles.switchContainer}>
       <Switch
@@ -128,6 +206,20 @@ export default function ADS() {
                   </select>
                 </td>
               </tr>
+                {controllerConnected && <tr>
+                  <td>Controller Button</td>
+                  <td>
+                    <select defaultValue={adsSettings.adsControllerButton} onChange={handleOnChangeController} type="text">
+                      {
+                        controllerButtons?.map(([key, name])=>(
+                          <option defaultValue={adsSettings.adsControllerButton === key} key={key} value={key}>{name}</option>
+                        ))
+                      }
+                    </select>
+                  </td>
+                </tr>
+              }
+              {!controllerConnected && <tr><td>Controller not connected</td></tr>}
             </tbody>
           </table>
         </div>

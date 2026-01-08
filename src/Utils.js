@@ -1,6 +1,5 @@
 import {useRef, useCallback } from 'react'
 
-
 async function getMessageResult(promise, cb) {
   const result = await promise;
   if (result instanceof Error) {
@@ -64,8 +63,8 @@ function defaultAppSettings() {
       'enabled': false,
       'color': {r: 0, g: 255, b:100},
       'speed': 100,
-      'adsMouseButton': 2,
-      'adsControllerButton': 'button1',
+      'adsMouseButton': 2, // mouse2
+      'adsControllerButton': 6, // bLeftTrigger (xinput)
     },
     'ambient': {
       'enabled': false,
