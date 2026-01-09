@@ -4,26 +4,26 @@
 
 ### Initial step
 
-The current nvm node version is set to  v18.8.0
+The current nvm node version is set to  v22.14
 
 ```
-nvm use v18
+nvm use v22
 yarn install
 ```
 
-## Build for development and local testing
+## Build for development and local testing (Vite)
 ```
-yarn react
+yarn dev
 ```
 
-In a separate tab after react start, run
+In a separate tab after starting Vite dev server, run
 ```
 yarn electron-dev
 ```
 
 ## Build for production (locally)
 
-### 1. To build the frontend for production
+### 1. To build the frontend for production (Vite)
 ```
 nvm use v18
 yarn install
