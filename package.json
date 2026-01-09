@@ -1,6 +1,6 @@
 {
   "name": "Gaimglass",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "private": false,
   "license": "BUSL-1.1",
   "author": "Gaimglass",
@@ -9,10 +9,9 @@
     "node": ">=22.14"
   },
   "scripts": {
-    "react": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
+    "dev": "vite",
+    "build": "vite build",
+    "test": "echo 'No test runner configured.'",
     "electron": "electron .",
     "electron-dev": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:3000 electron .",
     "electron-dev:win": "set NODE_ENV=development ELECTRON_START_URL=http://localhost:3000 && electron .",
@@ -41,7 +40,6 @@
     "react": "^19.0.0",
     "react-colorful": "^5.6.1",
     "react-dom": "^19.0.0",
-    "react-scripts": "5.0.1",
     "react-slider": "^2.0.6",
     "react-switch": "^7.1.0",
     "react-tabs": "^6.1.0",
@@ -58,7 +56,10 @@
     "@electron-forge/maker-zip": "^7.8.1",
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
     "@electron-forge/publisher-github": "^7.8.1",
-    "electron": "^35.7.5"
+    "@vitejs/plugin-react": "^5.1.2",
+    "electron": "^35.7.5",
+    "vite": "^7.3.1",
+    "vite-plugin-svgr": "^4.5.0"
   },
   "main": "./src/electron/index.js",
   "eslintConfig": {
