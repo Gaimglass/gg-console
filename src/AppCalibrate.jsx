@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 
 import styles from './css/AppCalibrate.module.css';
-import { ReactComponent as Close } from './assets/xmark-solid.svg';
+import Close from './assets/xmark-solid.svg?react';
 import { useThrottle } from './Utils';
 import { Crosshairs } from './Crosshairs';
 
