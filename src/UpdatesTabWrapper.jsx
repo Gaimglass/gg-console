@@ -3,7 +3,7 @@ import classNames from 'classnames';
 import { PropTypes } from "prop-types";
 
 import styles from './css/UpdatesTabWrapper.module.css'
-import { ReactComponent as RotateLeft } from './assets/rotate-left-solid.svg';
+import RotateLeft from './assets/rotate-left-solid.svg?react';
 
 
 const ipcRenderer  = window.ipcRenderer;

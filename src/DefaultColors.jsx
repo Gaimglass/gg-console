@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PropTypes } from "prop-types";
 import styles from './css/DefaultColors.module.css'
-import {ReactComponent as Edit} from './assets/pen-to-square-solid.svg';
-import {ReactComponent as Cancel} from './assets/xmark-solid.svg';
-import {ReactComponent as Check} from './assets/check-solid.svg';
-import {ReactComponent as Plus} from './assets/plus-solid.svg';
+import Edit from './assets/pen-to-square-solid.svg?react';
+import Cancel from './assets/xmark-solid.svg?react';
+import Check from './assets/check-solid.svg?react';
+import Plus from './assets/plus-solid.svg?react';
 import classNames from 'classnames';
 
 import DefaultRevertConfirm from './DefaultRevertConfirm'
