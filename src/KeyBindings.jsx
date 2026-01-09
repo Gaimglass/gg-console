@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './css/KeyBindings.module.css'
 
-import {ReactComponent as Keyboard} from './assets/keyboard-solid.svg';
+import Keyboard from './assets/keyboard-solid.svg?react';
 import  { loadAppSettings, defaultAppSettings, saveAppSettings, getPrettyTextFromCommand } from './Utils'
 import SettingsDefaultConfirm from './SettingsDefaultConfirm'
 

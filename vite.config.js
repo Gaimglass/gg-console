@@ -1,10 +1,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import svgr from 'vite-plugin-svgr';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    svgr(),
+  ],
   root: './src',
+  publicDir: '../public',
+  base: './',
   build: {
     outDir: '../build',
     emptyOutDir: true,

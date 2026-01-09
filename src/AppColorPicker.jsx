@@ -14,8 +14,8 @@ import { useSettings } from './SettingsProvider';
 
 import styles from './css/AppColorPicker.module.css';
 
-import { ReactComponent as PowerSwitch } from './assets/power-off-solid.svg';
-import { ReactComponent as CrosshairsIcon } from './assets/crosshair.svg';
+import PowerSwitch from './assets/power-off-solid.svg?react';
+import CrosshairsIcon from './assets/crosshair.svg?react';
 import { useThrottle } from './Utils';
 import './css/globalStyles.css';
 
