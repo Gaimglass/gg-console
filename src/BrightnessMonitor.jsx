@@ -12,7 +12,7 @@ const ipcRenderer  = window.ipcRenderer;
  * The component manages resource cleanup and responds to system suspend/resume events to ensure robust operation.
  */
 
-export default function BrightnessMonitor({ onBrightnessChange }) {
+export default function BrightnessMonitor({ onBrightnessChange, ledOn }) {
   const { ambientSettings } = useSettings();
   const { enabled, captureRegion } = ambientSettings;
   const videoRef = useRef(null);
@@ -29,7 +29,7 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
     // Always cleanup first to restart with new settings
     //console.log('[BrightnessMonitor] starting restart on OS resume');
     cleanup();
-    if (enabled) {
+    if (enabled && ledOn) {
       setupBrightnessMonitor();
       //console.log('[BrightnessMonitor] Restarted on OS resume');
     }
@@ -46,7 +46,7 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
   }, [onBrightnessChange]);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !ledOn) {
       cleanup();
       return;
     }
@@ -63,7 +63,7 @@ export default function BrightnessMonitor({ onBrightnessChange }) {
       ipcRenderer.removeListener('os-suspend', handleOnOsSuspend);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, captureRegion]);
+  }, [enabled, captureRegion, ledOn]);
 
   async function setupBrightnessMonitor() {
     //console.log('[BrightnessMonitor] Setting up with region:', captureRegion);
