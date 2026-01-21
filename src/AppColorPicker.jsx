@@ -742,6 +742,7 @@ function AppColorPicker() {
         />
         <BrightnessMonitor
           onBrightnessChange={handleAmbientBrightness}
+          ledOn={ledOn}
         />
         </>
       )}
