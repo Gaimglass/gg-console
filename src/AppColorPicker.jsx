@@ -248,7 +248,7 @@ function AppColorPicker() {
 
   // Separate effect for throttled LED state updates
   useEffect(() => {
-    ipcRenderer.on('update-main-led-state-from-gg', (evt, message) => {
+    ipcRenderer.on('update-main-led-state-from-gg', (message) => {
       handleUpdateGGThrottled(message);
     });
     return () => {
