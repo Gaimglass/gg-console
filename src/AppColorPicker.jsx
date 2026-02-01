@@ -8,7 +8,7 @@ import UpdatesTabWrapper from './UpdatesTabWrapper';
 import KeyBindings from './KeyBindings';
 import ADS from './ADS';
 import Ambient from './Ambient';
-import BrightnessMonitor from './BrightnessMonitor';
+import BrightnessMonitor from './BrightnessMonitor.rsx';
 import ControllerMonitor from './ControllerMonitor';
 import { useSettings } from './SettingsProvider';
 
@@ -636,7 +636,6 @@ function AppColorPicker() {
     }
   }
 
-
   return (
     <div className={styles.App}>
       <header className={styles.header}>
@@ -742,6 +741,8 @@ function AppColorPicker() {
         />
         <BrightnessMonitor
           onBrightnessChange={handleAmbientBrightness}
+          enabled={ambientSettings.enabled}
+          captureRegion={ambientSettings.captureRegion}
           ledOn={ledOn}
         />
         </>

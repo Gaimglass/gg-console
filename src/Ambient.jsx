@@ -15,14 +15,6 @@ export default function Ambient() {
   const [localEnabled, setLocalEnabled] = useState(ambientSettings?.enabled || false);
   const exponent = ambientSettings?.exponent ?? 1.65;
 
-  // Debounced update function to avoid rapid setup/cleanup cycles
-  const debouncedUpdateRegion = useDebounce((captureRegion) => {
-    updateAmbientSettings({
-      ...ambientSettings,
-      captureRegion
-    });
-  }, 500);
-
   const debouncedUpdateEnabled = useDebounce((enabled) => {
     updateAmbientSettings({
       ...ambientSettings,
@@ -32,6 +24,7 @@ export default function Ambient() {
 
   // Sync local state when settings change externally
   useEffect(() => {
+    /*eslint-disable-next-line react-hooks/exhaustive-deps */
     setLocalRegion(ambientSettings?.captureRegion || 100);
     setLocalEnabled(ambientSettings?.enabled || false);
   }, [ambientSettings?.captureRegion, ambientSettings?.enabled]);
@@ -47,7 +40,13 @@ export default function Ambient() {
     // Update local state immediately for responsive UI (this might be ahead of the actual setting)
     setLocalRegion(value);
     // Debounced settings update to avoid rapid setup/cleanup cycles
-    debouncedUpdateRegion(value);
+    //debouncedUpdateRegion(value);
+    updateAmbientSettings({
+      ...ambientSettings,
+      captureRegion: value
+    });
+    
+    
   }
 
   return (
@@ -85,7 +84,7 @@ export default function Ambient() {
               step={5}
               className={styles.slider}
               thumbClassName={styles.thumb}
-              renderTrack={(props, state) => {
+              renderTrack={(props) => {
                 const {key, style} = props;
                 const region = localRegion;
                 // Color changes from blue (10%) to green (100%)
@@ -96,7 +95,7 @@ export default function Ambient() {
                 }
                 return <div style={mergedStyle} key={key} className={styles.trackInner} />
               }}
-              renderThumb={(props, state) => {
+              renderThumb={(props) => {
                 const {key, ...rest} = props;
                 return <div key={key} {...rest}></div>
               }}
@@ -124,7 +123,7 @@ export default function Ambient() {
               step={0.1}
               className={styles.slider}
               thumbClassName={styles.thumb}
-              renderTrack={(props, state) => {
+              renderTrack={(props) => {
                 const {key, style} = props;
                 // Color changes from blue (10%) to green (100%)
                 const hue = 200 + (exponent / 5) * 120; // 200 to 320 degrees
@@ -134,7 +133,7 @@ export default function Ambient() {
                 }
                 return <div style={mergedStyle} key={key} className={styles.trackInner} />
               }}
-              renderThumb={(props, state) => {
+              renderThumb={(props) => {
                 const {key, ...rest} = props;
                 return <div key={key} {...rest}></div>
               }}
