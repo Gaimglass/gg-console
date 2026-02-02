@@ -63,9 +63,9 @@ function registerUIEvents(mainWindow, app, isDev) {
   electron.ipcMain.on('get-default-colors', async (event) => { 
     try {
       const ledStateStr = await getDefaultLEDs();
-      event.returnValue = ledStateStr;
+      event.returnValue = { ok: true, data: ledStateStr };
     } catch(err) {
-      event.returnValue = err;
+      event.returnValue = { ok: false, error: err.message || String(err) };
     }
   });
   

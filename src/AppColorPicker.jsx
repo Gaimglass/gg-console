@@ -540,11 +540,13 @@ function AppColorPicker() {
   }
 
   async function loadDefaultColorsFromGG() {
-    const result = ipcRenderer.sendSync('get-default-colors');
-    if (result) {
-      parseDefaultColors(result);
-      setIsConnected(true); // we just need to set this once on a successful response
+    const response = ipcRenderer.sendSync('get-default-colors');
+    if (!response.ok) {
+      console.warn('get-default-colors failed:', response.error);
+      return;
     }
+    parseDefaultColors(response.data);
+    setIsConnected(true); // we just need to set this once on a successful response
   }
 
   function changeRgb(e, colorComponent) {
