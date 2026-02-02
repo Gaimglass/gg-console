@@ -1044,15 +1044,15 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@lms5400/babel-plugin-rsx@^1.0.7":
-  version "1.0.7"
-  resolved "https://registry.yarnpkg.com/@lms5400/babel-plugin-rsx/-/babel-plugin-rsx-1.0.7.tgz#729f8348fa026d14666ff2838518eab57f0417de"
-  integrity sha512-4x96TKSsQpYiIeF4Dp+hBLsDfDJiEv8fOqZM7Z/xzXnhQYE62UQxgjt8ogc+x+p5O/bpfKNcQI8xJ29jpl+4dw==
+"@lms5400/babel-plugin-rsx@^1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@lms5400/babel-plugin-rsx/-/babel-plugin-rsx-1.1.1.tgz#5197c9579361e22140eb46254fff02438bb5df23"
+  integrity sha512-qPTusdnOVtUncftKkBhrC19mnYx2uvHWfxIHkbolXSPyX/xLyWMXuP/9w18MvbMgXg0eI4uN4eYpuGplRCnArQ==
 
-"@lms5400/eslint-plugin-rsx@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/@lms5400/eslint-plugin-rsx/-/eslint-plugin-rsx-1.0.0.tgz#ee2ab31d64abba44c524721a40b4198ce2837301"
-  integrity sha512-N12QzrvTv9HBAZVGkUNYVEY4Yjf97MVMPCLI+WkhkbM6xLBPEDuPma6B81OXRO606bDhrjpzCKdEAhaCoSkoYA==
+"@lms5400/eslint-plugin-rsx@^1.0.2":
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/@lms5400/eslint-plugin-rsx/-/eslint-plugin-rsx-1.0.2.tgz#f4949389815004fe289f8264b5081ea7315896ea"
+  integrity sha512-RhQ0FaE431epM4JkpAfKYu/kK04mWrnazdlaQzqESeDJ/Lk7hSDNwSuEGlBUo6JqJw3gngEahSJxoyjOnsSjwg==
 
 "@malept/cross-spawn-promise@^1.0.0":
   version "1.1.1"
