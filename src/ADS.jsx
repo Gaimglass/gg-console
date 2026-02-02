@@ -9,7 +9,6 @@ import { useThrottle } from './Utils'
 import { useSettings } from './SettingsProvider';
 import { useController } from './ControllerProvider';
 
-
 const XBOX_MAPPING = {
   0:  "A",
   1:  "B",
@@ -191,7 +190,7 @@ export default function ADS() {
       <div className={styles.rightControls}>
         <div>
           <h3 className={styles.noMarginTop}>ADS Hold Bindings</h3>
-          <p><em>Note: These button binding must match your games'</em></p>
+          <p><em>Note: These button binding must match your games&apos;</em></p>
           <table className={styles.mouseBindingsTable}>
             <tbody>
               <tr>

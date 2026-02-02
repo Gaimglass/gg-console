@@ -8,7 +8,7 @@ import UpdatesTabWrapper from './UpdatesTabWrapper';
 import KeyBindings from './KeyBindings';
 import ADS from './ADS';
 import Ambient from './Ambient';
-import BrightnessMonitor from './BrightnessMonitor';
+import BrightnessMonitor from './BrightnessMonitor.rsx';
 import ControllerMonitor from './ControllerMonitor';
 import { useSettings } from './SettingsProvider';
 
@@ -248,7 +248,7 @@ function AppColorPicker() {
 
   // Separate effect for throttled LED state updates
   useEffect(() => {
-    ipcRenderer.on('update-main-led-state-from-gg', (evt, message) => {
+    ipcRenderer.on('update-main-led-state-from-gg', (message) => {
       handleUpdateGGThrottled(message);
     });
     return () => {
@@ -540,11 +540,13 @@ function AppColorPicker() {
   }
 
   async function loadDefaultColorsFromGG() {
-    const result = ipcRenderer.sendSync('get-default-colors');
-    if (result) {
-      parseDefaultColors(result);
-      setIsConnected(true); // we just need to set this once on a successful response
+    const response = ipcRenderer.sendSync('get-default-colors');
+    if (!response.ok) {
+      console.warn('get-default-colors failed:', response.error);
+      return;
     }
+    parseDefaultColors(response.data);
+    setIsConnected(true); // we just need to set this once on a successful response
   }
 
   function changeRgb(e, colorComponent) {
@@ -635,7 +637,6 @@ function AppColorPicker() {
       e.target.value = e.target.value.slice(0, 4);
     }
   }
-
 
   return (
     <div className={styles.App}>
@@ -742,6 +743,8 @@ function AppColorPicker() {
         />
         <BrightnessMonitor
           onBrightnessChange={handleAmbientBrightness}
+          enabled={ambientSettings.enabled}
+          captureRegion={ambientSettings.captureRegion}
           ledOn={ledOn}
         />
         </>

@@ -1,0 +1,14 @@
+{
+  "eslint.useFlatConfig": true,
+
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "rsx"
+  ],
+
+  "eslint.nodePath": "./node_modules",
+  "files.associations": {
+    "*.rsx": "javascriptreact"
+  },
+}
