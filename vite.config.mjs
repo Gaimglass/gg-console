@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [
     rsxVitePlugin(),
     react({
-      include: /\.(jsx|tsx|rsx)$/,
+      include: /\.(jsx|tsx)$/,
     }),
     svgr(),
   ],
