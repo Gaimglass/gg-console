@@ -43,6 +43,7 @@ export default function ControllerMonitor({
   useEffect(() => {
     if (type === 'xinput') {
       if(adsSettings.adsControllerButton === 6) {
+        /*eslint-disable-next-line react-hooks/exhaustive-deps */
         setAnalogTriggerKey('bLeftTrigger');
         setButtonTriggerKey(null)
       }
