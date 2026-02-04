@@ -113,7 +113,7 @@ function registerUIEvents(mainWindow, app, isDev) {
   });
 
 
-  electron.ipcMain.handle('restart-and-update-app', async (event) => {
+  electron.ipcMain.handle('restart-and-update-app', async () => {
     try {
       updateAndRestart(app);
       return 'okay';
@@ -127,7 +127,7 @@ function registerUIEvents(mainWindow, app, isDev) {
   // Non-blocking handlers
   //
 
-  electron.ipcMain.handle('check-for-updates', async (event) => {
+  electron.ipcMain.handle('check-for-updates', async () => {
     try {
       const result = await checkForUpdates(app.getVersion(), isDev);
       return {
@@ -140,28 +140,31 @@ function registerUIEvents(mainWindow, app, isDev) {
     }
   });
 
-  electron.ipcMain.handle('calibrate-gaimglass', async (event) => {
+  electron.ipcMain.handle('calibrate-gaimglass', async () => {
     toggleCalibrateWindow()
   });
 
   electron.ipcMain.handle('set-enable-shortcuts', async (event, bindings) => {
+    void event;
     return enableShortcuts(mainWindow, bindings)
   });
 
   electron.ipcMain.handle('set-enable-shortcut', async (event, command, value) => {
+    void event;
     return enableShortcut(mainWindow, command, value)
   });
 
-  electron.ipcMain.handle('set-disable-shortcuts', async (event) => {
+  electron.ipcMain.handle('set-disable-shortcuts', async () => {
     disableShortcuts();
   });
 
 
   electron.ipcMain.handle('set-enable-ads', async (event, ads) => {
+    void event;
     return setADS(mainWindow, ads)
   });
 
-  electron.ipcMain.handle('get-screen-sources', async (event) => {
+  electron.ipcMain.handle('get-screen-sources', async () => {
     try {
       const { desktopCapturer } = electron;
       const sources = await desktopCapturer.getSources({

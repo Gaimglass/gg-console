@@ -3,6 +3,7 @@ const XInput = require("xinput-ffi");
 
 //let subscribers = [];
 let mainWindow = null;
+const ENABLE_HID_BACKEND = false;
 
 
 // -----------------------
@@ -17,7 +18,7 @@ function startXInput() {
     
     try {
       state = await XInput.getState(0); // controller 0
-    } catch (e) {
+    } catch {
       // Controller disconnected
       if(lastPacket) {
         // let the client know
@@ -74,7 +75,9 @@ function startHID() {
 function setupController(main) {
   mainWindow = main;
   startXInput();
-  //startHID(); // disabled for now until better testing
+  if (ENABLE_HID_BACKEND) {
+    startHID();
+  }
 }
 
 module.exports = {
