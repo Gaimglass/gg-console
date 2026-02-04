@@ -25,26 +25,16 @@ export default function BrightnessMonitor({ update, destroy, props }) {
 
   // --- props update: replaces dependency array logic ---
   update((prev, next) => {
-    const {
-      onBrightnessChange: nextOnBrightnessChange,
-      ledOn: nextLedOn,
-      enabled: nextEnabled,
-      captureRegion: nextRegion,
-    } = next;
-
     // snapshots
-    currentOnBrightnessChange =
-      onBrightnessChange =
-      nextOnBrightnessChange;
-
-    currentEnabled = enabled = nextEnabled;
-    currentLedOn = ledOn = nextLedOn;
-    currentCaptureRegion = captureRegion = nextRegion;
+    currentOnBrightnessChange = next.onBrightnessChange;
+    currentEnabled = next.enabled;
+    currentLedOn = next.ledOn;
+    currentCaptureRegion = next.captureRegion;
 
     // diffs
-    const enabledChanged = prev.enabled !== nextEnabled;
-    const ledChanged = prev.ledOn !== nextLedOn;
-    const regionChanged = prev.captureRegion !== nextRegion;
+    const enabledChanged = prev.enabled !== next.enabled;
+    const ledChanged = prev.ledOn !== next.ledOn;
+    const regionChanged = prev.captureRegion !== next.captureRegion;
 
     // lifecycle changes dominate
     if (enabledChanged || ledChanged) {

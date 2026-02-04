@@ -21,10 +21,11 @@ async function checkForUpdates(currentVersion, isDev) {
     if (isDev) {
       setTimeout(() => {
         resolve({
-          updateAvailable: false,
+          updateAvailable: false, // change to true to test update in dev
           releaseNotes: 'test',
           releaseName: '1.2.3',
         });
+
       }, 1000);
       return;
     }
@@ -36,17 +37,17 @@ async function checkForUpdates(currentVersion, isDev) {
     }
     updateCheckLock = true;
 
-    const checkingForUpdate = function (event, releaseNotes, releaseName) {
+    const checkingForUpdate = function () {
       // ...existing code...
     };
-    const updateAvailable = function (event, releaseNotes, releaseName) {
+    const updateAvailable = function () {
       // ...existing code...
     };
-    const updateNotAvailable = function (event, releaseNotes, releaseName) {
+    const updateNotAvailable = function () {
       cleanUpEvents();
       resolve({ updateAvailable: false });
     };
-    const updateDownloaded = function (event, releaseNotes, releaseName) {
+    const updateDownloaded = function (_event, releaseNotes, releaseName) {
       // Cache the downloaded update info
       updateDownloadedInfo = { releaseNotes, releaseName };
       cleanUpEvents();
@@ -56,7 +57,7 @@ async function checkForUpdates(currentVersion, isDev) {
         releaseName,
       });
     };
-    const updateError = function (message) {
+    const updateError = function (_event, message) {
       cleanUpEvents();
       reject({ message });
     };

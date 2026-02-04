@@ -55,11 +55,11 @@ export default function Settings() {
     return key
   }
 
-  function handleFocus(e) {
+  function handleFocus() {
     ipcRenderer.invoke('set-disable-shortcuts');
   }
 
-  async function handleBlur(e) {
+  async function handleBlur() {
     const errors = await ipcRenderer.invoke('set-enable-shortcuts', settings.keyBindings);
     setErrors({...errors});
   }

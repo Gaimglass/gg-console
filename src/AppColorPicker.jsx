@@ -4,7 +4,7 @@ import classNames from 'classnames';
 import DefaultColors from './DefaultColors';
 import WindowControls from './WindowsControls';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
-import UpdatesTabWrapper from './UpdatesTabWrapper';
+import UpdatesTabWrapper from './UpdatesTabWrapper.rsx';
 import KeyBindings from './KeyBindings';
 import ADS from './ADS';
 import Ambient from './Ambient';

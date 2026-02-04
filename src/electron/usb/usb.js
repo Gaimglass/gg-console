@@ -91,7 +91,7 @@ async function connectUsb(mainWindow, _isDev, app) {
     });
 
     // Read the port data
-    port.on("open", async (o) => {
+    port.on("open", async () => {
       try {
         if (!port.isOpen) {
           throw new Error('Port did not open correctly')

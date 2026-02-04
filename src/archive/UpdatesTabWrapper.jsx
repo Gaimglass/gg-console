@@ -13,22 +13,6 @@ export default function UpdatesTabWrapper({ children }) {
   const [releaseName, setReleaseName] = useState('');
   const hasChecked = useRef(false);
   
-  useEffect(()=>{
-    // Prevent double-call in React Strict Mode (dev only)
-    if (hasChecked.current) return;
-    hasChecked.current = true;
-    
-    checkForUpdatesTabWrapper();
-    const interval = setInterval(() => {
-      checkForUpdatesTabWrapper();
-    }, 1000 * 60 * 60); // continue checking once an hour
-    return () => clearInterval(interval);
-  }, [])
-
-  function restart() {
-    ipcRenderer.invoke('restart-and-update-app');
-  }
-
   async function checkForUpdatesTabWrapper() {
     const result = await ipcRenderer.invoke('check-for-updates');
     if (result.error) {
@@ -41,6 +25,24 @@ export default function UpdatesTabWrapper({ children }) {
       setUpdateRequired(false);
     }
   }
+
+  useEffect(()=>{
+    // Prevent double-call in React Strict Mode (dev only)
+    if (hasChecked.current) return;
+    hasChecked.current = true;
+    
+    // /*eslint-disable-next-line react-hooks/exhaustive-deps */
+    checkForUpdatesTabWrapper();
+    const interval = setInterval(() => {
+      checkForUpdatesTabWrapper();
+    }, 1000 * 60 * 60); // continue checking once an hour
+    return () => clearInterval(interval);
+  }, [])
+
+  function restart() {
+    ipcRenderer.invoke('restart-and-update-app');
+  }
+
 
   const show = updateRequired ? 'visible' : 'hidden';
   return (
