@@ -14,6 +14,7 @@ export default function BrightnessMonitor({ update, destroy, props }) {
   let stream = null;
   let intervalId = null;
   let texCoordBuffer = null;
+  let setupGeneration = 0; // Track setup generation to detect stale async work
 
   // Store last-known settings for stable event handlers (OS resume/suspend)
   let currentEnabled = !!enabled;
@@ -41,7 +42,8 @@ export default function BrightnessMonitor({ update, destroy, props }) {
       if (!currentEnabled || !currentLedOn) {
         cleanup();
       } else {
-        restartIfActive();
+        // Defer restart to avoid blocking UI during rapid toggling
+        setTimeout(restartIfActive, 0);
       }
       return;
     }
@@ -60,8 +62,9 @@ export default function BrightnessMonitor({ update, destroy, props }) {
   });
 
   function cleanup() {
+    setupGeneration++; // Invalidate any in-progress or active setup
+
     if (intervalId) {
-      console.log("cleanup clearinterval");
       clearInterval(intervalId);
       intervalId = null;
     }
@@ -161,7 +164,6 @@ export default function BrightnessMonitor({ update, destroy, props }) {
 
     gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, texCoords);
-    console.log("Updated capture region to", regionPercent, "%");
   }
 
   async function waitForVideo(video) {
@@ -176,10 +178,13 @@ export default function BrightnessMonitor({ update, destroy, props }) {
   }
 
   async function setupBrightnessMonitor() {
+    const myGeneration = ++setupGeneration; // Capture generation for this setup attempt
+
     try {
       // 1) Request screen sources from main process via IPC
       const sources = await ipcRenderer.invoke("get-screen-sources");
       if (!sources || sources.length === 0) return;
+      if (myGeneration !== setupGeneration) return; // Stale setup, abort
 
       // Use the first screen (primary display)
       const primaryScreen = sources[0];
@@ -201,6 +206,12 @@ export default function BrightnessMonitor({ update, destroy, props }) {
         },
       });
 
+      if (myGeneration !== setupGeneration) {
+        // Cleanup the stream we just acquired since this setup is stale
+        s.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       stream = s;
 
       // 3) Setup video element
@@ -221,6 +232,7 @@ export default function BrightnessMonitor({ update, destroy, props }) {
       });
 
       if (!g) return;
+      if (myGeneration !== setupGeneration) return; // Stale setup, abort
 
       gl = g;
       glLoseContext = gl.getExtension("WEBGL_lose_context");
@@ -284,15 +296,27 @@ export default function BrightnessMonitor({ update, destroy, props }) {
       // 6) Wait for video to be ready
       await waitForVideo(videoEl);
 
-      // Abort if another setup already created interval (or cleaned up / restarted)
-      if (intervalId !== null) return;
+      // Abort if this setup was invalidated during the async wait
+      if (myGeneration !== setupGeneration) return;
 
       // 7) Start sampling loop at 20 FPS
-      intervalId = setInterval(() => {
-        if (!videoEl || !gl) return;
+      // Capture gl and texture in closure so they stay paired
+      const capturedGl = gl;
+      const capturedTexture = texture;
+      const capturedVideo = videoEl;
 
-        if (!videoEl.paused && !videoEl.ended && videoEl.readyState >= 2) {
-          const brightness = calculateBrightness(gl, videoEl, texture);
+      intervalId = setInterval(() => {
+        // Check if this interval is still valid
+        if (myGeneration !== setupGeneration) {
+          clearInterval(intervalId);
+          intervalId = null;
+          return;
+        }
+
+        if (!capturedVideo || !capturedGl) return;
+
+        if (!capturedVideo.paused && !capturedVideo.ended && capturedVideo.readyState >= 2) {
+          const brightness = calculateBrightness(capturedGl, capturedVideo, capturedTexture);
 
           // Use latest callback (avoid stale closure)
           if (typeof currentOnBrightnessChange === "function") {
