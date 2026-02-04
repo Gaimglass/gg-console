@@ -1,6 +1,5 @@
 const {writeCommand} = require('./usb');
 const {SERIAL_COMMANDS} = require('./serial-codes');
-const { type } = require('@testing-library/user-event/dist/cjs/utility/type.js');
 
 
 // Commands
