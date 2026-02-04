@@ -40,7 +40,7 @@ function setAuxLED(color, ledOn) {
 
 function setDefaultColors(colors) {
   const defaultColorStrs = [];
-  colors.forEach((defaultColor, index) => {
+  colors.forEach((defaultColor) => {
     const color = defaultColor.color;
     const enabled = Number(defaultColor.enabled);
     defaultColorStrs.push(

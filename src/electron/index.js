@@ -26,7 +26,7 @@ var mainWindow;
 var isDev = process.env.NODE_ENV === 'development'
 console.log(process.env.NODE_ENV, "process.env.NODE_ENV")
 // task tray object reference
-var tray = 1;
+let tray = null;
 
 
 const mouseState = {
@@ -55,7 +55,7 @@ function createTray() {
       }
   ]);
 
-  appIcon.on('double-click', function (event) {
+  appIcon.on('double-click', function () {
       mainWindow.show();
       mainWindow.setSkipTaskbar(false);
   });
@@ -116,6 +116,10 @@ if (!gotTheLock) {
     // On OS X it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
     disconnectUsb(app);
+    if (tray) {
+      tray.destroy();
+      tray = null;
+    }
     if (process.platform !== 'darwin') { 
       app.quit()
     }
@@ -129,7 +133,7 @@ if (!gotTheLock) {
     }
   });
 
-  app.on('second-instance', (event, commandLine, workingDirectory, additionalData) => {
+  app.on('second-instance', () => {
     // Someone tried to run a second instance, we should focus our window.
     if (mainWindow) {
       mainWindow.show();
@@ -246,15 +250,4 @@ async function createWindow() {
     mainWindow = null
   })
 
-  mainWindow.on('minimize', function (event) {
-    
-  });
-
-  mainWindow.on('restore', function (event) {
-    
-  });
-
-  mainWindow.on('show', function (event) {
-    
-  });
 }

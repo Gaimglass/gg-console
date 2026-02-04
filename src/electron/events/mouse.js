@@ -15,7 +15,7 @@ let adsSettings = {
 try {
   const globalMouseEvents = require("global-mouse-events");
   mouseEvents = globalMouseEvents;
-} catch (e) {
+} catch {
   // Mac is not supported ATM
 }
 
