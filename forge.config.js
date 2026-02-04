@@ -42,7 +42,7 @@ module.exports = {
           name: 'gg-console'
         },
         prerelease: false,
-        draft: true,
+        draft: false,
       }
     }
   ]
