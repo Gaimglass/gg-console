@@ -25,19 +25,29 @@ let isDev = false;
 let intervalId = null;
 let isConnecting = false;
 let mainWindowRef = null;
+let connectionGeneration = 0; // Incremented on disconnect to invalidate stale async operations
 
 
 // Connect to the serial port of the Arduino Uno USB device
 async function connectUsb(mainWindow, _isDev, app) {
   isDev = _isDev;
   mainWindowRef = mainWindow;
-  if (isConnecting || port?.isOpen || port?.closing) {
+  
+  if (isConnecting || port?.isOpen) {
     return;
   }
+  
+  const myGeneration = connectionGeneration;
   isConnecting = true;
   
   try {
-  const ports =  await SerialPort.list();
+  const ports = await SerialPort.list();
+  
+  // Abort if disconnectUsb was called during the await
+  if (myGeneration !== connectionGeneration) {
+    isConnecting = false;
+    return;
+  }
   let path = '';
   for (let i = 0; i < ports.length; i++) {
     const vendorId = ports[i].vendorId;
@@ -51,11 +61,11 @@ async function connectUsb(mainWindow, _isDev, app) {
     }
   }
   if (path) {
-    if (port?.isOpen) {
-      console.error("port already connected", port)
+    if (port?.isOpen || myGeneration !== connectionGeneration) {
       isConnecting = false;
       return;
     }
+    
     port = new SerialPort({
       path,
       baudRate: 115200,
@@ -63,9 +73,10 @@ async function connectUsb(mainWindow, _isDev, app) {
     
 
     port.on('error', (e) => {
-      console.log("[port error]", e.message)
+      console.log("[USB] Port error:", e.message);
       isConnecting = false;
-      disconnectUsb(app);
+      // Use setImmediate to avoid potential stack issues from within event handler
+      setImmediate(() => disconnectUsb(app));
     })
 
     // todo, is this \n or \r\n ?
@@ -93,10 +104,23 @@ async function connectUsb(mainWindow, _isDev, app) {
     // Read the port data
     port.on("open", async () => {
       try {
-        if (!port.isOpen) {
+        if (!port || !port.isOpen) {
           throw new Error('Port did not open correctly')
         }
-        const result = await getDeviceInfo();
+        
+        // Add timeout to getDeviceInfo to prevent hanging
+        const deviceInfoTimeout = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Device info request timed out')), 3000);
+        });
+        
+        const result = await Promise.race([getDeviceInfo(), deviceInfoTimeout]);
+        
+        // Abort if disconnectUsb was called during the await
+        if (myGeneration !== connectionGeneration) {
+          isConnecting = false;
+          return;
+        }
+        
         const [name, version] = result.split('&');
         deviceInfo.name = name.split('=')[1]
         deviceInfo.version = version.split('=')[1]
@@ -104,12 +128,11 @@ async function connectUsb(mainWindow, _isDev, app) {
         if (deviceInfo.name !== 'ggpro') {
           throw new Error(`Invalid device name, expected "ggpro" and found ${deviceInfo.name}`);
         }
-        // Connection successful, release lock
         isConnecting = false;
       } catch(err) {
-        console.log("on port open error", err)
+        console.log("[USB] Port open error:", err.message);
         isConnecting = false;
-        disconnectUsb(app);
+        setImmediate(() => disconnectUsb(app));
         return;
       }
       // send previous state to GG if there was any
@@ -118,21 +141,24 @@ async function connectUsb(mainWindow, _isDev, app) {
 
     port.on("close", (error) => {
       if (error) {
-        console.log('Serial port closed with error:', error.message);
+        console.log('[USB] Serial port closed with error:', error.message);
       } else {
-        console.log('Serial port closed successfully');
+        console.log('[USB] Serial port closed successfully');
       }
       mainWindow.webContents.send('usb-disconnected');
     });
     return true
   } else {
     // No device found, release lock
+    if (isDev) {
+      console.log('[USB] No device found');
+    }
     isConnecting = false;
   }
   } catch(error) {
-    console.error("connectUsb error:", error);
+    console.error("[USB] connectUsb error:", error.message);
     isConnecting = false;
-    throw error;
+    // Don't throw - let the reconnect loop try again
   }
 }
 
@@ -181,49 +207,38 @@ async function startConnectThink(mainWindow, app, isDev) {
 }
 
 async function disconnectUsb(electronApp) {
-  // Stop reconnection attempts during cleanup
+  // Invalidate any in-flight connection attempts
+  connectionGeneration++;
+  isConnecting = false;
+  
+  // Stop current reconnection loop
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
   }
   
+  // Clean up port
   if (port) {
-    // Remove all listeners to prevent memory leaks
     port.removeAllListeners();
     if (parser) {
       parser.removeAllListeners();
       parser = null;
     }
-    
-    return new Promise((resolve) => {
-      const cleanup = () => {
-        port = null;
-        isConnecting = false;
-        // Restart reconnection loop
-        if (mainWindowRef && electronApp) {
-          startConnectThink(mainWindowRef, electronApp, isDev);
-        }
-        resolve();
-      };
-      
+    try {
       if (port.isOpen) {
-        port.close((error) => {
-          if (error) {
-            console.error("Error closing port:", error);
-          }
-          cleanup();
-        });
-      } else {
-        console.log(`disconnectUsb: port exists but not open (isOpen=${port.isOpen})`);
-        // Force destroy the port object
-        try {
-          port.destroy();
-        } catch (e) {
-          console.error("Error destroying port:", e);
-        }
-        cleanup();
+        port.close();
+      } else if (!port.destroyed) {
+        port.destroy();
       }
-    });
+    } catch (e) {
+      console.log('[USB] Error closing port:', e.message);
+    }
+    port = null;
+  }
+  
+  // Always restart the connection loop
+  if (mainWindowRef && electronApp) {
+    startConnectThink(mainWindowRef, electronApp, isDev);
   }
 }
 
