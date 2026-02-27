@@ -24,7 +24,7 @@ export default function Ambient() {
 
   // Sync local state when settings change externally
   useEffect(() => {
-    /*eslint-disable-next-line react-hooks/exhaustive-deps */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalRegion(ambientSettings?.captureRegion || 100);
     setLocalEnabled(ambientSettings?.enabled || false);
   }, [ambientSettings?.captureRegion, ambientSettings?.enabled]);

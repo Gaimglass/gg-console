@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {useController} from './ControllerProvider';
 import { useSettings } from "./SettingsProvider";
 
@@ -36,28 +36,26 @@ export default function ControllerMonitor({
   const isADSRef = useRef(false);
   const {type, setType} = useController();
   const { adsSettings } = useSettings();
-  const [analogTriggerKey, setAnalogTriggerKey] = useState('');
-  const [buttonTriggerKey, setButtonTriggerKey] = useState('');
+  const adsControllerButton = adsSettings?.adsControllerButton;
 
+  const { analogTriggerKey, buttonTriggerKey } = useMemo(() => {
+    if (type !== 'xinput') {
+      return { analogTriggerKey: null, buttonTriggerKey: null };
+    }
 
-  useEffect(() => {
-    if (type === 'xinput') {
-      if(adsSettings.adsControllerButton === 6) {
-        /*eslint-disable-next-line react-hooks/exhaustive-deps */
-        setAnalogTriggerKey('bLeftTrigger');
-        setButtonTriggerKey(null)
-      }
-      else if(adsSettings.adsControllerButton === 7) {
-        setAnalogTriggerKey('bRightTrigger');
-        setButtonTriggerKey(null)
-      }
-      else {
-        setButtonTriggerKey(XINPUT_INDEX_BUTTON[adsSettings.adsControllerButton] || null);
-        setAnalogTriggerKey(null)
-      }
-    }  
-  },[type, adsSettings.adsControllerButton]);
-  
+    if (adsControllerButton === 6) {
+      return { analogTriggerKey: 'bLeftTrigger', buttonTriggerKey: null };
+    }
+
+    if (adsControllerButton === 7) {
+      return { analogTriggerKey: 'bRightTrigger', buttonTriggerKey: null };
+    }
+
+    return {
+      analogTriggerKey: null,
+      buttonTriggerKey: XINPUT_INDEX_BUTTON[adsControllerButton] || null,
+    };
+  }, [type, adsControllerButton]);
 
 
 
@@ -131,7 +129,7 @@ export default function ControllerMonitor({
       );
     };
 
-  }, [onADSDown, type, setType, onADSUp, buttonTriggerKey, analogTriggerKey, adsSettings.adsControllerButton]);
+  }, [onADSDown, type, setType, onADSUp, buttonTriggerKey, analogTriggerKey, adsControllerButton]);
 
   return null;
 }

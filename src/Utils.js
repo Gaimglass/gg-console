@@ -1,4 +1,4 @@
-import {useRef, useCallback } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 async function getMessageResult(promise, cb) {
   const result = await promise;
@@ -123,35 +123,37 @@ function useThrottle (func, timeout = 50) {
   const timer = useRef(undefined);
   const latestArgs = useRef(undefined);
   const funcRef = useRef(func);
-  
-  // Always keep the latest function reference
-  funcRef.current = func;
-  
-  const throttledFunction = useCallback((...args) => {
-    if (!timer.current) {
-      funcRef.current(...args);
-      timer.current = setTimeout(() => {
+  useEffect(() => {
+    funcRef.current = func;
+  }, [func]);
+
+  return useMemo(() => {
+    const throttledFunction = (...args) => {
+      if (!timer.current) {
+        funcRef.current(...args);
+        timer.current = setTimeout(() => {
+          timer.current = undefined;
+          if (latestArgs.current) {
+            // ensures the last invocation always executes
+            funcRef.current(...latestArgs.current);
+            latestArgs.current = undefined;
+          }
+        }, timeout);
+      } else {
+        latestArgs.current = args;
+      }
+    };
+
+    throttledFunction.cancel = () => {
+      if (timer.current) {
+        clearTimeout(timer.current);
         timer.current = undefined;
-        if (latestArgs.current) {
-          // ensures the last one always proceeds
-          funcRef.current(...latestArgs.current);
-          latestArgs.current = undefined;
-        }
-      }, timeout);
-    } else {
-      latestArgs.current = args;
-    }
+        latestArgs.current = undefined;
+      }
+    };
+
+    return throttledFunction;
   }, [timeout]);
-  
-  throttledFunction.cancel = () => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = undefined;
-      latestArgs.current = undefined;
-    }
-  };
-  
-  return throttledFunction;
 }
 
 /**
@@ -165,32 +167,34 @@ function useThrottle (func, timeout = 50) {
 function useDebounce(func, delay = 300) {
   const timerRef = useRef(null);
   const funcRef = useRef(func);
-  
-  // Keep function reference updated
-  funcRef.current = func;
-  
-  const debouncedFunction = useCallback((...args) => {
-    // Clear existing timer
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-    
-    // Set new timer
-    timerRef.current = setTimeout(() => {
-      funcRef.current(...args);
-      timerRef.current = null;
-    }, delay);
+  useEffect(() => {
+    funcRef.current = func;
+  }, [func]);
+
+  return useMemo(() => {
+    const debouncedFunction = (...args) => {
+      // Clear existing timer
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+
+      // Set new timer
+      timerRef.current = setTimeout(() => {
+        funcRef.current(...args);
+        timerRef.current = null;
+      }, delay);
+    };
+
+    // Cleanup on unmount
+    debouncedFunction.cancel = () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+
+    return debouncedFunction;
   }, [delay]);
-  
-  // Cleanup on unmount
-  debouncedFunction.cancel = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-  
-  return debouncedFunction;
 }
 
 function getAmbientSettings() {
