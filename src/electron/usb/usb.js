@@ -1,283 +1,508 @@
-const { SerialPort } = require('serialport')
+const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { SERIAL_COMMANDS } = require('./serial-codes');
 const { BrowserWindow } = require('electron');
 
-// Serial result promise resolvers
-//  <message ID> : {
-//    resolve,
-//    reject
-//  }, ...
-const serialMessageResults = {
-  [SERIAL_COMMANDS.SET_MAIN_LED]: null,
-  [SERIAL_COMMANDS.SET_AUX_LED]: null,
-  [SERIAL_COMMANDS.SET_DEFAULT_LEDS]: null,
-  [SERIAL_COMMANDS.GET_MAIN_LED]: null,
-  [SERIAL_COMMANDS.GET_DEFAULT_LEDS]: null,
-  [SERIAL_COMMANDS.GET_DEVICE_INFO]: null,
-};
+const RECONNECT_INTERVAL_MS = 800;
+const OPEN_TIMEOUT_MS = 5000;
+const CLOSE_TIMEOUT_MS = 5000;
+const SERIAL_RESPONSE_TIMEOUT_MS = 150;
+const REPEATED_ERROR_LOG_INTERVAL_MS = 30000;
 
-//let electronApp;
-let port = null;
-let parser = null;
-let deviceInfo = {}
+let activeConnection = null;
+let pendingConnection = null;
+let connectPromise = null;
+let deviceInfo = {};
 let isDev = false;
 let intervalId = null;
-let isConnecting = false;
 let mainWindowRef = null;
-let connectionGeneration = 0; // Incremented on disconnect to invalidate stale async operations
+let electronAppRef = null;
+let connectionGeneration = 0;
+let connectionAttempt = 0;
+let shouldReconnect = false;
+let repeatedOpenError = null;
 
+function getPortState(serialPort) {
+  if (!serialPort) {
+    return 'port=none';
+  }
 
-// Connect to the serial port of the Arduino Uno USB device
-async function connectUsb(mainWindow, _isDev, app) {
-  isDev = _isDev;
-  mainWindowRef = mainWindow;
-  
-  if (isConnecting || port?.isOpen) {
+  return `port=${serialPort.path} isOpen=${serialPort.isOpen} opening=${serialPort.opening} closing=${serialPort.closing} destroyed=${serialPort.destroyed}`;
+}
+
+function sendToMainWindow(channel) {
+  const windowDestroyed = mainWindowRef?.isDestroyed?.() ?? false;
+  const webContentsDestroyed = mainWindowRef?.webContents?.isDestroyed?.() ?? false;
+
+  if (!mainWindowRef || windowDestroyed || webContentsDestroyed) {
     return;
   }
-  
-  const myGeneration = connectionGeneration;
-  isConnecting = true;
-  
-  try {
-  const ports = await SerialPort.list();
-  
-  // Abort if disconnectUsb was called during the await
-  if (myGeneration !== connectionGeneration) {
-    isConnecting = false;
+
+  mainWindowRef.webContents.send(channel);
+}
+
+function logOpenFailure(connection, error) {
+  const now = Date.now();
+  const key = `${connection.port.path}:${error.message}`;
+
+  if (!repeatedOpenError || repeatedOpenError.key !== key) {
+    repeatedOpenError = { key, count: 1, lastLoggedAt: now };
+    console.log(`[USB] attempt=${connection.id} open failed: ${error.message}`);
     return;
   }
-  let path = '';
-  for (let i = 0; i < ports.length; i++) {
-    const vendorId = ports[i].vendorId;
-    const productId = ports[i].productId;
-    // TODO: register a real vendor id with usb.org
-    // hard coded to Arduino (2341) and 5400 for now
-    if (productId === '5400' && vendorId === '2341') {
-      //console.log({productId, vendorId})
-      path = ports[i]?.path;
-      break;
-    }
+
+  repeatedOpenError.count++;
+  if (now - repeatedOpenError.lastLoggedAt >= REPEATED_ERROR_LOG_INTERVAL_MS) {
+    console.log(`[USB] attempt=${connection.id} open still failing after ${repeatedOpenError.count} attempts: ${error.message}`);
+    repeatedOpenError.count = 0;
+    repeatedOpenError.lastLoggedAt = now;
   }
-  if (path) {
-    if (port?.isOpen || myGeneration !== connectionGeneration) {
-      isConnecting = false;
-      return;
-    }
-    
-    port = new SerialPort({
-      path,
-      baudRate: 115200,
-    })
-    
+}
 
-    port.on('error', (e) => {
-      console.log("[USB] Port error:", e.message);
-      isConnecting = false;
-      // Use setImmediate to avoid potential stack issues from within event handler
-      setImmediate(() => disconnectUsb(app));
-    })
+function clearOpenFailure() {
+  if (repeatedOpenError?.count > 1) {
+    console.log(`[USB] Port opened after ${repeatedOpenError.count} suppressed failures`);
+  }
+  repeatedOpenError = null;
+}
 
-    // todo, is this \n or \r\n ?
-    parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+function rejectPendingResponses(connection, error) {
+  for (const pendingResponse of connection.pendingResponses.values()) {
+    pendingResponse.reject(error);
+  }
+  connection.pendingResponses.clear();
+}
 
-    parser.on('data', data => {
+function writeCommandToConnection(connection, command, commandStr = '') {
+  const serialPort = connection?.port;
+  if (!serialPort || !serialPort.isOpen || serialPort.destroyed || connection.cancelled) {
+    return Promise.reject(new Error('Port not available'));
+  }
 
-      const parts = data.split(':');
-      const messageId = parts[0].padStart(3,0);
-      const ggResponse = parts[1];
-      
-      if (isDev) {
-        console.log("Gaimglass response:", {data});
-      }
-      
-      if (serialMessageResults[messageId]) {
-        serialMessageResults[messageId].resolve(ggResponse);
-        serialMessageResults[messageId] = null; // ensure its only called once.
-      } else {
-        // Uninitiated messages. When a user presses a button on the device
-        handleUnprovokedMessages(mainWindow, messageId, ggResponse);
-      }
-    });
+  const previousResponse = connection.pendingResponses.get(command);
+  if (previousResponse) {
+    previousResponse.reject(new Error(`Serial command ${command} was superseded`));
+  }
 
-    // Read the port data
-    port.on("open", async () => {
-      try {
-        if (!port || !port.isOpen) {
-          throw new Error('Port did not open correctly')
-        }
-        
-        // Add timeout to getDeviceInfo to prevent hanging
-        const deviceInfoTimeout = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Device info request timed out')), 3000);
-        });
-        
-        const result = await Promise.race([getDeviceInfo(), deviceInfoTimeout]);
-        
-        // Abort if disconnectUsb was called during the await
-        if (myGeneration !== connectionGeneration) {
-          isConnecting = false;
-          return;
-        }
-        
-        const [name, version] = result.split('&');
-        deviceInfo.name = name.split('=')[1]
-        deviceInfo.version = version.split('=')[1]
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeoutId = null;
 
-        if (deviceInfo.name !== 'ggpro') {
-          throw new Error(`Invalid device name, expected "ggpro" and found ${deviceInfo.name}`);
-        }
-        isConnecting = false;
-      } catch(err) {
-        console.log("[USB] Port open error:", err.message);
-        isConnecting = false;
-        setImmediate(() => disconnectUsb(app));
+    const finish = (error, value) => {
+      if (settled) {
         return;
       }
-      // send previous state to GG if there was any
-      mainWindow.webContents.send('usb-connected');
-    });
 
-    port.on("close", (error) => {
-      if (error) {
-        console.log('[USB] Serial port closed with error:', error.message);
-      } else {
-        console.log('[USB] Serial port closed successfully');
+      settled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
-      mainWindow.webContents.send('usb-disconnected');
+
+      if (connection.pendingResponses.get(command) === pendingResponse) {
+        connection.pendingResponses.delete(command);
+      }
+
+      if (error) {
+        reject(error);
+      } else {
+        resolve(value);
+      }
+    };
+
+    const pendingResponse = {
+      resolve: value => finish(null, value),
+      reject: error => finish(error),
+    };
+
+    connection.pendingResponses.set(command, pendingResponse);
+    timeoutId = setTimeout(() => {
+      finish(new Error('Serial port timed out'));
+    }, SERIAL_RESPONSE_TIMEOUT_MS);
+
+    if (isDev) {
+      console.log('Write Command:', command, commandStr, serialPort.path);
+    }
+
+    try {
+      serialPort.write(`${command}${commandStr}\n`, error => {
+        if (error) {
+          finish(error);
+        }
+      });
+    } catch (error) {
+      finish(error);
+    }
+  });
+}
+
+function getDeviceInfo(connection) {
+  return writeCommandToConnection(connection, SERIAL_COMMANDS.GET_DEVICE_INFO);
+}
+
+function handleParserData(connection, data) {
+  const parts = data.split(':');
+  const messageId = parts[0].padStart(3, 0);
+  const ggResponse = parts[1];
+
+  if (isDev) {
+    console.log('Gaimglass response:', { data });
+  }
+
+  const pendingResponse = connection.pendingResponses.get(messageId);
+  if (pendingResponse) {
+    pendingResponse.resolve(ggResponse);
+    return;
+  }
+
+  if (connection === activeConnection) {
+    handleUnprovokedMessages(messageId, ggResponse);
+  }
+}
+
+function attachConnectionListeners(connection) {
+  const serialPort = connection.port;
+
+  connection.errorHandler = error => {
+    console.log(`[USB] attempt=${connection.id} port error: ${error.message}; ${getPortState(serialPort)}`);
+
+    if (connection === activeConnection && !connection.intentionalClose) {
+      setImmediate(() => {
+        void disconnectUsb(connection.app, { reason: 'port-error' });
+      });
+    }
+  };
+
+  connection.closeHandler = error => {
+    const wasActive = connection === activeConnection;
+    if (wasActive) {
+      activeConnection = null;
+    }
+
+    rejectPendingResponses(connection, error || new Error('Serial port closed'));
+    const suffix = error ? ` with error: ${error.message}` : ' successfully';
+    console.log(`[USB] attempt=${connection.id} serial port closed${suffix}`);
+
+    if (wasActive) {
+      sendToMainWindow('usb-disconnected');
+    }
+  };
+
+  serialPort.on('error', connection.errorHandler);
+  serialPort.on('close', connection.closeHandler);
+
+  connection.parser = serialPort.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+  connection.dataHandler = data => handleParserData(connection, data);
+  connection.parser.on('data', connection.dataHandler);
+}
+
+function openConnection(connection) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      settled = true;
+      connection.cancelled = true;
+      reject(new Error(`Opening ${connection.port.path} timed out`));
+    }, OPEN_TIMEOUT_MS);
+
+    connection.port.open(error => {
+      if (settled) {
+        if (!error && connection.port.isOpen) {
+          console.warn(`[USB] attempt=${connection.id} completed after cancellation; closing stale port`);
+          void disposeConnection(connection, 'late-open');
+        }
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeoutId);
+
+      if (error) {
+        reject(error);
+      } else {
+        connection.opened = true;
+        resolve();
+      }
     });
-    return true
-  } else {
-    // No device found, release lock
+  });
+}
+
+function closeConnectionPort(connection, reason) {
+  const serialPort = connection.port;
+
+  if (serialPort.opening) {
+    connection.cancelled = true;
+    console.log(`[USB] attempt=${connection.id} close deferred while port is opening; reason=${reason}`);
+    return Promise.resolve(false);
+  }
+
+  if (!serialPort.isOpen) {
+    if (!serialPort.destroyed) {
+      serialPort.destroy();
+    }
+    return Promise.resolve(true);
+  }
+
+  return new Promise(resolve => {
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      console.error(`[USB] attempt=${connection.id} close timed out; reason=${reason}; ${getPortState(serialPort)}`);
+      resolve(false);
+    }, CLOSE_TIMEOUT_MS);
+
+    serialPort.close(error => {
+      clearTimeout(timeoutId);
+
+      if (timedOut) {
+        const suffix = error ? `error=${error.message}` : 'success';
+        console.log(`[USB] attempt=${connection.id} late close completed; reason=${reason}; ${suffix}`);
+        return;
+      }
+
+      if (error) {
+        console.error(`[USB] attempt=${connection.id} close failed; reason=${reason}: ${error.message}`);
+        resolve(false);
+      } else {
+        console.log(`[USB] attempt=${connection.id} close completed; reason=${reason}`);
+        resolve(true);
+      }
+    });
+  });
+}
+
+async function disposeConnection(connection, reason) {
+  if (!connection || connection.disposed) {
+    return;
+  }
+
+  connection.cancelled = true;
+  connection.intentionalClose = true;
+  rejectPendingResponses(connection, new Error(`Serial connection closed: ${reason}`));
+
+  if (connection.parser && connection.dataHandler) {
+    connection.parser.removeListener('data', connection.dataHandler);
+  }
+
+  const closed = await closeConnectionPort(connection, reason);
+  if (!closed && connection.port.opening) {
+    return;
+  }
+
+  connection.disposed = true;
+  if (connection.errorHandler) {
+    connection.port.removeListener('error', connection.errorHandler);
+  }
+  if (connection.closeHandler) {
+    connection.port.removeListener('close', connection.closeHandler);
+  }
+  connection.parser?.removeAllListeners();
+}
+
+async function performConnect(mainWindow, app, generation, attemptId) {
+  const ports = await SerialPort.list();
+  if (generation !== connectionGeneration || !shouldReconnect) {
+    return false;
+  }
+
+  const devicePort = ports.find(candidate => candidate.productId === '5400' && candidate.vendorId === '2341');
+  if (!devicePort?.path) {
     if (isDev) {
       console.log('[USB] No device found');
     }
-    isConnecting = false;
+    return false;
   }
-  } catch(error) {
-    console.error("[USB] connectUsb error:", error.message);
-    isConnecting = false;
-    // Don't throw - let the reconnect loop try again
+
+  const serialPort = new SerialPort({
+    path: devicePort.path,
+    baudRate: 115200,
+    autoOpen: false,
+  });
+
+  const connection = {
+    id: attemptId,
+    generation,
+    port: serialPort,
+    parser: null,
+    pendingResponses: new Map(),
+    app,
+    mainWindow,
+    cancelled: false,
+    intentionalClose: false,
+    opened: false,
+    disposed: false,
+  };
+
+  pendingConnection = connection;
+  if (isDev) {
+    console.log(`[USB] attempt=${attemptId} opening ${devicePort.path}; generation=${generation}`);
+  }
+
+  try {
+    await openConnection(connection);
+
+    if (generation !== connectionGeneration || !shouldReconnect) {
+      console.log(`[USB] attempt=${attemptId} became stale after open; generation=${generation}->${connectionGeneration}`);
+      await disposeConnection(connection, 'stale-open');
+      return false;
+    }
+
+    attachConnectionListeners(connection);
+    const result = await getDeviceInfo(connection);
+
+    if (generation !== connectionGeneration || !shouldReconnect) {
+      console.log(`[USB] attempt=${attemptId} became stale during initialization; generation=${generation}->${connectionGeneration}`);
+      await disposeConnection(connection, 'stale-initialization');
+      return false;
+    }
+
+    const [name, version] = result.split('&');
+    deviceInfo = {
+      name: name?.split('=')[1],
+      version: version?.split('=')[1],
+    };
+
+    if (deviceInfo.name !== 'ggpro') {
+      throw new Error(`Invalid device name, expected "ggpro" and found ${deviceInfo.name}`);
+    }
+
+    activeConnection = connection;
+    clearOpenFailure();
+    console.log(`[USB] attempt=${attemptId} connected to ${devicePort.path}; firmware=${deviceInfo.version || 'unknown'}`);
+    sendToMainWindow('usb-connected');
+    return true;
+  } catch (error) {
+    if (!connection.opened) {
+      logOpenFailure(connection, error);
+    } else if (generation === connectionGeneration) {
+      console.log(`[USB] attempt=${attemptId} initialization failed: ${error.message}`);
+    }
+
+    await disposeConnection(connection, connection.opened ? 'initialization-failed' : 'open-failed');
+    return false;
+  } finally {
+    if (pendingConnection === connection) {
+      pendingConnection = null;
+    }
   }
 }
 
-// Special initialize command that we need local to this file, moving to serial-commands.js would cause a 
-// circular import issue
-function getDeviceInfo() {
-  return writeCommand(SERIAL_COMMANDS.GET_DEVICE_INFO);
+// Connect to the serial port of the Gaimglass device. Only one attempt may run at a time.
+async function connectUsb(mainWindow, _isDev, app) {
+  isDev = _isDev;
+  mainWindowRef = mainWindow;
+  electronAppRef = app;
+
+  if (!shouldReconnect || activeConnection?.port.isOpen || connectPromise) {
+    return connectPromise;
+  }
+
+  const generation = connectionGeneration;
+  const attemptId = ++connectionAttempt;
+  const attemptPromise = performConnect(mainWindow, app, generation, attemptId);
+  connectPromise = attemptPromise;
+
+  try {
+    return await attemptPromise;
+  } catch (error) {
+    console.error(`[USB] attempt=${attemptId} connection attempt failed: ${error.message}`);
+    return false;
+  } finally {
+    if (connectPromise === attemptPromise) {
+      connectPromise = null;
+    }
+  }
 }
 
-// Messages directly from GG that are not provoked from the console. This could be a button
-// press for example
-function handleUnprovokedMessages(mainWindow, messageId, ggResponse) {
-  // Uninitiated messages. When a user presses a button on the device
-  // Broadcast to all windows, not just main window
+// Messages directly from GG that are not provoked from the console, such as a device button press.
+function handleUnprovokedMessages(messageId, ggResponse) {
   const allWindows = BrowserWindow.getAllWindows();
-  
-  if ( SERIAL_COMMANDS.UPDATE_MAIN_LED === messageId) {
-    allWindows.forEach(win => {
-      win.webContents.send('update-main-led-state-from-gg', ggResponse);
+
+  if (SERIAL_COMMANDS.UPDATE_MAIN_LED === messageId) {
+    allWindows.forEach(window => {
+      window.webContents.send('update-main-led-state-from-gg', ggResponse);
     });
   }
-  if ( SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS === messageId) {
-    allWindows.forEach(win => {
-      win.webContents.send('update-default-colors-from-gg', ggResponse);
-    }); 
+  if (SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS === messageId) {
+    allWindows.forEach(window => {
+      window.webContents.send('update-default-colors-from-gg', ggResponse);
+    });
   }
 }
 
-// Attempt to connect to the USB device
-async function initializeUsb(mainWindow, app, isDev) {
-  //electronApp = app;
-  // set up connection loop.
-  startConnectThink(mainWindow, app, isDev)
-}
-
-async function startConnectThink(mainWindow, app, isDev) {
-  if (intervalId) {
-    clearInterval(intervalId)
-    console.warn("startConnectThink called twice")
-
-  }
-  intervalId = setInterval(()=>{
-    // check the connection evyarnery 800ms and reconnect if needed
-    connectUsb(mainWindow, isDev, app);
-  }, 800);
-}
-
-async function disconnectUsb(electronApp) {
-  // Invalidate any in-flight connection attempts
-  connectionGeneration++;
-  isConnecting = false;
-  
-  // Stop current reconnection loop
+function stopConnectThink() {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
   }
-  
-  // Clean up port
-  if (port) {
-    port.removeAllListeners();
-    if (parser) {
-      parser.removeAllListeners();
-      parser = null;
-    }
-    try {
-      if (port.isOpen) {
-        port.close();
-      } else if (!port.destroyed) {
-        port.destroy();
-      }
-    } catch (e) {
-      console.log('[USB] Error closing port:', e.message);
-    }
-    port = null;
-  }
-  
-  // Always restart the connection loop
-  if (mainWindowRef && electronApp) {
-    startConnectThink(mainWindowRef, electronApp, isDev);
-  }
 }
 
+function startConnectThink() {
+  if (intervalId || !shouldReconnect || !mainWindowRef || !electronAppRef) {
+    return;
+  }
+
+  void connectUsb(mainWindowRef, isDev, electronAppRef);
+  intervalId = setInterval(() => {
+    void connectUsb(mainWindowRef, isDev, electronAppRef);
+  }, RECONNECT_INTERVAL_MS);
+}
+
+// Attempt to connect to the USB device and keep retrying while the app is running.
+async function initializeUsb(mainWindow, app, developmentMode) {
+  mainWindowRef = mainWindow;
+  electronAppRef = app;
+  isDev = developmentMode;
+  shouldReconnect = true;
+  startConnectThink();
+}
+
+async function disconnectUsb(electronApp, options = {}) {
+  const reconnect = options.reconnect !== false;
+  const reason = options.reason || 'requested';
+  const generation = ++connectionGeneration;
+
+  electronAppRef = electronApp || electronAppRef;
+  shouldReconnect = reconnect && !electronAppRef?.isQuitting;
+  stopConnectThink();
+
+  const connectionToClose = activeConnection;
+  activeConnection = null;
+
+  console.log(`[USB] reset requested; reason=${reason}; generation=${generation}; reconnect=${shouldReconnect}; active=${getPortState(connectionToClose?.port)}; pending=${getPortState(pendingConnection?.port)}`);
+
+  if (connectionToClose) {
+    sendToMainWindow('usb-disconnected');
+    await disposeConnection(connectionToClose, reason);
+  }
+
+  const pendingAttempt = connectPromise;
+  if (pendingAttempt) {
+    try {
+      await pendingAttempt;
+    } catch (error) {
+      console.log(`[USB] Pending connection cleanup failed: ${error.message}`);
+    }
+  }
+
+  // A newer reset owns the decision about whether to reconnect.
+  if (generation !== connectionGeneration) {
+    return;
+  }
+
+  if (shouldReconnect) {
+    startConnectThink();
+  }
+}
 
 /**
- * Write a command string to Gaimglass over the serial port and return a promise
- * that will contain the response from Gaimglass. The response may contain data when
- * requested or it simply may be an "okay" status when new state has been received.
+ * Write a command string to Gaimglass and resolve with the device response.
  */
-async function writeCommand(command, commandStr='') {
-  if (!port || !port.isOpen || port.destroyed) {
-    // Silent fail - UI will retry on usb-connected event
-    return Promise.reject(new Error('Port not available'));
-  }
-
-  const serialTimeout = new Promise((_, reject) => {
-    setTimeout(()=>{
-      // Do not change this message unless also changing getMessageResult() in App.js in react
-      reject(new Error('Serial port timed out'));
-    } ,150)
-  });
-
-  const serialResponse = new Promise((resolve, reject)=>{
-    serialMessageResults[command] = {
-      resolve,
-      reject
-    }
-    if (isDev) {
-      console.log("Write Command:", command, commandStr, port.path);
-    }
-    port.write(`${command}${commandStr}\n`);
-  });
-
-  return Promise.race([serialResponse, serialTimeout]);
+async function writeCommand(command, commandStr = '') {
+  return writeCommandToConnection(activeConnection, command, commandStr);
 }
-
 
 module.exports = {
   initializeUsb,
   writeCommand,
   disconnectUsb,
-}
+};
