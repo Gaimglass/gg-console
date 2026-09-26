@@ -1,7 +1,6 @@
 const electron = require('electron');
 //const Store = require('electron-store');
 const log = require('electron-log/main');
-const fs = require('fs');
 
 const { registerUIEvents } = require('./events/ui');
 const { registerMouseEvents } = require('./events/mouse');
@@ -101,26 +100,34 @@ if (!gotTheLock) {
     });*/
     electron.powerMonitor.on("suspend", () => {
       // Turn off the LED when sleeping
+      console.log('[USB] OS suspend detected');
       mainWindow.webContents.send('os-suspend');
     });
     electron.powerMonitor.on("resume", () => {
       // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
+      console.log('[USB] OS resume detected');
       mainWindow.webContents.send('os-resume');
-      disconnectUsb(app);
+      void disconnectUsb(app, { reason: 'os-resume' });
     });
     checkStartHidden();
+  });
+
+  app.on('before-quit', function () {
+    app.isQuitting = true;
+    void disconnectUsb(app, { reconnect: false, reason: 'app-quit' });
   });
 
   // Quit when all windows are closed.
   app.on('window-all-closed', function () {
     // On OS X it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
-    disconnectUsb(app);
+    const willQuit = process.platform !== 'darwin';
+    void disconnectUsb(app, { reconnect: !willQuit, reason: 'window-all-closed' });
     if (tray) {
       tray.destroy();
       tray = null;
     }
-    if (process.platform !== 'darwin') { 
+    if (willQuit) {
       app.quit()
     }
   });
@@ -205,12 +212,6 @@ async function createWindow() {
       console.log = log.log
       console.warn = log.warn
       console.error = log.error
-      fs.unlink(`${process.env.APPDATA}/Gaimglass/logs/main.log`, (err) => {
-        if (err) {
-          console.error(`Error removing file: ${err}`);
-          return;
-        }
-      });
     }
   }
 

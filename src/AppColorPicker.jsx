@@ -20,7 +20,7 @@ import { useThrottle } from './Utils';
 import './css/globalStyles.css';
 
 
-const ipcRenderer  = window.ipcRenderer;
+const ipcRenderer = window.ipcRenderer;
 
 function AppColorPicker() {
   const [color, setColor] = useState({ r: 255, g: 255, b: 255, a: 0 });
@@ -41,7 +41,7 @@ function AppColorPicker() {
   const prevAmbientValueRef = useRef(null);
 
   const { ambientSettings, adsSettings } = useSettings();
-  
+
   // Transition constants
   const RED = 1;
   const GREEN = 2;
@@ -80,16 +80,16 @@ function AppColorPicker() {
     setColor(finalColor);
     setLEDOn(true);
     sendMainLEDStatus(finalColor, true);
-    if (defaultIndex > -1)  {
+    if (defaultIndex > -1) {
       // update the index position on the device so that the left and right color 
       // button on the device start from where this default color is.
-      sendDefaultIndex(defaultIndex); 
+      sendDefaultIndex(defaultIndex);
     }
-     
+
     if (editSwatch !== null) {
       // when editing a default color, update that color in real time
       const c = {
-        color: {r: finalColor.r, g: finalColor.g, b: finalColor.b},
+        color: { r: finalColor.r, g: finalColor.g, b: finalColor.b },
         enabled: true
       };
       const dc = [...defaultColors];
@@ -117,7 +117,7 @@ function AppColorPicker() {
     const minBrightness = 0.075;
     const maxBrightness = 1.0;
     const mappedBrightness = minBrightness + (brightness * (maxBrightness - minBrightness));
-    
+
     // Clamp to valid range
     const ambientValue = Math.max(minBrightness, Math.min(maxBrightness, mappedBrightness));
 
@@ -194,17 +194,17 @@ function AppColorPicker() {
     }
   }, [ledOn, sendMainLEDStatus]);
 
-  
+
   const onADSDown = useCallback(() => {
     adsFlagsRef.current = 0;
-    finalTransitionColorRef.current = { 
+    finalTransitionColorRef.current = {
       ...adsSettings.color,
       a: color.a // ads does not control brightness, just match the current value
     };
     if (ledOn) {
       changeColorTo(adsSettings.speed);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color.a, ledOn, adsSettings.speed, adsSettings.color]);
 
   const onADSUp = useCallback(() => {
@@ -213,10 +213,10 @@ function AppColorPicker() {
     if (ledOn) {
       changeColorTo(adsSettings.speed);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color, ledOn, adsSettings.speed]);
 
-  const getStateFromGG = () => { 
+  const getStateFromGG = () => {
     loadMainLedFromGG();
     loadDefaultColorsFromGG();
   }
@@ -228,8 +228,8 @@ function AppColorPicker() {
 
     // this will error on first load bc port is most likely not ready, but we can ignore that
     // because we also listen for 'usb-connected'
-    getStateFromGG(); 
-    
+    getStateFromGG();
+
     // Receive uninitiated messages from the gg device
     // these messages are prefixed with "update-" for organization
     ipcRenderer.on('update-default-colors-from-gg', parseDefaultColors);
@@ -243,7 +243,7 @@ function AppColorPicker() {
       ipcRenderer.removeListener('update-default-colors-from-gg', parseDefaultColors);
       ipcRenderer.removeListener('usb-connected', getStateFromGG);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Separate effect for throttled LED state updates
@@ -255,7 +255,7 @@ function AppColorPicker() {
       ipcRenderer.removeListener('update-main-led-state-from-gg', handleUpdateGGThrottled);
     };
   }, [handleUpdateGGThrottled]);
-  
+
   // Update currentTransitionColorRef when color changes
   useEffect(() => {
     currentTransitionColorRef.current = { ...color };
@@ -278,7 +278,7 @@ function AppColorPicker() {
     ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
     ipcRenderer.on('update-ads-active', onADSDown);
     ipcRenderer.on('update-ads-inactive', onADSUp);
-    
+
     return () => {
       ipcRenderer.removeListener('shortcut-toggle-led', toggleLEDOn);
       ipcRenderer.removeListener('os-suspend', deactivateLED);
@@ -299,12 +299,12 @@ function AppColorPicker() {
   ]);
 
   useEffect(() => {
-    if(!ambientSettings.enabled) {
+    if (!ambientSettings.enabled) {
       sendAlphaValue(1); // turns off ambient mode
     }
-  }, [ambientSettings.enabled, sendAlphaValue]) ;
-  
-  
+  }, [ambientSettings.enabled, sendAlphaValue]);
+
+
   function createDefaultColors() {
     return [
       { r: 15, g: 255, b: 15 },
@@ -342,7 +342,7 @@ function AppColorPicker() {
 
   function sendDefaultIndex(index) {
     ipcRenderer.sendSync('set-default-index', index);
-  } 
+  }
 
 
   function sendDefaultColors(dc) {
@@ -361,7 +361,7 @@ function AppColorPicker() {
     // Send to device
     sendDefaultColors();
   }
-  
+
   function handleDeleteDefaultColor() {
     const dc = [...defaultColors];
     dc.splice(editSwatch, 1);
@@ -453,7 +453,7 @@ function AppColorPicker() {
         adsFlagsRef.current |= ALPHA;
         current.a = final.a;
       }*/
-      
+
       sendMainLEDStatus(
         {
           r: Math.round(current.r),
@@ -463,7 +463,7 @@ function AppColorPicker() {
         },
         ledOn
       );
-      
+
       if (adsFlagsRef.current === ALL_COLORS) {
         clearInterval(changeIntervalRef.current);
         changeIntervalRef.current = null;
@@ -530,7 +530,7 @@ function AppColorPicker() {
     setColor(c);
     setLEDOn(led);
   }
-  
+
 
   async function loadMainLedFromGG() {
     const result = ipcRenderer.sendSync('get-led-state');
@@ -553,11 +553,11 @@ function AppColorPicker() {
     const rawString = e.target.value.trim();
     let updateKey = false; // Force an update on the input field if clamped
     let newColorComponent = parseInt(rawString, 10);
-    
+
     if (isNaN(newColorComponent)) {
       return;
     }
-    
+
     if (newColorComponent > 255) {
       newColorComponent = 255;
       updateKey = true;
@@ -565,7 +565,7 @@ function AppColorPicker() {
       newColorComponent = 0;
       updateKey = true;
     }
-    
+
     const c = {
       ...color,
       [colorComponent]: newColorComponent,
@@ -573,11 +573,11 @@ function AppColorPicker() {
     setColor(c);
     setLEDOn(true);
     sendMainLEDStatus(c, true);
-    
+
     if (updateKey) {
       e.target.value = newColorComponent;
     }
-    
+
     if (editSwatch !== null) {
       // When editing a default color, update that color in real time
       const dc = [...defaultColors];
@@ -607,7 +607,7 @@ function AppColorPicker() {
     if (isNaN(newColorComponent)) {
       return;
     }
-    
+
     if (newColorComponent > 1) {
       newColorComponent = 1;
       updateKey = true;
@@ -615,7 +615,7 @@ function AppColorPicker() {
       newColorComponent = 0;
       updateKey = true;
     }
-    
+
     const c = {
       ...color,
       a: newColorComponent,
@@ -623,7 +623,7 @@ function AppColorPicker() {
     setColor(c);
     setLEDOn(true);
     sendMainLEDStatus(c, true);
-    
+
     if (updateKey) {
       e.target.value = newColorComponent;
     }
@@ -657,38 +657,38 @@ function AppColorPicker() {
 
       {isConnected && (
         <div className={styles.mainContainer}>
-              <Tabs className={styles.tabContainer}>
-                <UpdatesTabWrapper>
-                  <TabList className={styles.tabControls}>
-                    <Tab tabIndex="-1"><button onClick={handleChangeToCalibrateTab}>Calibrate</button></Tab>
-                    <Tab tabIndex="-1"><button>ADS</button></Tab>
-                    <Tab tabIndex="-1"><button>Ambient</button></Tab>
-                    <Tab tabIndex="-1"><button>Shortcuts</button></Tab>
-                  </TabList>
-                </UpdatesTabWrapper>
-                <TabPanel className={styles.tabCalibrate}>
-                  <div className={styles.mainContent}>
-                    <div className={styles.main}>
-                      <div className={styles.mainControls}>
-                        {/* <button onClick={readDefault}>Get Default Color</button> */}
-                        
-                          {/* <button onClick={(()=>handleAmbientBrightness(1))}>TEST ALPPHA</button> */}
-                          <button className={classNames({
-                              [styles.power]: true,
-                              [styles.enabled]: ledOn
-                          })} onClick={toggleLEDOn}>
-                            <PowerSwitch className={styles.powerIcon}></PowerSwitch>
-                            <span className={styles.powerText}>LED: {ledOn ? " ON " : "OFF"}</span>
-                          </button>
-                          <button className={classNames({
-                              [styles.calibrate]: true,
-                          })} onClick={()=>{
-                            handleCalibrate();
-                          }}>
-                            <CrosshairsIcon className={styles.crosshairIcon}></CrosshairsIcon>
-                          </button>
-                        
-                        
+          <Tabs className={styles.tabContainer}>
+            <UpdatesTabWrapper>
+              <TabList className={styles.tabControls}>
+                <Tab tabIndex="-1"><button onClick={handleChangeToCalibrateTab}>Calibrate</button></Tab>
+                <Tab tabIndex="-1"><button>ADS</button></Tab>
+                <Tab tabIndex="-1"><button>Ambient</button></Tab>
+                <Tab tabIndex="-1"><button>Shortcuts</button></Tab>
+              </TabList>
+            </UpdatesTabWrapper>
+            <TabPanel className={styles.tabCalibrate}>
+              <div className={styles.mainContent}>
+                <div className={styles.main}>
+                  <div className={styles.mainControls}>
+                    {/* <button onClick={readDefault}>Get Default Color</button> */}
+
+                    {/* <button onClick={(()=>handleAmbientBrightness(1))}>TEST ALPPHA</button> */}
+                    <button className={classNames({
+                      [styles.power]: true,
+                      [styles.enabled]: ledOn
+                    })} onClick={toggleLEDOn}>
+                      <PowerSwitch className={styles.powerIcon}></PowerSwitch>
+                      <span className={styles.powerText}>LED: {ledOn ? " ON " : "OFF"}</span>
+                    </button>
+                    <button className={classNames({
+                      [styles.calibrate]: true,
+                    })} onClick={() => {
+                      handleCalibrate();
+                    }}>
+                      <CrosshairsIcon className={styles.crosshairIcon}></CrosshairsIcon>
+                    </button>
+
+
                   </div>
 
                   <RgbaColorPicker color={color} onChange={handleColorChangeThrottled} />
@@ -737,16 +737,16 @@ function AppColorPicker() {
       {/* Brightness monitor runs independently when connected */}
       {isConnected && (
         <>
-        <ControllerMonitor 
-          onADSDown={onADSDown}
-          onADSUp={onADSUp}
-        />
-        <BrightnessMonitor
-          onBrightnessChange={handleAmbientBrightness}
-          enabled={ambientSettings.enabled}
-          captureRegion={ambientSettings.captureRegion}
-          ledOn={ledOn}
-        />
+          <ControllerMonitor
+            onADSDown={onADSDown}
+            onADSUp={onADSUp}
+          />
+          <BrightnessMonitor
+            onBrightnessChange={handleAmbientBrightness}
+            enabled={ambientSettings.enabled}
+            captureRegion={ambientSettings.captureRegion}
+            ledOn={ledOn}
+          />
         </>
       )}
     </div>

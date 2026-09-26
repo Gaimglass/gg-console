@@ -1,6 +1,6 @@
 {
   "name": "Gaimglass",
-  "version": "1.5.5",
+  "version": "1.6.0",
   "private": false,
   "license": "BUSL-1.1",
   "author": "Gaimglass",
@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "echo 'No test runner configured.'",
+    "test": "node --test test/usb-connection.test.js",
     "electron": "electron .",
     "electron-dev": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:3000 electron .",
     "electron-dev:win": "set NODE_ENV=development ELECTRON_START_URL=http://localhost:3000 && electron .",
