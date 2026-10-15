@@ -2,7 +2,7 @@
 
 ## On-screen feedback
 
-Brightness, default color slot, and LED power changes from the app or its shortcuts show a small, click-through card in the upper left. It updates in place and fades after 2.5 seconds without another action. Ambient changes, ADS transitions, device reads, and failed USB commands do not produce notifications.
+Brightness, default color slot, and LED power changes from the app, its shortcuts, or the Gaimglass device's buttons show a small, click-through card in the upper left. Device button feedback is handled directly in Electron, including while the main window is hidden. It updates in place and fades after 2.5 seconds without another action. Ambient changes, ADS transitions, device reads, and failed USB commands do not produce notifications.
 
 The **Overlay** tab enables feedback, enables the experimental fullscreen game integration, and previews each card without writing to the device. Fully quit Gaimglass from its tray menu and reopen it after changing main-process code. Existing Titanfall-only preferences migrate to the fullscreen setting, including a saved opt-out.
 

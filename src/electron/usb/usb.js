@@ -2,6 +2,8 @@ const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { SERIAL_COMMANDS } = require('./serial-codes');
 const { BrowserWindow } = require('electron');
+const { showActionOverlay } = require('../overlay');
+const { createDeviceFeedback } = require('./device-feedback');
 
 const RECONNECT_INTERVAL_MS = 800;
 const OPEN_TIMEOUT_MS = 5000;
@@ -134,6 +136,7 @@ function writeCommandToConnection(connection, command, commandStr = '') {
         reject(error);
       } else {
         commandFailures.delete(command);
+        connection.feedback.recordResponse(command, commandStr, value);
         resolve(value);
       }
     };
@@ -189,7 +192,7 @@ function handleParserData(connection, data) {
   }
 
   if (connection === activeConnection) {
-    handleUnprovokedMessages(messageId, ggResponse);
+    handleUnprovokedMessages(connection, messageId, ggResponse);
   }
 }
 
@@ -358,6 +361,7 @@ async function performConnect(mainWindow, app, generation, attemptId) {
     port: serialPort,
     parser: null,
     pendingResponses: new Map(),
+    feedback: createDeviceFeedback(),
     app,
     mainWindow,
     cancelled: false,
@@ -448,7 +452,9 @@ async function connectUsb(mainWindow, _isDev, app) {
 }
 
 // Messages directly from GG that are not provoked from the console, such as a device button press.
-function handleUnprovokedMessages(messageId, ggResponse) {
+function handleUnprovokedMessages(connection, messageId, ggResponse) {
+  const notification = connection.feedback.fromDevice(messageId, ggResponse);
+  if (notification) showActionOverlay(notification);
   const allWindows = BrowserWindow.getAllWindows();
 
   if (SERIAL_COMMANDS.UPDATE_MAIN_LED === messageId) {

@@ -28,8 +28,9 @@ function waitFor(predicate, timeoutMs = 1000) {
   });
 }
 
-function loadUsbModule() {
+function loadUsbModule({ windows = [] } = {}) {
   const instances = [];
+  const feedback = [];
 
   class FakeReadlineParser extends EventEmitter {}
 
@@ -113,7 +114,8 @@ function loadUsbModule() {
   const replacements = [
     [require.resolve('serialport'), { SerialPort: FakeSerialPort }],
     [require.resolve('@serialport/parser-readline'), { ReadlineParser: FakeReadlineParser }],
-    [require.resolve('electron'), { BrowserWindow: { getAllWindows: () => [] } }],
+    [require.resolve('electron'), { BrowserWindow: { getAllWindows: () => windows } }],
+    [require.resolve('../src/electron/overlay'), { showActionOverlay: notification => { feedback.push(notification); return true; } }],
   ];
   const previousCacheEntries = replacements.map(([modulePath]) => require.cache[modulePath]);
 
@@ -141,7 +143,7 @@ function loadUsbModule() {
     });
   };
 
-  return { instances, restore, usb };
+  return { instances, restore, usb, feedback };
 }
 
 function createWindow(sentEvents) {
@@ -238,4 +240,111 @@ test('state reads without a connection fail cleanly and log unavailable commands
   assert.deepEqual(await usb.readDeviceState('window-activated'), { ok: false, error: 'Port not available' });
   assert.equal(warnings.filter(message => message.includes('command=GET_MAIN_LED(128) failed')).length, 1);
   assert.ok(warnings.some(message => message.includes('state read failed; reason=window-activated') && message.includes('port=none')));
+});
+
+test('device buttons show brightness, color-slot and power feedback directly while preserving renderer updates', async t => {
+  const sentEvents = [];
+  const window = createWindow(sentEvents);
+  const deviceMessages = [];
+  window.webContents.send = (channel, payload) => {
+    sentEvents.push(channel);
+    if (payload !== undefined) deviceMessages.push([channel, payload]);
+  };
+  const { instances, restore, usb, feedback } = loadUsbModule({ windows: [window] });
+  const app = { isQuitting: false };
+  t.after(async () => {
+    await usb.disconnectUsb(app, { reconnect: false, reason: 'test-cleanup' });
+    restore();
+  });
+  await usb.initializeUsb(window, app, false);
+  await waitFor(() => instances[0]?.opening);
+  const port = instances[0];
+  port.responses.set('128', 'color=10,20,30,&brightness=0.50&ledOn=1&index=0');
+  port.completeOpen();
+  await waitFor(() => sentEvents.includes('usb-connected'));
+  await usb.readDeviceState('test-baseline');
+  assert.deepEqual(feedback, [], 'initial reads stay quiet');
+  const writesBeforeButtons = port.writes.length;
+
+  const updates = [
+    'color=10,20,30,&brightness=0.50&ledOn=1&index=0',
+    'color=10,20,30,&brightness=0.55&ledOn=1&index=0',
+    'color=10,20,30,&brightness=0.50&ledOn=1&index=0',
+    'color=20,110,255,&brightness=0.50&ledOn=1&index=1',
+    'color=10,20,30,&brightness=0.50&ledOn=1&index=0',
+    'color=10,20,30,&brightness=0.50&ledOn=0&index=0',
+    'color=10,20,30,&brightness=0.50&ledOn=0&index=0',
+    'color=10,20,30,&brightness=0.50&ledOn=1&index=0',
+  ];
+  for (const payload of updates) port.parser.emit('data', `200:${payload}`);
+
+  assert.deepEqual(feedback, [
+    { type: 'brightness', value: 0.55 },
+    { type: 'brightness', value: 0.50 },
+    { type: 'color-slot', slot: 2, color: { r: 20, g: 110, b: 255 } },
+    { type: 'color-slot', slot: 1, color: { r: 10, g: 20, b: 30 } },
+    { type: 'power', on: false },
+    { type: 'power', on: true },
+  ]);
+  assert.deepEqual(deviceMessages, updates.map(payload => ['update-main-led-state-from-gg', payload]));
+  assert.equal(port.writes.length, writesBeforeButtons, 'feedback does not write back to USB');
+});
+
+test('acknowledged app writes update the device baseline without duplicating feedback', async t => {
+  const { instances, restore, usb, feedback } = loadUsbModule();
+  const app = { isQuitting: false };
+  const sentEvents = [];
+  t.after(async () => {
+    await usb.disconnectUsb(app, { reconnect: false, reason: 'test-cleanup' });
+    restore();
+  });
+  await usb.initializeUsb(createWindow(sentEvents), app, false);
+  await waitFor(() => instances[0]?.opening);
+  const port = instances[0];
+  port.responses.set('128', 'color=10,20,30&brightness=0.50&ledOn=1&index=0');
+  for (const command of ['000', '003', '004', '005']) port.responses.set(command, 'okay');
+  port.completeOpen();
+  await waitFor(() => sentEvents.includes('usb-connected'));
+  await usb.readDeviceState('test-baseline');
+  await usb.writeCommand('000', '0100200300.800');
+  await usb.writeCommand('003', ' 7');
+  await usb.writeCommand('005', '0.251.5');
+  assert.deepEqual(feedback, []);
+
+  // This is a power button press after the app changed brightness, power and index.
+  port.parser.emit('data', '200:color=10,20,30,&brightness=0.80&ledOn=1&index=7');
+  port.parser.emit('data', '200:color=10,20,30,&brightness=0.75&ledOn=1&index=7');
+  port.parser.emit('data', '200:color=20,110,255,&brightness=0.75&ledOn=1&index=0');
+  await usb.writeCommand('004', ' 0');
+  port.parser.emit('data', '200:color=20,110,255,&brightness=0.75&ledOn=1&index=0');
+  assert.deepEqual(feedback, [
+    { type: 'power', on: true },
+    { type: 'brightness', value: 0.75 },
+    { type: 'color-slot', slot: 1, color: { r: 20, g: 110, b: 255 } },
+    { type: 'power', on: true },
+  ]);
+
+  port.responses.set('000', 'error');
+  await usb.writeCommand('000', '0201102550.200');
+  port.parser.emit('data', '200:color=20,110,255,&brightness=0.75&ledOn=1&index=0');
+  assert.equal(feedback.length, 4, 'rejected writes cannot alter the confirmed baseline');
+});
+
+test('default palette updates select the correct slot, while invalid and repeated device state stays quiet', () => {
+  const { createDeviceFeedback } = require('../src/electron/usb/device-feedback');
+  const feedback = createDeviceFeedback();
+  feedback.recordResponse('128', '', 'color=10,20,30,&brightness=0.50&ledOn=1&index=0');
+  const palette = 'color=10,20,30,1&color=20,110,255,1&index=1';
+  assert.deepEqual(feedback.fromDevice('201', palette), { type: 'color-slot', slot: 2, color: { r: 20, g: 110, b: 255 } });
+  assert.equal(feedback.fromDevice('201', palette), null);
+  assert.equal(feedback.fromDevice('201', 'color=99,99,99,1&color=20,110,255,1&index=1'), null, 'an unselected palette change is quiet');
+  for (const payload of [undefined, '', 'okay', 'brightness=NaN&ledOn=2&index=8&color=256,0,0', 'brightness=&ledOn=&index=&color=,,']) {
+    assert.equal(feedback.fromDevice('200', payload), null);
+  }
+  assert.equal(feedback.fromDevice('128', 'brightness=0.10'), null, 'reads are not button events');
+  assert.deepEqual(feedback.fromDevice('200', 'brightness=0.55'), { type: 'brightness', value: 0.55 });
+
+  const reconnected = createDeviceFeedback();
+  assert.equal(reconnected.fromDevice('200', 'color=20,110,255&brightness=0.55&ledOn=1&index=1'), null, 'a new connection never compares against stale state');
+  assert.deepEqual(reconnected.fromDevice('200', 'ledOn=0'), { type: 'power', on: false });
 });
