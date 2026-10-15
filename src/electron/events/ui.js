@@ -63,15 +63,6 @@ function registerUIEvents(mainWindow, app, isDev) {
   });
   
   
-  electron.ipcMain.on('get-default-colors', async (event) => { 
-    try {
-      const ledStateStr = await getDefaultLEDs();
-      event.returnValue = { ok: true, data: ledStateStr };
-    } catch(err) {
-      event.returnValue = { ok: false, error: err.message || String(err) };
-    }
-  });
-  
   electron.ipcMain.on('set-default-colors', async (event, colors) => {
     try {
       const result = await setDefaultColors(colors);
@@ -129,6 +120,15 @@ function registerUIEvents(mainWindow, app, isDev) {
   //
   // Non-blocking handlers
   //
+
+  electron.ipcMain.handle('get-default-colors', async () => {
+    try {
+      const ledStateStr = await getDefaultLEDs();
+      return { ok: true, data: ledStateStr };
+    } catch (err) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  });
 
   electron.ipcMain.handle('check-for-updates', async () => {
     try {

@@ -36,6 +36,7 @@ function AppColorPicker() {
   const refreshInFlightRef = useRef(false);
   const refreshGenerationRef = useRef(0);
   const queuedRefreshRef = useRef(null);
+  const defaultColorsReadInFlightRef = useRef(false);
 
   // ADS transition variables - use refs to persist across renders
   const changeIntervalRef = useRef(null);
@@ -589,13 +590,27 @@ function AppColorPicker() {
 
 
   async function loadDefaultColorsFromGG() {
-    const response = ipcRenderer.sendSync('get-default-colors');
-    if (!response.ok) {
-      console.warn('get-default-colors failed:', response.error);
+    if (defaultColorsReadInFlightRef.current) {
       return;
     }
-    parseDefaultColors(response.data);
-    setIsConnected(true); // we just need to set this once on a successful response
+
+    defaultColorsReadInFlightRef.current = true;
+    const generation = refreshGenerationRef.current;
+    try {
+      const response = await ipcRenderer.invoke('get-default-colors');
+      if (generation !== refreshGenerationRef.current) {
+        return;
+      }
+      if (!response?.ok) {
+        console.warn('get-default-colors failed:', response?.error);
+        return;
+      }
+      parseDefaultColors(response.data);
+    } catch (error) {
+      console.warn('get-default-colors failed:', error);
+    } finally {
+      defaultColorsReadInFlightRef.current = false;
+    }
   }
 
   function changeRgb(e, colorComponent) {
@@ -641,7 +656,7 @@ function AppColorPicker() {
   function handleChangeToCalibrateTab() {
     // fixes a bug where if the user was editing a swatch color but didn't save to GG, the color
     // would be set in the UI, but not in GG, this reset the UI to match GG.
-    loadDefaultColorsFromGG();
+    void loadDefaultColorsFromGG();
   }
 
   function handleCalibrate() {
