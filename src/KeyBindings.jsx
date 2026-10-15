@@ -1,235 +1,195 @@
-import React, { useState } from 'react';
-import styles from './css/KeyBindings.module.css'
-
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import styles from './css/KeyBindings.module.css';
 import Keyboard from './assets/keyboard-solid.svg?react';
-import  { loadAppSettings, defaultAppSettings, saveAppSettings, getPrettyTextFromCommand } from './Utils'
-import SettingsDefaultConfirm from './SettingsDefaultConfirm'
+import { defaultAppSettings, getPrettyTextFromCommand } from './Utils';
+import { useSettings } from './SettingsProvider';
+import { bindingFromEvent, displayBinding, findDuplicateBinding, shortcutSaveError } from './keyboardShortcuts.mjs';
+import SettingsDefaultConfirm from './SettingsDefaultConfirm';
 
-const ipcRenderer  = window.ipcRenderer;
+const ipcRenderer = window.ipcRenderer;
+const commands = ['brightness+', 'brightness-', 'calibrate', 'led', ...Array.from({ length: 8 }, (_, index) => `s${index + 1}`)];
+const modifierKeys = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph']);
 
-export default function Settings() {
+export default function KeyBindings() {
+  const { keyBindings, updateKeyBindings, shortcutErrors, updateShortcutErrors } = useSettings();
+  const [errors, setErrors] = useState({});
+  const [activeCommand, setActiveCommand] = useState(null);
+  const [savingCommand, setSavingCommand] = useState(null);
+  const [savedCommand, setSavedCommand] = useState(null);
+  const editorRef = useRef(null);
+  const pausedRef = useRef(false);
+  const pausePromiseRef = useRef(Promise.resolve());
+  const requestRef = useRef(0);
+  const savingRef = useRef(false);
+  const mountedRef = useRef(true);
 
-  const [settings, setSettings] = useState(loadAppSettings())
-  const [errors, setErrors] = useState({})
+  const resumeShortcuts = useCallback(() => {
+    if (!pausedRef.current) return;
+    pausedRef.current = false;
+    void ipcRenderer.invoke('set-resume-shortcuts').then(result => {
+      updateShortcutErrors(result || {});
+      if (mountedRef.current) setErrors({});
+    }).catch(error => console.warn('Could not resume shortcuts:', error));
+  }, [updateShortcutErrors]);
 
-  function translateKey(key, code) {
-    if (code.startsWith('Numpad')) {
-      switch(code) {
-        case 'Numpad0':
-          return 'num0';
-        case 'Numpad1':
-          return 'num1';
-        case 'Numpad2':
-          return 'num2';
-        case 'Numpad3':
-          return 'num3';
-        case 'Numpad4':
-          return 'num4';
-        case 'Numpad5':
-          return 'num5';
-        case 'Numpad6':
-          return 'num6';
-        case 'Numpad7':
-          return 'num7';
-        case 'Numpad8':
-          return 'num8';
-        case 'Numpad9':
-          return 'num9';
-        case 'NumpadAdd':
-          return 'numadd'
-        case 'NumpadSubtract':
-          return 'numsub'
-        case 'NumpadMultiply':
-          return 'nummult'
-        case 'NumpadDivide':
-          return 'numdiv'
-        case 'NumpadDecimal':
-          return 'numdec'
-        case 'NumpadEnter':
-          return 'Enter'
-        default:
-          return '';
-      }
-      
+  const pauseShortcuts = useCallback(() => {
+    if (pausedRef.current) return;
+    pausedRef.current = true;
+    pausePromiseRef.current = ipcRenderer.invoke('set-disable-shortcuts');
+    void pausePromiseRef.current.catch(error => console.warn('Could not pause shortcuts:', error));
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const invalidateRequest = () => { requestRef.current++; };
+    const onWindowFocus = () => {
+      if (editorRef.current?.contains(document.activeElement)) pauseShortcuts();
+    };
+    window.addEventListener('blur', resumeShortcuts);
+    window.addEventListener('focus', onWindowFocus);
+    return () => {
+      mountedRef.current = false;
+      invalidateRequest();
+      window.removeEventListener('blur', resumeShortcuts);
+      window.removeEventListener('focus', onWindowFocus);
+      resumeShortcuts();
+    };
+  }, [pauseShortcuts, resumeShortcuts]);
+
+  function clearError(command) {
+    setErrors(previous => ({ ...previous, [command]: null }));
+    setSavedCommand(null);
+  }
+
+  async function assignBinding(command, binding) {
+    if (savingRef.current) return;
+    clearError(command);
+    const duplicate = findDuplicateBinding(keyBindings, command, binding);
+    if (duplicate) {
+      setErrors(previous => ({ ...previous, [command]: `Already assigned to ${getPrettyTextFromCommand(duplicate)}.` }));
+      return;
     }
-    return key
+
+    savingRef.current = true;
+    const request = ++requestRef.current;
+    setSavingCommand(command);
+    try {
+      await pausePromiseRef.current;
+      const error = await ipcRenderer.invoke('validate-shortcut', command, binding);
+      if (!mountedRef.current || request !== requestRef.current) return;
+      if (error) {
+        setErrors(previous => ({ ...previous, [command]: error }));
+        return;
+      }
+      updateKeyBindings({ ...keyBindings, [command]: binding });
+      setSavedCommand(command);
+    } catch (error) {
+      if (mountedRef.current && request === requestRef.current) {
+        setErrors(previous => ({ ...previous, [command]: shortcutSaveError(error) }));
+        console.warn('Could not save shortcut:', { command, binding, message: error.message });
+      }
+    } finally {
+      savingRef.current = false;
+      if (mountedRef.current) setSavingCommand(null);
+    }
   }
 
-  function handleFocus() {
-    ipcRenderer.invoke('set-disable-shortcuts');
-  }
-
-  async function handleBlur() {
-    const errors = await ipcRenderer.invoke('set-enable-shortcuts', settings.keyBindings);
-    setErrors({...errors});
+  function handleKeyAssign(event, command) {
+    // Keep navigation out of validation so Tab cannot briefly render an error.
+    if (event.key === 'Tab') return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      requestRef.current++;
+      clearError(command);
+      event.currentTarget.blur();
+      return;
+    }
+    if (modifierKeys.has(event.key) || event.isComposing || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat || savingRef.current) return;
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      void assignBinding(command, '');
+      return;
+    }
+    const binding = bindingFromEvent(event);
+    if (!binding) {
+      setErrors(previous => ({ ...previous, [command]: 'This key is not supported. Choose another key.' }));
+      return;
+    }
+    void assignBinding(command, binding);
   }
 
   function handleReset() {
-    const newSettings = defaultAppSettings();
-    saveAppSettings(newSettings);
-    setSettings(newSettings);
-    ipcRenderer.invoke('set-enable-shortcuts', newSettings.keyBindings);
+    requestRef.current++;
+    updateKeyBindings(defaultAppSettings().keyBindings);
+    setErrors({});
+    setSavedCommand(null);
   }
 
-  function validateAccelerator(accelerator, buttonName) {
-    for (const [k,v] of Object.entries(settings.keyBindings)) {
-      if (k === buttonName) {
-        continue;
-      }      
-      if (v.toLowerCase() === accelerator.toLowerCase()) {
-        return `"${getPrettyTextFromCommand(k)}" is using this binding`
-      }
-    }
-    return null;
-  }
-
-  async function handleKeyAssign(e) {
-    // todo avoid duplicate
-    const buttonName = e.target.name;
-    const newSettings = {...settings}
-  
-    if (e.key === 'Backspace' || e.code === 'Delete') {
-      newSettings.keyBindings[buttonName] = ''; // unset
-      
-      saveAppSettings(newSettings);
-      setSettings(loadAppSettings());
-      e.target.blur()
-      
-    }
-    else if (e.key === 'Escape') {
-      return;
-    }
-    else if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt') {
-      return;
-    }
-
-    else {
-      try {
-        const key = translateKey(e.key, e.code);
-        if (!key) {
-          throw Error('Invalid key binding')
-        }
-        const modifiers = getModifiers(e);
-        const accelerator = `${modifiers}${key}`;
-        if (modifiers === '') {
-          throw Error('No modifier found, try "Shift", "Control" or "Alt"')
-        }
-        let acceleratorError = validateAccelerator(accelerator, buttonName)
-        if (acceleratorError) {
-          throw Error(acceleratorError)
-        }
-
-        const newShortcutError = await ipcRenderer.invoke('set-enable-shortcut', buttonName, accelerator);
-        if (newShortcutError) {
-          throw Error(newShortcutError)
-        }
-        setErrors({})
-        newSettings.keyBindings[buttonName] = accelerator
-        saveAppSettings(newSettings);
-        setSettings(loadAppSettings());
-        e.target.blur()
-      }
-       catch(e) {
-        setErrors({
-          ...errors,
-          [buttonName]: e.message
-        });
-      }
-      
-    }
-  }
-
-  function getModifiers(e) {
-    let modifiers = []
-    if(e.ctrlKey) {
-      modifiers.push("Control")
-    }
-    if(e.altKey) {
-      modifiers.push("Alt")
-    }
-    if(e.shiftKey) {
-      modifiers.push("Shift")
-    }
-    return modifiers.length ? modifiers.join('+')+'+' : ''
-  }
-
-  const slotName = 'Color slot'
-
-  return <div className={styles.container}>
-    <div className={styles.bindings}>
-      <h3><Keyboard className={styles.keyboard}></Keyboard>Keyboard Shortcuts</h3>
-      <div className={styles.keybindingsTableWrapper}>
-        <table className={styles.keybindingsTable}>
-          <tbody>
-            <tr>
-              <td>Increase Brightness</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['brightness+']} type="text" readOnly="readOnly" name="brightness+" /></td>
-              <td>{errors['brightness+']}</td>
-            </tr>
-            <tr>
-              <td>Decrease Brightness</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['brightness-']} type="text" readOnly="readOnly" name="brightness-" /></td>
-              <td>{errors['brightness-']}</td>
-            </tr>
-            <tr>
-              <td>Quick Calibrate</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['calibrate']} type="text" readOnly="readOnly" name="calibrate" /></td>
-              <td>{errors['calibrate']}</td>
-            </tr>
-            <tr>
-              <td>LED on/off</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['led']} type="text" readOnly="readOnly" name="led" /></td>
-              <td>{errors['led']}</td>
-            </tr>
-            <tr>
-              <td>{`${slotName} 1`}</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['s1']} type="text" readOnly="readOnly" name="s1" /></td>
-              <td>{errors['s1']}</td>
-            </tr>
-            <tr>
-              <td>{`${slotName} 2`}</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['s2']} type="text" readOnly="readOnly" name="s2" /></td>
-              <td>{errors['s2']}</td>
-            </tr>
-            <tr>
-              <td>{`${slotName} 3`}</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['s3']} type="text" readOnly="readOnly" name="s3" /></td>
-              <td>{errors['s3']}</td>
-            </tr>
-            <tr>
-              <td>{`${slotName} 4`}</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['s4']} type="text" readOnly="readOnly" name="s4" /></td>
-              <td>{errors['s4']}</td>
-            </tr>
-            <tr>
-              <td>{`${slotName} 5`}</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['s5']} type="text" readOnly="readOnly" name="s5" /></td>
-              <td>{errors['s5']}</td>
-            </tr>
-            <tr>
-              <td>{`${slotName} 6`}</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['s6']} type="text" readOnly="readOnly" name="s6" /></td>
-              <td>{errors['s6']}</td>
-            </tr>
-            <tr>
-              <td>{`${slotName} 7`}</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['s7']} type="text" readOnly="readOnly" name="s7" /></td>
-              <td>{errors['s7']}</td>
-            </tr>
-            <tr>
-              <td>{`${slotName} 8`}</td>
-              <td><input onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyAssign} value={settings.keyBindings['s8']} type="text" readOnly="readOnly" name="s8" /></td>
-              <td>{errors['s8']}</td>
-            </tr>
-          </tbody>
-        </table>
+  return (
+    <div className={styles.container}>
+      <div className={styles.bindings}>
+        <h3><Keyboard className={styles.keyboard} />Keyboard Shortcuts</h3>
+        <p className={styles.help} id="shortcut-help">
+          Select a binding and press a key, with or without Ctrl, Alt, Shift or Win/Cmd.
+          <br />Tab moves between controls. Esc stops recording. Backspace or Delete clears.
+        </p>
+        <div
+          className={styles.keybindingsTableWrapper}
+          ref={editorRef}
+          onFocusCapture={pauseShortcuts}
+          onBlurCapture={event => {
+            if (event.currentTarget.contains(event.relatedTarget)) return;
+            setActiveCommand(null);
+            resumeShortcuts();
+          }}
+        >
+          <table className={styles.keybindingsTable} aria-label="Keyboard shortcut bindings">
+            <tbody>
+              {commands.map(command => {
+                const label = getPrettyTextFromCommand(command);
+                const error = errors[command] ?? shortcutErrors[command];
+                const status = savingCommand === command ? 'Checking...' : savedCommand === command ? 'Saved' : activeCommand === command ? 'Press a key...' : '';
+                const statusId = `shortcut-status-${command}`;
+                return (
+                  <tr key={command}>
+                    <th scope="row"><label htmlFor={`shortcut-${command}`}>{label}</label></th>
+                    <td className={styles.bindingCell}>
+                      <input
+                        id={`shortcut-${command}`}
+                        name={command}
+                        type="text"
+                        readOnly
+                        spellCheck={false}
+                        value={displayBinding(keyBindings[command])}
+                        placeholder="Not assigned"
+                        aria-describedby={`shortcut-help ${statusId}`}
+                        aria-invalid={Boolean(error)}
+                        aria-busy={savingCommand === command}
+                        onFocus={() => { setActiveCommand(command); setSavedCommand(null); }}
+                        onBlur={() => setActiveCommand(null)}
+                        onKeyDown={event => handleKeyAssign(event, command)}
+                      />
+                      <button
+                        type="button"
+                        className={styles.clear}
+                        aria-label={`Clear ${label} shortcut`}
+                        disabled={!keyBindings[command] || Boolean(savingCommand)}
+                        onClick={() => { void assignBinding(command, ''); }}
+                      >Clear</button>
+                    </td>
+                    <td className={styles.feedback}>
+                      <span id={statusId} role="status" className={error ? styles.error : styles.status}>{error || status}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-      </div>
-      <SettingsDefaultConfirm 
-        onReset={handleReset}/>
+      <SettingsDefaultConfirm onReset={handleReset} />
     </div>
+  );
 }
-
-Settings.propTypes = {
-}
-

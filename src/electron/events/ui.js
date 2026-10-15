@@ -5,7 +5,7 @@ const { getMainLED, getDefaultLEDs, setMainLED, setAlpha, setDefaultColors, setD
 const { readDeviceState } = require('../usb/usb');
 const { checkForUpdates, updateAndRestart } = require('../updates')
 const { toggleCalibrateWindow } = require('../calibrateWindow')
-const { disableShortcuts, enableShortcuts, enableShortcut } = require('./shortcuts')
+const { disableShortcuts, enableShortcuts, validateShortcut, resumeShortcuts } = require('./shortcuts')
 const { setADS } = require('./mouse')
 
 
@@ -152,14 +152,16 @@ function registerUIEvents(mainWindow, app, isDev) {
     return enableShortcuts(mainWindow, bindings)
   });
 
-  electron.ipcMain.handle('set-enable-shortcut', async (event, command, value) => {
+  electron.ipcMain.handle('validate-shortcut', async (event, command, value) => {
     void event;
-    return enableShortcut(mainWindow, command, value)
+    return validateShortcut(mainWindow, command, value)
   });
 
   electron.ipcMain.handle('set-disable-shortcuts', async () => {
     disableShortcuts();
   });
+
+  electron.ipcMain.handle('set-resume-shortcuts', async () => resumeShortcuts(mainWindow));
 
 
   electron.ipcMain.handle('set-enable-ads', async (event, ads) => {

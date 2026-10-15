@@ -8,6 +8,7 @@ const SettingsContext = createContext();
 export function SettingsProvider({ children }) {
   const initialSettings = loadAppSettings();
   const [settings, setSettings] = useState(initialSettings);
+  const [shortcutErrors, setShortcutErrors] = useState({});
 
   // Persist settings to localStorage whenever they change
   useEffect(() => {
@@ -18,10 +19,15 @@ export function SettingsProvider({ children }) {
   useEffect(() => {
     // Send ADS settings
     ipcRenderer.invoke('set-enable-ads', settings.ads);
-    
-    // Send keyboard shortcuts
-    ipcRenderer.invoke('set-enable-shortcuts', settings.keyBindings);
-  }, [settings.ads, settings.keyBindings]);
+  }, [settings.ads]);
+
+  useEffect(() => {
+    let current = true;
+    ipcRenderer.invoke('set-enable-shortcuts', settings.keyBindings).then(errors => {
+      if (current) setShortcutErrors(errors || {});
+    }).catch(error => console.warn('Could not register shortcuts:', error));
+    return () => { current = false; };
+  }, [settings.keyBindings]);
 
   const updateSettings = (newSettings) => {
     setSettings(newSettings);
@@ -45,11 +51,7 @@ export function SettingsProvider({ children }) {
   };
 
   const updateKeyBindings = (keyBindings) => {
-    const newSettings = {
-      ...settings,
-      keyBindings: keyBindings
-    };
-    updateSettings(newSettings);
+    setSettings(previous => ({ ...previous, keyBindings }));
   };
 
   const value = {
@@ -57,6 +59,8 @@ export function SettingsProvider({ children }) {
     adsSettings: settings.ads,
     ambientSettings: settings.ambient,
     keyBindings: settings.keyBindings,
+    shortcutErrors,
+    updateShortcutErrors: setShortcutErrors,
     updateSettings,
     updateADSSettings,
     updateAmbientSettings,

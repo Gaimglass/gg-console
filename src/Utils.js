@@ -16,7 +16,7 @@ function getPrettyTextFromCommand(command) {
   switch(command) {
     case 'brightness+':
       return "Increase Brightness";
-    case 'brightness1':
+    case 'brightness-':
       return 'Decrease Brightness';
     case 'calibrate':
       return 'Quick Calibrate';

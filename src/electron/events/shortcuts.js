@@ -1,40 +1,23 @@
 const { globalShortcut} = require('electron')
 const { toggleCalibrateWindow } = require('../calibrateWindow');
+let currentBindings = {};
+let shortcutsPaused = false;
 
-// https://www.electronjs.org/docs/latest/api/accelerator
+// https://www.electronjs.org/docs/latest/tutorial/keyboard-shortcuts
 
 function getAccelerator(value) {
-  let accelerator = '';
-  const modifiers = value.split('+');
-  const button = modifiers.pop();
-  const electronModifiers = [];
-  for (let i = 0; i < modifiers.length; i++) {
-    switch (modifiers[i]) {
-      case "Control":
-        electronModifiers.push('CommandOrControl')
-        break;
-      default:
-        electronModifiers.push(modifiers[i])
-    }
-  }
-  const modifiersStr = electronModifiers.join("+");
-  if (modifiersStr.length > 0) {
-    accelerator = `${modifiersStr}+${button}`
-  } else {
-    accelerator = button;
-  }
-  return accelerator;
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 /**
- * Note Duplicates must be detected client side before calling this function
+ * Probe OS availability without activating a shortcut while the user records it.
  * 
  * @param {*} mainWindow 
  * @param {*} command 
  * @param {*} value 
  * @returns 
  */
-function enableShortcut(mainWindow, command, value) {
+function validateShortcut(mainWindow, command, value) {
   let error = null
   const accelerator = getAccelerator(value);
   if (accelerator.trim()==='') {
@@ -42,18 +25,23 @@ function enableShortcut(mainWindow, command, value) {
     return null;
   }
   const action = getActionForCommand(command);
+  const duplicate = Object.entries(currentBindings).find(([other, binding]) => other !== command && getAccelerator(binding).toLowerCase() === accelerator.toLowerCase());
+  if (duplicate) return 'This shortcut is already assigned to another Gaimglass action.';
+  if (!shortcutsPaused && getAccelerator(currentBindings[command]).toLowerCase() === accelerator.toLowerCase() && globalShortcut.isRegistered(accelerator)) return null;
   if (action) {
     try{
       const result = globalShortcut.register(accelerator, () => {
         action(mainWindow, command);
       })
       if (!result) {
-        error = 'This key binding is already in use'
+        error = 'Unavailable: another app or the system may be using this shortcut.'
+      } else {
+        globalShortcut.unregister(accelerator);
       }
     } 
     catch(e) {
       console.warn("Invalid accelerator", e.message)
-      error = 'Invalid key binding2'
+      error = 'This key combination is not supported. Choose another shortcut.'
     }
   }
   return error;
@@ -66,9 +54,16 @@ function enableShortcut(mainWindow, command, value) {
  * @returns 
  */
 function enableShortcuts(mainWindow, bindings) {
-  disableShortcuts();
+  currentBindings = { ...bindings };
+  if (shortcutsPaused) return {};
+  return registerBindings(mainWindow);
+}
+
+function registerBindings(mainWindow) {
+  globalShortcut.unregisterAll();
   const errors = {};
-  for (const [command, accelerator] of Object.entries(bindings)) {
+  for (const [command, value] of Object.entries(currentBindings)) {
+    const accelerator = getAccelerator(value);
     const action = getActionForCommand(command);
     if (accelerator.trim()==='') {
       // not bound to any buttons
@@ -80,7 +75,7 @@ function enableShortcuts(mainWindow, bindings) {
           action(mainWindow, command);
         })
         if(!result) {
-          errors[command] = 'This key binding is already in use'
+          errors[command] = 'Unavailable: another app or the system may be using this shortcut.'
         }
       } 
       catch(e) {
@@ -129,11 +124,18 @@ function getActionForCommand(command) {
 }
 
 function disableShortcuts() {
+  shortcutsPaused = true;
   globalShortcut.unregisterAll();
+}
+
+function resumeShortcuts(mainWindow) {
+  shortcutsPaused = false;
+  return registerBindings(mainWindow);
 }
 
 module.exports = {
   disableShortcuts,
-  enableShortcut,
+  validateShortcut,
   enableShortcuts,
+  resumeShortcuts,
 }

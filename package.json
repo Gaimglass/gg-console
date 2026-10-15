@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test test/usb-connection.test.js",
+    "test": "node --test test/usb-connection.test.js test/keyboard-shortcuts.test.mjs",
     "electron": "electron .",
     "electron-dev": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:3000 electron .",
     "electron-dev:win": "set NODE_ENV=development ELECTRON_START_URL=http://localhost:3000 && electron .",
