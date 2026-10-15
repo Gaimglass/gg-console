@@ -6,6 +6,7 @@ import WindowControls from './WindowsControls';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import UpdatesTabWrapper from './UpdatesTabWrapper.rsx';
 import KeyBindings from './KeyBindings';
+import OverlaySettings from './OverlaySettings';
 import ADS from './ADS';
 import Ambient from './Ambient';
 import BrightnessMonitor from './BrightnessMonitor.rsx';
@@ -56,12 +57,13 @@ function AppColorPicker() {
   const TRANS_MULTIPLIER = 35;
   const ALL_COLORS = RED | GREEN | BLUE; // 7
 
-  const sendMainLEDStatus = useCallback((color, ledOn) => {
+  const sendMainLEDStatus = useCallback((color, ledOn, feedback) => {
     if (isConnected) {
       ipcRenderer.sendSync('set-led-state', {
         color,
         brightness: color.a,
         ledOn,
+        feedback,
       });
       // Broadcast to other windows (like calibrate window)
       ipcRenderer.send('broadcast-color-sync', color, ledOn);
@@ -74,6 +76,10 @@ function AppColorPicker() {
     }
   }, [isConnected, ambientSettings.exponent])
 
+  const sendDefaultIndex = useCallback((index, color) => {
+    if (isConnected) ipcRenderer.sendSync('set-default-index', index, color);
+  }, [isConnected]);
+
   // Stable function references for throttling
   const handleColorChangeStable = useCallback((newColor, defaultIndex = -1) => {
     // defaults don't have an alpha so use the current value
@@ -85,11 +91,12 @@ function AppColorPicker() {
     };
     setColor(finalColor);
     setLEDOn(true);
-    sendMainLEDStatus(finalColor, true);
+    const feedback = defaultIndex < 0 ? (alpha !== color.a ? 'brightness' : (!ledOn ? 'power' : undefined)) : undefined;
+    sendMainLEDStatus(finalColor, true, feedback);
     if (defaultIndex > -1) {
       // update the index position on the device so that the left and right color 
       // button on the device start from where this default color is.
-      sendDefaultIndex(defaultIndex);
+      sendDefaultIndex(defaultIndex, finalColor);
     }
 
     if (editSwatch !== null) {
@@ -102,7 +109,7 @@ function AppColorPicker() {
       dc[editSwatch] = c;
       setDefaultColors(dc);
     }
-  }, [color.a, sendMainLEDStatus, editSwatch, defaultColors]);
+  }, [color.a, ledOn, sendMainLEDStatus, sendDefaultIndex, editSwatch, defaultColors]);
 
 
   const handleUpdateGGStable = useCallback((message) => {
@@ -144,7 +151,7 @@ function AppColorPicker() {
 
   const toggleLEDOn = useCallback(() => {
     setLEDOn((on) => {
-      sendMainLEDStatus(color, !on);
+      sendMainLEDStatus(color, !on, 'power');
       return !on;
     });
   }, [color, sendMainLEDStatus]);
@@ -152,7 +159,7 @@ function AppColorPicker() {
   const switchColorShortcut = useCallback((index) => {
     if (ledOn) {
       const colorIndex = Number(index - 1);
-      if (colorIndex < 0) {
+      if (!Number.isInteger(colorIndex) || !defaultColors[colorIndex]) {
         return;
       }
       const newColor = {
@@ -161,9 +168,9 @@ function AppColorPicker() {
       };
       setColor(newColor);
       sendMainLEDStatus(newColor, true);
-      sendDefaultIndex(colorIndex);
+      sendDefaultIndex(colorIndex, newColor);
     }
-  }, [ledOn, defaultColors, color.a, sendMainLEDStatus]);
+  }, [ledOn, defaultColors, color.a, sendMainLEDStatus, sendDefaultIndex]);
 
   const decreaseBrightnessShortcut = useCallback(() => {
     if (ledOn) {
@@ -176,7 +183,7 @@ function AppColorPicker() {
           ...c,
           a: newAlpha,
         };
-        sendMainLEDStatus(newColor, true);
+        sendMainLEDStatus(newColor, true, 'brightness');
         return newColor;
       });
     }
@@ -194,7 +201,7 @@ function AppColorPicker() {
           ...c,
           a: newAlpha,
         };
-        sendMainLEDStatus(newColor, true);
+        sendMainLEDStatus(newColor, true, 'brightness');
         return newColor;
       });
     }
@@ -396,11 +403,6 @@ function AppColorPicker() {
     setMac(result.isMac);
     setVersion(result.version);
   }
-
-  function sendDefaultIndex(index) {
-    ipcRenderer.sendSync('set-default-index', index);
-  }
-
 
   function sendDefaultColors(dc) {
     // This condition is preferred over useEffect so we have more control over writing to EPROM
@@ -636,7 +638,7 @@ function AppColorPicker() {
     };
     setColor(c);
     setLEDOn(true);
-    sendMainLEDStatus(c, true);
+    sendMainLEDStatus(c, true, !ledOn ? 'power' : undefined);
 
     if (updateKey) {
       e.target.value = newColorComponent;
@@ -686,7 +688,7 @@ function AppColorPicker() {
     };
     setColor(c);
     setLEDOn(true);
-    sendMainLEDStatus(c, true);
+    sendMainLEDStatus(c, true, 'brightness');
 
     if (updateKey) {
       e.target.value = newColorComponent;
@@ -728,6 +730,7 @@ function AppColorPicker() {
                 <Tab tabIndex="-1"><button>ADS</button></Tab>
                 <Tab tabIndex="-1"><button>Ambient</button></Tab>
                 <Tab tabIndex="-1"><button>Shortcuts</button></Tab>
+                <Tab tabIndex="-1"><button>Overlay</button></Tab>
               </TabList>
             </UpdatesTabWrapper>
             <TabPanel className={styles.tabCalibrate}>
@@ -789,6 +792,9 @@ function AppColorPicker() {
             </TabPanel>
             <TabPanel>
               <KeyBindings />
+            </TabPanel>
+            <TabPanel>
+              <OverlaySettings />
             </TabPanel>
           </Tabs>
         </div>

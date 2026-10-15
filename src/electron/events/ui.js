@@ -7,10 +7,17 @@ const { checkForUpdates, updateAndRestart } = require('../updates')
 const { toggleCalibrateWindow } = require('../calibrateWindow')
 const { disableShortcuts, enableShortcuts, validateShortcut, resumeShortcuts } = require('./shortcuts')
 const { setADS } = require('./mouse')
+const { showActionOverlay, configureActionOverlay, getActionOverlayStatus } = require('../overlay');
 
 
 function registerUIEvents(mainWindow, app, isDev) {
   electron.ipcMain.handle('get-device-state', (_event, reason) => readDeviceState(reason));
+
+  electron.ipcMain.handle('set-overlay-settings', (_event, settings) => {
+    configureActionOverlay(settings);
+  });
+  electron.ipcMain.handle('preview-action-overlay', (_event, notification) => showActionOverlay(notification));
+  electron.ipcMain.handle('get-overlay-status', () => getActionOverlayStatus());
 
   //
   // Synchronous events from UI to electron
@@ -28,6 +35,9 @@ function registerUIEvents(mainWindow, app, isDev) {
     try {
       const result = await setMainLED(ledState.color, ledState.brightness, ledState.ledOn);
       event.returnValue = result;
+      // Only explicit user actions produce feedback; ADS, ambient and startup writes stay quiet.
+      if (ledState.feedback === 'brightness') showActionOverlay({ type: 'brightness', value: ledState.brightness });
+      else if (ledState.feedback === 'power') showActionOverlay({ type: 'power', on: ledState.ledOn });
     } catch(err) {
       event.returnValue = err;
     }
@@ -53,10 +63,11 @@ function registerUIEvents(mainWindow, app, isDev) {
     });
   });
   
-  electron.ipcMain.on('set-default-index', async (event, index) => {
+  electron.ipcMain.on('set-default-index', async (event, index, color) => {
     try {
       const result = await setDefaultIndex(index);
       event.returnValue = result;
+      showActionOverlay({ type: 'color-slot', slot: index + 1, color });
     } catch(err) {
       event.returnValue = err;
     }

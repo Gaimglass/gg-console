@@ -29,6 +29,11 @@ export function SettingsProvider({ children }) {
     return () => { current = false; };
   }, [settings.keyBindings]);
 
+  useEffect(() => {
+    ipcRenderer.invoke('set-overlay-settings', settings.overlay)
+      .catch(error => console.warn('Could not configure overlay. Fully quit and reopen Gaimglass:', error));
+  }, [settings.overlay]);
+
   const updateSettings = (newSettings) => {
     setSettings(newSettings);
     saveAppSettings(newSettings);
@@ -58,6 +63,7 @@ export function SettingsProvider({ children }) {
     settings,
     adsSettings: settings.ads,
     ambientSettings: settings.ambient,
+    overlaySettings: settings.overlay,
     keyBindings: settings.keyBindings,
     shortcutErrors,
     updateShortcutErrors: setShortcutErrors,
@@ -65,6 +71,7 @@ export function SettingsProvider({ children }) {
     updateADSSettings,
     updateAmbientSettings,
     updateKeyBindings,
+    updateOverlaySettings: overlay => setSettings(previous => ({ ...previous, overlay })),
   };
 
   return (

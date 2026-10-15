@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { normalizeOverlaySettings } from './normalizeOverlaySettings.mjs';
 
 async function getMessageResult(promise, cb) {
   const result = await promise;
@@ -66,6 +67,10 @@ function defaultAppSettings() {
       'adsMouseButton': 2, // mouse2
       'adsControllerButton': 6, // bLeftTrigger (xinput)
     },
+    'overlay': {
+      'enabled': true,
+      'fullscreenGames': true,
+    },
     'ambient': {
       'enabled': false,
       'captureRegion': 35, // Percentage of screen to capture (10-100), centered
@@ -96,7 +101,8 @@ function loadAppSettings() {
   if (!userSettings) {
     return defaultAppSettings();
   }
-  const result = deepMerge(defaultAppSettings(), JSON.parse(userSettings));
+  const savedSettings = JSON.parse(userSettings);
+  const result = deepMerge(defaultAppSettings(), { ...savedSettings, overlay: normalizeOverlaySettings(savedSettings.overlay) });
   return result;
 }
 

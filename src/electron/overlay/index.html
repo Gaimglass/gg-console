@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gaimglass on-screen feedback</title>
+    <link rel="stylesheet" href="overlay.css" />
+    <script src="renderer.js" defer></script>
+  </head>
+  <body>
+    <article id="notification" role="status" aria-live="polite" aria-atomic="true">
+      <span class="brand">gaimglass</span>
+      <div id="icon" aria-hidden="true">
+        <svg id="brightness-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></svg>
+        <svg id="power-icon" viewBox="0 0 24 24" hidden><path d="M12 2v10m-5-7a8 8 0 1 0 10 0" /></svg>
+        <span id="swatch" hidden></span>
+      </div>
+      <div class="content">
+        <div class="heading"><span id="label">Brightness</span></div>
+        <div id="value">0%</div>
+        <div class="indicator">
+          <div id="track" role="progressbar" aria-label="Gaimglass brightness" aria-valuemin="0" aria-valuemax="100"><div id="fill"></div></div>
+          <div id="slots" aria-hidden="true" hidden></div>
+        </div>
+      </div>
+    </article>
+  </body>
+</html>
