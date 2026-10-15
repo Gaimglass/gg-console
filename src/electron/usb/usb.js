@@ -21,6 +21,8 @@ let connectionGeneration = 0;
 let connectionAttempt = 0;
 let shouldReconnect = false;
 let repeatedOpenError = null;
+const commandFailures = new Map();
+const commandNames = new Map(Object.entries(SERIAL_COMMANDS).map(([name, code]) => [code, name]));
 
 function getPortState(serialPort) {
   if (!serialPort) {
@@ -73,10 +75,34 @@ function rejectPendingResponses(connection, error) {
   connection.pendingResponses.clear();
 }
 
+function logCommandFailure(connection, command, error, elapsedMs) {
+  const now = Date.now();
+  const previousFailure = commandFailures.get(command);
+  const sameFailure = previousFailure?.attemptId === connection?.id && previousFailure?.message === error.message;
+  const failure = sameFailure ? previousFailure : {
+    attemptId: connection?.id,
+    message: error.message,
+    count: 0,
+    lastLoggedAt: 0,
+  };
+  failure.count++;
+  commandFailures.set(command, failure);
+
+  if (sameFailure && now - failure.lastLoggedAt < REPEATED_ERROR_LOG_INTERVAL_MS) {
+    return;
+  }
+
+  failure.lastLoggedAt = now;
+  const lastResponseAge = connection?.lastResponseAt ? now - connection.lastResponseAt : 'none';
+  console.warn(`[USB] attempt=${connection?.id ?? 'none'} command=${commandNames.get(command) || command}(${command}) failed: ${error.message}; elapsedMs=${elapsedMs}; failures=${failure.count}; lastResponseAgeMs=${lastResponseAge}; cancelled=${connection?.cancelled ?? false}; ${getPortState(connection?.port)}`);
+}
+
 function writeCommandToConnection(connection, command, commandStr = '') {
   const serialPort = connection?.port;
   if (!serialPort || !serialPort.isOpen || serialPort.destroyed || connection.cancelled) {
-    return Promise.reject(new Error('Port not available'));
+    const error = new Error('Port not available');
+    logCommandFailure(connection, command, error, 0);
+    return Promise.reject(error);
   }
 
   const previousResponse = connection.pendingResponses.get(command);
@@ -85,6 +111,7 @@ function writeCommandToConnection(connection, command, commandStr = '') {
   }
 
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
     let settled = false;
     let timeoutId = null;
 
@@ -103,8 +130,10 @@ function writeCommandToConnection(connection, command, commandStr = '') {
       }
 
       if (error) {
+        logCommandFailure(connection, command, error, Date.now() - startedAt);
         reject(error);
       } else {
+        commandFailures.delete(command);
         resolve(value);
       }
     };
@@ -140,6 +169,7 @@ function getDeviceInfo(connection) {
 }
 
 function handleParserData(connection, data) {
+  connection.lastResponseAt = Date.now();
   const parts = data.split(':');
   const messageId = parts[0].padStart(3, 0);
   const ggResponse = parts[1];
@@ -152,6 +182,10 @@ function handleParserData(connection, data) {
   if (pendingResponse) {
     pendingResponse.resolve(ggResponse);
     return;
+  }
+
+  if ([SERIAL_COMMANDS.GET_MAIN_LED, SERIAL_COMMANDS.GET_DEFAULT_LEDS, SERIAL_COMMANDS.GET_DEVICE_INFO].includes(messageId)) {
+    console.warn(`[USB] attempt=${connection.id} response without pending request; command=${commandNames.get(messageId)}(${messageId}); ${getPortState(connection.port)}`);
   }
 
   if (connection === activeConnection) {
@@ -501,8 +535,33 @@ async function writeCommand(command, commandStr = '') {
   return writeCommandToConnection(activeConnection, command, commandStr);
 }
 
+// Reload renderer state through the existing connection without resetting USB.
+async function readDeviceState(reason = 'requested') {
+  const connection = activeConnection;
+  const startedAt = Date.now();
+  console.log(`[USB] state read requested; reason=${reason}; attempt=${connection?.id ?? 'none'}; active=${getPortState(connection?.port)}; pending=${getPortState(pendingConnection?.port)}; connecting=${Boolean(connectPromise)}`);
+
+  try {
+    const mainLed = await writeCommandToConnection(connection, SERIAL_COMMANDS.GET_MAIN_LED);
+    const defaultColors = await writeCommandToConnection(connection, SERIAL_COMMANDS.GET_DEFAULT_LEDS);
+    if (connection !== activeConnection || connection.cancelled) {
+      throw new Error('Connection changed while reading device state');
+    }
+    if (!mainLed || !defaultColors) {
+      throw new Error('Incomplete device state response');
+    }
+
+    console.log(`[USB] state read succeeded; reason=${reason}; attempt=${connection.id}; elapsedMs=${Date.now() - startedAt}; ${getPortState(connection.port)}`);
+    return { ok: true, mainLed, defaultColors };
+  } catch (error) {
+    console.warn(`[USB] state read failed; reason=${reason}; attempt=${connection?.id ?? 'none'}; elapsedMs=${Date.now() - startedAt}; error=${error.message}; ${getPortState(connection?.port)}`);
+    return { ok: false, error: error.message };
+  }
+}
+
 module.exports = {
   initializeUsb,
   writeCommand,
   disconnectUsb,
+  readDeviceState,
 };

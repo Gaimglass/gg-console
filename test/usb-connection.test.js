@@ -49,6 +49,13 @@ function loadUsbModule() {
       this.closeCalls = 0;
       this.openCallback = null;
       this.parser = null;
+      this.silentCommands = new Set();
+      this.writes = [];
+      this.responses = new Map([
+        ['130', 'name=ggpro&version=test'],
+        ['128', 'color=10,20,30&brightness=0.50&ledOn=1'],
+        ['129', 'color=10,20,30,1'],
+      ]);
       instances.push(this);
     }
 
@@ -91,10 +98,12 @@ function loadUsbModule() {
     }
 
     write(data, callback) {
+      this.writes.push(data);
       queueMicrotask(() => {
         callback?.(null);
-        if (data.startsWith('130')) {
-          this.parser.emit('data', '130:name=ggpro&version=test');
+        const command = data.slice(0, 3);
+        if (this.responses.has(command) && !this.silentCommands.has(command)) {
+          this.parser.emit('data', `${command}:${this.responses.get(command)}`);
         }
       });
       return true;
@@ -181,4 +190,52 @@ test('shutdown closes an active port and does not start another attempt', async 
   assert.equal(instances.length, 1);
   assert.equal(instances[0].closeCalls, 1);
   assert.deepEqual(sentEvents, ['usb-connected', 'usb-disconnected']);
+});
+
+test('a failed state read can be refreshed using the same open COM port', async t => {
+  const { instances, restore, usb } = loadUsbModule();
+  const app = { isQuitting: false };
+  const sentEvents = [];
+  const warnings = [];
+  t.mock.method(console, 'warn', message => warnings.push(message));
+  t.after(async () => {
+    await usb.disconnectUsb(app, { reconnect: false, reason: 'test-cleanup' });
+    restore();
+  });
+
+  await usb.initializeUsb(createWindow(sentEvents), app, false);
+  await waitFor(() => instances[0]?.opening);
+  const port = instances[0];
+  port.completeOpen();
+  await waitFor(() => sentEvents.includes('usb-connected'));
+
+  port.silentCommands.add('129');
+  assert.deepEqual(await usb.readDeviceState('usb-connected'), {
+    ok: false,
+    error: 'Serial port timed out',
+  });
+  assert.equal(port.isOpen, true);
+  assert.equal(port.closeCalls, 0);
+  assert.ok(warnings.some(message => message.includes('command=GET_DEFAULT_LEDS(129) failed: Serial port timed out') && message.includes('isOpen=true')));
+
+  port.silentCommands.delete('129');
+  assert.deepEqual(await usb.readDeviceState('refresh-button'), {
+    ok: true,
+    mainLed: 'color=10,20,30&brightness=0.50&ledOn=1',
+    defaultColors: 'color=10,20,30,1',
+  });
+  assert.equal(instances.length, 1);
+  assert.equal(port.closeCalls, 0);
+});
+
+test('state reads without a connection fail cleanly and log unavailable commands once', async t => {
+  const { restore, usb } = loadUsbModule();
+  const warnings = [];
+  t.mock.method(console, 'warn', message => warnings.push(message));
+  t.after(restore);
+
+  assert.deepEqual(await usb.readDeviceState('refresh-button'), { ok: false, error: 'Port not available' });
+  assert.deepEqual(await usb.readDeviceState('window-activated'), { ok: false, error: 'Port not available' });
+  assert.equal(warnings.filter(message => message.includes('command=GET_MAIN_LED(128) failed')).length, 1);
+  assert.ok(warnings.some(message => message.includes('state read failed; reason=window-activated') && message.includes('port=none')));
 });

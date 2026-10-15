@@ -2,6 +2,7 @@ const electron = require('electron');
 const { BrowserWindow } = require('electron');
 
 const { getMainLED, getDefaultLEDs, setMainLED, setAlpha, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
+const { readDeviceState } = require('../usb/usb');
 const { checkForUpdates, updateAndRestart } = require('../updates')
 const { toggleCalibrateWindow } = require('../calibrateWindow')
 const { disableShortcuts, enableShortcuts, enableShortcut } = require('./shortcuts')
@@ -9,6 +10,8 @@ const { setADS } = require('./mouse')
 
 
 function registerUIEvents(mainWindow, app, isDev) {
+  electron.ipcMain.handle('get-device-state', (_event, reason) => readDeviceState(reason));
+
   //
   // Synchronous events from UI to electron
   //

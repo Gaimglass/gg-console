@@ -226,6 +226,14 @@ async function createWindow() {
 
   mainWindow.loadURL(startUrl);
 
+  const notifyWindowActivated = () => {
+    if (!mainWindow.webContents.isDestroyed() && !mainWindow.webContents.isLoading()) {
+      mainWindow.webContents.send('window-activated');
+    }
+  };
+  mainWindow.on('show', notifyWindowActivated);
+  mainWindow.on('focus', notifyWindowActivated);
+
   // create the try in Windows
   if (process.platform !== 'darwin') {
     tray = createTray();

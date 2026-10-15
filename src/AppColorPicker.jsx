@@ -30,7 +30,12 @@ function AppColorPicker() {
   const [version, setVersion] = useState('');
   const [isMac, setMac] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
   const [editSwatch, setEditSwatch] = useState(null);
+  const refreshInFlightRef = useRef(false);
+  const refreshGenerationRef = useRef(0);
+  const queuedRefreshRef = useRef(null);
 
   // ADS transition variables - use refs to persist across renders
   const changeIntervalRef = useRef(null);
@@ -216,35 +221,86 @@ function AppColorPicker() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color, ledOn, adsSettings.speed]);
 
-  const getStateFromGG = () => {
-    loadMainLedFromGG();
-    loadDefaultColorsFromGG();
-  }
+  const getStateFromGG = useCallback(async (reason = 'requested') => {
+    if (refreshInFlightRef.current) {
+      // A connection event can arrive while an earlier read is still failing.
+      if (reason === 'usb-connected' || reason === 'mount') {
+        queuedRefreshRef.current = reason;
+      }
+      return;
+    }
+
+    refreshInFlightRef.current = true;
+    const generation = refreshGenerationRef.current;
+    setIsRefreshing(true);
+    setRefreshError('');
+    try {
+      const response = await ipcRenderer.invoke('get-device-state', reason);
+      if (generation !== refreshGenerationRef.current) {
+        return;
+      }
+      if (!response?.ok) {
+        setRefreshError('Could not read Gaimglass settings. Try refreshing again.');
+        return;
+      }
+      parseMainLedFromGG(response.mainLed);
+      parseDefaultColors(response.defaultColors);
+      setIsConnected(true);
+    } catch (error) {
+      if (generation === refreshGenerationRef.current) {
+        console.warn('Device state refresh failed:', error);
+        setRefreshError('Could not read Gaimglass settings. Try refreshing again.');
+      }
+    } finally {
+      refreshInFlightRef.current = false;
+      setIsRefreshing(false);
+      const queuedReason = queuedRefreshRef.current;
+      queuedRefreshRef.current = null;
+      if (queuedReason) {
+        void getStateFromGG(queuedReason);
+      }
+    }
+  }, []);
 
   // Setup once on mount
   useEffect(() => {
     getAppState();
     initialDefaults();
 
-    // this will error on first load bc port is most likely not ready, but we can ignore that
-    // because we also listen for 'usb-connected'
-    getStateFromGG();
-
     // Receive uninitiated messages from the gg device
     // these messages are prefixed with "update-" for organization
     ipcRenderer.on('update-default-colors-from-gg', parseDefaultColors);
-    ipcRenderer.on('usb-connected', getStateFromGG);
-
-    ipcRenderer.on('usb-disconnected', () => {
+    const handleConnected = () => { void getStateFromGG('usb-connected'); };
+    const handleDisconnected = () => {
+      refreshGenerationRef.current++;
       setIsConnected(false);
-    });
+      setRefreshError('');
+    };
+    ipcRenderer.on('usb-connected', handleConnected);
+    ipcRenderer.on('usb-disconnected', handleDisconnected);
+
+    // Also covers a USB connection event that happened before this UI mounted.
+    void getStateFromGG('mount');
 
     return () => {
       ipcRenderer.removeListener('update-default-colors-from-gg', parseDefaultColors);
-      ipcRenderer.removeListener('usb-connected', getStateFromGG);
+      ipcRenderer.removeListener('usb-connected', handleConnected);
+      ipcRenderer.removeListener('usb-disconnected', handleDisconnected);
+      refreshGenerationRef.current++;
+      queuedRefreshRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const retryDisconnectedState = () => {
+      if (!isConnected) {
+        void getStateFromGG('window-activated');
+      }
+    };
+    ipcRenderer.on('window-activated', retryDisconnectedState);
+    return () => ipcRenderer.removeListener('window-activated', retryDisconnectedState);
+  }, [isConnected, getStateFromGG]);
 
   // Separate effect for throttled LED state updates
   useEffect(() => {
@@ -532,13 +588,6 @@ function AppColorPicker() {
   }
 
 
-  async function loadMainLedFromGG() {
-    const result = ipcRenderer.sendSync('get-led-state');
-    if (result) {
-      parseMainLedFromGG(result);
-    }
-  }
-
   async function loadDefaultColorsFromGG() {
     const response = ipcRenderer.sendSync('get-default-colors');
     if (!response.ok) {
@@ -732,6 +781,17 @@ function AppColorPicker() {
       {!isConnected && (
         <div className={styles.disconnected}>
           <span>Gaimglass not connected</span>
+          <button
+            type="button"
+            className={styles.refreshButton}
+            disabled={isRefreshing}
+            onClick={() => { void getStateFromGG('refresh-button'); }}
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <span className={styles.refreshStatus} role="status">
+            {refreshError}
+          </span>
         </div>
       )}
       {/* Brightness monitor runs independently when connected */}
