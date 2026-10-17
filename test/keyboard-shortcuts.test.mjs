@@ -41,6 +41,7 @@ function loadShortcuts(t) {
   const modulePath = require.resolve('../src/electron/events/shortcuts.js');
   const registered = new Map();
   const unavailable = new Set();
+  const actions = [];
   const globalShortcut = {
     register(accelerator, callback) {
       if (unavailable.has(accelerator) || registered.has(accelerator.toLowerCase())) return false;
@@ -54,6 +55,7 @@ function loadShortcuts(t) {
   const replacements = [
     [require.resolve('electron'), { globalShortcut }],
     [require.resolve('../src/electron/calibrateWindow.js'), { toggleCalibrateWindow: () => {} }],
+    [require.resolve('../src/electron/events/shortcut-controls.js'), { runDeviceShortcut: command => actions.push(command) }],
   ];
   const originals = replacements.map(([id]) => require.cache[id]);
   for (const [id, exports] of replacements) require.cache[id] = { id, filename: id, loaded: true, exports };
@@ -65,11 +67,11 @@ function loadShortcuts(t) {
       else delete require.cache[id];
     });
   });
-  return { shortcuts: require(modulePath), registered, unavailable };
+  return { shortcuts: require(modulePath), registered, unavailable, actions };
 }
 
 test('saving during capture stays paused and resuming registers the latest bindings', t => {
-  const { shortcuts, registered } = loadShortcuts(t);
+  const { shortcuts, registered, actions } = loadShortcuts(t);
   const sent = [];
   const window = { webContents: { send: channel => sent.push(channel) } };
   assert.deepEqual(shortcuts.enableShortcuts(window, { led: 'F9', s1: 'Control+num1' }), {});
@@ -83,7 +85,8 @@ test('saving during capture stays paused and resuming registers the latest bindi
   assert.deepEqual(shortcuts.resumeShortcuts(window), {});
   assert.equal(registered.size, 1);
   registered.get('f13')();
-  assert.deepEqual(sent, ['shortcut-toggle-led']);
+  assert.deepEqual(sent, [], 'device shortcuts must not wait for the renderer');
+  assert.deepEqual(actions, ['led']);
 });
 
 test('failed or duplicate candidates keep the saved binding and report registration errors', t => {

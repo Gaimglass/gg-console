@@ -1,5 +1,6 @@
 const { globalShortcut} = require('electron')
 const { toggleCalibrateWindow } = require('../calibrateWindow');
+const { runDeviceShortcut } = require('./shortcut-controls');
 let currentBindings = {};
 let shortcutsPaused = false;
 
@@ -91,17 +92,8 @@ function registerBindings(mainWindow) {
 function getActionForCommand(command) {
   switch(command) {
     case "brightness-":
-      return (mainWindow)=>{
-        mainWindow.webContents.send('shortcut-decrease-brightness');
-      }
     case "brightness+":
-      return (mainWindow)=>{
-        mainWindow.webContents.send('shortcut-increase-brightness');
-      }
     case "led":
-      return (mainWindow)=>{
-        mainWindow.webContents.send('shortcut-toggle-led');
-      }
     case "s1":
     case "s2":
     case "s3":
@@ -110,8 +102,8 @@ function getActionForCommand(command) {
     case "s6":
     case "s7":
     case "s8":
-      return (mainWindow, command)=>{
-        mainWindow.webContents.send('shortcut-switch-color', command[1]);
+      return (_mainWindow, command)=>{
+        void runDeviceShortcut(command);
       }
     case "calibrate":
       return ()=>{

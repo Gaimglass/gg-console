@@ -41,6 +41,12 @@ In a separate tab after starting Vite dev server, run
 yarn electron-dev
 ```
 
+### Shortcut and fullscreen feedback
+
+Shortcuts execute in Electron's main process and broadcast confirmed device state to the UI. Pending repeats are combined while preserving brightness steps and the final color/power state. USB commands sharing a response code are serialized. Native feedback coalesces visual updates to 30 fps, starts offscreen capture once per visible notification period, and updates window geometry only when it changes. Device actions do not wait for rendering.
+
+To verify changes, run `yarn test` and compare shortcuts on the desktop and in fullscreen, including a short brightness-key hold. USB connection/failure and overlay routing/attachment logs remain in the Electron log (`%APPDATA%/Gaimglass/logs/main.log` on Windows).
+
 ## Build for production (locally)
 
 ### 1. To build the frontend for production (Vite)

@@ -100,16 +100,25 @@ function logCommandFailure(connection, command, error, elapsedMs) {
 }
 
 function writeCommandToConnection(connection, command, commandStr = '') {
+  if (!connection) return performCommandToConnection(connection, command, commandStr);
+  // Replies carry only a command code. Keep one request per code in flight.
+  const previous = connection.commandQueues.get(command);
+  const run = () => performCommandToConnection(connection, command, commandStr);
+  const request = previous ? previous.then(run) : run();
+  const tail = request.then(() => {}, () => {});
+  connection.commandQueues.set(command, tail);
+  void tail.then(() => {
+    if (connection.commandQueues.get(command) === tail) connection.commandQueues.delete(command);
+  });
+  return request;
+}
+
+function performCommandToConnection(connection, command, commandStr) {
   const serialPort = connection?.port;
   if (!serialPort || !serialPort.isOpen || serialPort.destroyed || connection.cancelled) {
     const error = new Error('Port not available');
     logCommandFailure(connection, command, error, 0);
     return Promise.reject(error);
-  }
-
-  const previousResponse = connection.pendingResponses.get(command);
-  if (previousResponse) {
-    previousResponse.reject(new Error(`Serial command ${command} was superseded`));
   }
 
   return new Promise((resolve, reject) => {
@@ -151,10 +160,6 @@ function writeCommandToConnection(connection, command, commandStr = '') {
       finish(new Error('Serial port timed out'));
     }, SERIAL_RESPONSE_TIMEOUT_MS);
 
-    if (isDev) {
-      console.log('Write Command:', command, commandStr, serialPort.path);
-    }
-
     try {
       serialPort.write(`${command}${commandStr}\n`, error => {
         if (error) {
@@ -176,10 +181,6 @@ function handleParserData(connection, data) {
   const parts = data.split(':');
   const messageId = parts[0].padStart(3, 0);
   const ggResponse = parts[1];
-
-  if (isDev) {
-    console.log('Gaimglass response:', { data });
-  }
 
   const pendingResponse = connection.pendingResponses.get(messageId);
   if (pendingResponse) {
@@ -361,6 +362,7 @@ async function performConnect(mainWindow, app, generation, attemptId) {
     port: serialPort,
     parser: null,
     pendingResponses: new Map(),
+    commandQueues: new Map(),
     feedback: createDeviceFeedback(),
     app,
     mainWindow,
@@ -565,9 +567,15 @@ async function readDeviceState(reason = 'requested') {
   }
 }
 
+function getDeviceControlState() {
+  if (!activeConnection || activeConnection.cancelled || !activeConnection.port.isOpen) return null;
+  return { connectionId: activeConnection.id, ...activeConnection.feedback.snapshot() };
+}
+
 module.exports = {
   initializeUsb,
   writeCommand,
   disconnectUsb,
   readDeviceState,
+  getDeviceControlState,
 };

@@ -143,69 +143,14 @@ function AppColorPicker() {
   }, [ledOn, isConnected, sendAlphaValue]);
 
   const deactivateLED = useCallback(() => {
-    setLEDOn(() => {
-      sendMainLEDStatus(color, false);
-      return false;
-    });
+    setLEDOn(false);
+    sendMainLEDStatus(color, false);
   }, [color, sendMainLEDStatus]);
 
   const toggleLEDOn = useCallback(() => {
-    setLEDOn((on) => {
-      sendMainLEDStatus(color, !on, 'power');
-      return !on;
-    });
-  }, [color, sendMainLEDStatus]);
-
-  const switchColorShortcut = useCallback((index) => {
-    if (ledOn) {
-      const colorIndex = Number(index - 1);
-      if (!Number.isInteger(colorIndex) || !defaultColors[colorIndex]) {
-        return;
-      }
-      const newColor = {
-        ...defaultColors[colorIndex].color,
-        a: color.a,
-      };
-      setColor(newColor);
-      sendMainLEDStatus(newColor, true);
-      sendDefaultIndex(colorIndex, newColor);
-    }
-  }, [ledOn, defaultColors, color.a, sendMainLEDStatus, sendDefaultIndex]);
-
-  const decreaseBrightnessShortcut = useCallback(() => {
-    if (ledOn) {
-      setColor((c) => {
-        let newAlpha = c.a - 0.05;
-        if (newAlpha < 0.075) {
-          newAlpha = 0.075;
-        }
-        const newColor = {
-          ...c,
-          a: newAlpha,
-        };
-        sendMainLEDStatus(newColor, true, 'brightness');
-        return newColor;
-      });
-    }
-  }, [ledOn, sendMainLEDStatus]);
-
-  const increaseBrightnessShortcut = useCallback(() => {
-    if (ledOn) {
-
-      setColor((c) => {
-        let newAlpha = c.a + 0.05;
-        if (newAlpha > 1) {
-          newAlpha = 1;
-        }
-        const newColor = {
-          ...c,
-          a: newAlpha,
-        };
-        sendMainLEDStatus(newColor, true, 'brightness');
-        return newColor;
-      });
-    }
-  }, [ledOn, sendMainLEDStatus]);
+    setLEDOn(!ledOn);
+    sendMainLEDStatus(color, !ledOn, 'power');
+  }, [color, ledOn, sendMainLEDStatus]);
 
 
   const onADSDown = useCallback(() => {
@@ -326,38 +271,19 @@ function AppColorPicker() {
     colorRgbRef.current = { r: color.r, g: color.g, b: color.b };
   }, [color]);
 
-  // Send LED status when ledOn or color changes (while connected)
-  useEffect(() => {
-    if (ledOn && isConnected) {
-      sendMainLEDStatus(color, true);
-    }
-  }, [ledOn, isConnected, color, sendMainLEDStatus]);
-
   // Register all IPC listeners once - they use stable useCallback references
   useEffect(() => {
-    ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
     ipcRenderer.on('os-suspend', deactivateLED);
-    ipcRenderer.on('shortcut-increase-brightness', increaseBrightnessShortcut);
-    ipcRenderer.on('shortcut-decrease-brightness', decreaseBrightnessShortcut);
-    ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
     ipcRenderer.on('update-ads-active', onADSDown);
     ipcRenderer.on('update-ads-inactive', onADSUp);
 
     return () => {
-      ipcRenderer.removeListener('shortcut-toggle-led', toggleLEDOn);
       ipcRenderer.removeListener('os-suspend', deactivateLED);
-      ipcRenderer.removeListener('shortcut-increase-brightness', increaseBrightnessShortcut);
-      ipcRenderer.removeListener('shortcut-decrease-brightness', decreaseBrightnessShortcut);
-      ipcRenderer.removeListener('shortcut-switch-color', switchColorShortcut);
       ipcRenderer.removeListener('update-ads-active', onADSDown);
       ipcRenderer.removeListener('update-ads-inactive', onADSUp);
     };
   }, [
-    toggleLEDOn,
     deactivateLED,
-    increaseBrightnessShortcut,
-    decreaseBrightnessShortcut,
-    switchColorShortcut,
     onADSDown,
     onADSUp
   ]);
@@ -458,6 +384,7 @@ function AppColorPicker() {
     sendDefaultColors(dc);
     const newColor = { r: c.color.r, g: c.color.g, b: c.color.b, a: color.a };
     setColor(newColor);
+    if (ledOn) sendMainLEDStatus(newColor, true);
   }
 
   // Non-throttled version for direct calls

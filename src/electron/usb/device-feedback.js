@@ -1,4 +1,5 @@
 const { SERIAL_COMMANDS } = require('./serial-codes');
+const { isCommandAcknowledged } = require('./serial-response');
 
 function numberInRange(value, min, max, integer = false) {
   if (typeof value !== 'string' || value.trim() === '') return undefined;
@@ -27,23 +28,38 @@ function parseState(payload, defaults = false) {
 
 function createDeviceFeedback() {
   let state = {};
+  let defaultColors;
   const remember = update => { state = { ...state, ...update }; };
+  const rememberDefaults = payload => {
+    if (typeof payload !== 'string') return;
+    defaultColors = new URLSearchParams(payload).getAll('color').map(value => ({
+      color: parseState(`color=${value}`).color,
+      enabled: value.split(',')[3] === '1',
+    }));
+  };
 
   return {
+    snapshot: () => structuredClone({ ...state, defaultColors }),
     // Reads and acknowledged app writes keep the baseline current without showing feedback.
     recordResponse(command, request, response) {
       if (command === SERIAL_COMMANDS.GET_MAIN_LED) {
         remember(parseState(response));
       } else if (command === SERIAL_COMMANDS.GET_DEFAULT_LEDS) {
+        rememberDefaults(response);
         const { index } = parseState(response, true);
         if (index !== undefined) remember({ index });
-      } else if (response?.trim() === 'okay') {
+      } else if (isCommandAcknowledged(command, request, response)) {
         if (command === SERIAL_COMMANDS.SET_MAIN_LED && request.length === 14) {
           remember(parseState(`color=${request.slice(0, 3)},${request.slice(3, 6)},${request.slice(6, 9)}&brightness=${request.slice(9, 13)}&ledOn=${request.slice(13)}`));
         } else if (command === SERIAL_COMMANDS.SET_DEFAULT_INDEX) {
           remember(parseState(`index=${request.trim()}`));
         } else if (command === SERIAL_COMMANDS.SET_LED_ON) {
           remember(parseState(`ledOn=${request.trim()}`));
+        } else if (command === SERIAL_COMMANDS.SET_DEFAULT_LEDS) {
+          defaultColors = request.split(',').map(value => ({
+            color: parseState(`color=${value.slice(0, 3)},${value.slice(3, 6)},${value.slice(6, 9)}`).color,
+            enabled: value[9] === '1',
+          }));
         }
       }
     },
@@ -51,6 +67,7 @@ function createDeviceFeedback() {
     fromDevice(messageId, payload) {
       if (![SERIAL_COMMANDS.UPDATE_MAIN_LED, SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS].includes(messageId)) return null;
       const previous = state;
+      if (messageId === SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS) rememberDefaults(payload);
       const next = parseState(payload, messageId === SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS);
       remember(next);
 

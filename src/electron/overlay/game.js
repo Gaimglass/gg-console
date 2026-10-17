@@ -3,6 +3,8 @@ const { attachToWindow } = require('./attachment');
 const { foregroundWindow, windowLayout } = require('./foreground');
 const { isFullscreenLayout, selectGameWindow } = require('./target');
 const { loadOverlayPage } = require('./page');
+const FRAME_RATE = 30;
+const FRAME_INTERVAL_MS = Math.ceil(1000 / FRAME_RATE);
 
 function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => require('@hamstu/electron-game-overlay'), now = Date.now, attach = attachToWindow, getForegroundWindow = foregroundWindow, getWindowLayout = windowLayout, onUnavailable = () => {}, onDiagnostic = () => {}, logger = console, setTimer = setTimeout, clearTimer = clearTimeout }) {
   let addon;
@@ -11,6 +13,12 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
   let ready = false;
   let registered = false;
   let pending = null;
+  let renderTimer;
+  let lastRenderAt = -Infinity;
+  let painting = false;
+  let lastPosition;
+  let lastScale;
+  let lastBounds;
   let nextScanAt = 0;
   let candidates = [];
   let target = null;
@@ -46,10 +54,14 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
 
   function hide() {
     pending = null;
+    clearTimer(renderTimer);
+    renderTimer = null;
+    lastRenderAt = -Infinity;
     clearTimer(focusTimer);
     focusTimer = null;
     closeSurface();
-    if (ready && window && !window.isDestroyed()) window.webContents.stopPainting();
+    if (painting && window && !window.isDestroyed()) window.webContents.stopPainting();
+    painting = false;
   }
 
   function fail(error) {
@@ -69,11 +81,31 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
 
   function render() {
     if (!ready || !pending || unavailable || window.isDestroyed()) return;
+    // Render the latest state at the card's frame rate, without delaying USB actions.
+    const wait = FRAME_INTERVAL_MS - (now() - lastRenderAt);
+    if (wait > 0) {
+      if (!renderTimer) renderTimer = setTimer(() => {
+        renderTimer = null;
+        try { render(); }
+        catch (error) { fail(error); }
+      }, wait);
+      return;
+    }
+    clearTimer(renderTimer);
+    renderTimer = null;
+    lastRenderAt = now();
     const display = targetDisplay();
     const scale = display.scaleFactor || 1;
     const rect = { x: Math.round(24 * scale), y: Math.round(24 * scale), width: Math.round(316 * scale), height: Math.round(112 * scale) };
-    window.setPosition(display.bounds.x, display.bounds.y, false);
-    host.setScaleFactor(scale);
+    const position = { x: display.bounds.x, y: display.bounds.y };
+    if (!lastPosition || position.x !== lastPosition.x || position.y !== lastPosition.y) {
+      window.setPosition(position.x, position.y, false);
+      lastPosition = position;
+    }
+    if (scale !== lastScale) {
+      host.setScaleFactor(scale);
+      lastScale = scale;
+    }
     if (!registered) {
       host.addWindow(window.id, {
         name: 'GaimglassActions', nativeHandle: window.getNativeWindowHandle().readUInt32LE(0),
@@ -81,10 +113,16 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
         minWidth: 0, minHeight: 0, maxWidth: rect.width, maxHeight: rect.height, rect,
       });
       registered = true;
-    } else host.sendWindowBounds(window.id, rect);
+    } else if (!lastBounds || Object.keys(rect).some(key => rect[key] !== lastBounds[key])) {
+      host.sendWindowBounds(window.id, rect);
+    }
+    lastBounds = rect;
     window.webContents.send('action-overlay:show', pending);
-    window.webContents.startPainting();
-    window.webContents.invalidate();
+    // startPainting restarts Electron's video capturer, even when already active.
+    if (!painting) {
+      window.webContents.startPainting();
+      painting = true;
+    }
   }
 
   function monitorFocus() {
@@ -134,11 +172,13 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
       show: false, frame: false, transparent: true, focusable: false, skipTaskbar: true,
       webPreferences: { offscreen: true, preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false },
     });
-    window.webContents.setFrameRate(30);
+    window.webContents.setFrameRate(FRAME_RATE);
+    window.webContents.stopPainting();
     window.webContents.on('paint', (_event, _dirty, image) => {
       if (!registered) return;
       try {
         const size = image.getSize();
+        if (size.width <= 0 || size.height <= 0) return;
         host.sendFrameBuffer(window.id, image.getBitmap(), size.width, size.height);
         if (!firstFrameSent) {
           firstFrameSent = true;
@@ -146,7 +186,14 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
         }
       } catch (error) { fail(error); }
     });
-    window.webContents.on('did-start-loading', () => { ready = false; });
+    window.webContents.on('did-start-loading', () => {
+      ready = false;
+      clearTimer(renderTimer);
+      renderTimer = null;
+      lastRenderAt = -Infinity;
+      window.webContents.stopPainting();
+      painting = false;
+    });
     window.webContents.on('did-finish-load', () => {
       if (!window || window.isDestroyed()) return;
       ready = true;

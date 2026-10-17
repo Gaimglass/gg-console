@@ -88,7 +88,7 @@ function gameFixture(options = {}) {
     setScaleFactor() {}
     addWindow(id) { calls.push(['add', id]); }
     closeWindow(id) { calls.push(['close', id]); }
-    sendWindowBounds() {}
+    sendWindowBounds(...args) { calls.push(['bounds', ...args]); }
     sendFrameBuffer() {}
   }
   const native = createGameOverlay({
@@ -169,6 +169,22 @@ test('desktop reloads restore only the latest active notification', () => {
   assert.equal(window.sent.length, sentWhenDisabled);
   assert.equal(window.visible, false);
   overlay.dispose();
+});
+
+test('notifications reach desktop and native renderers without extra IPC arguments', () => {
+  const notification = { type: 'power', on: false };
+  const electron = fakeElectron();
+  const overlay = createActionOverlay(electron, { ...fakeClock(), platform: 'linux' });
+  overlay.show(notification);
+  electron.windows[0].webContents.emit('did-finish-load');
+  assert.deepEqual(electron.windows[0].sent.at(-1), ['action-overlay:show', notification]);
+  overlay.dispose();
+
+  const fixture = gameFixture();
+  fixture.native.show(notification);
+  fixture.electron.windows[0].webContents.emit('did-finish-load');
+  assert.deepEqual(fixture.electron.windows[0].sent.at(-1), ['action-overlay:show', notification]);
+  fixture.native.dispose();
 });
 
 test('expired, disabled and quitting feedback cannot appear after a slow load', () => {
@@ -297,6 +313,8 @@ test('native overlay sends frames, preserves game input, reuses an attachment an
   window.webContents.emit('did-finish-load');
   callback('game.process', { processId: target.processId });
   assert.ok(calls.filter(call => call?.command === 'input.intercept').every(call => call.intercept === false));
+  window.webContents.emit('paint', {}, {}, { getSize: () => ({ width: 0, height: 0 }), getBitmap: () => assert.fail('empty frames must be ignored') });
+  assert.equal(calls.filter(call => call[0] === 'frame').length, 0);
   window.webContents.emit('paint', {}, {}, { getSize: () => ({ width: 316, height: 112 }), getBitmap: () => Buffer.alloc(4) });
   assert.deepEqual(calls.at(-1), ['frame', 1, 4, 316, 112]);
   assert.equal(native.show({ type: 'power', on: false }), true);
@@ -335,6 +353,68 @@ test('native renderer reloads restore active feedback without restoring dismisse
   assert.equal(window.painting, false);
   native.dispose();
   assert.equal(clock.size, 0);
+});
+
+test('rapid native feedback renders the latest state at the frame rate without restarting capture', t => {
+  t.mock.method(console, 'log', () => {});
+  const { native, electron, clock, calls } = gameFixture();
+  native.show({ type: 'power', on: true });
+  const window = electron.windows[0];
+  const start = t.mock.method(window.webContents, 'startPainting');
+  const invalidate = t.mock.method(window.webContents, 'invalidate');
+  const position = t.mock.method(window, 'setPosition');
+  window.webContents.emit('did-finish-load');
+  for (let percent = 1; percent <= 100; percent++) native.show({ type: 'brightness', percent });
+  assert.equal(window.sent.length, 1, 'a burst must not flood the renderer with intermediate states');
+  clock.tick(33);
+  assert.equal(window.sent.length, 1);
+  clock.tick(1);
+  assert.deepEqual(window.sent.at(-1), ['action-overlay:show', { type: 'brightness', percent: 100 }]);
+  assert.equal(start.mock.callCount(), 1, 'capture starts once for the visible notification');
+  assert.equal(invalidate.mock.callCount(), 0, 'cached pixels must not be replayed as a new render');
+  assert.equal(position.mock.callCount(), 1, 'unchanged display geometry is left alone');
+  assert.equal(calls.filter(call => call[0] === 'bounds').length, 0);
+  native.show({ type: 'power', on: false });
+  native.hide();
+  const sent = window.sent.length;
+  clock.tick(100);
+  assert.equal(window.sent.length, sent, 'dismissal cancels a pending trailing update');
+  native.show({ type: 'power', on: true });
+  assert.equal(start.mock.callCount(), 2, 'a dismissed surface can resume immediately');
+  native.dispose();
+  assert.equal(clock.size, 0);
+});
+
+test('a coalesced render failure falls back and clears scheduled work', t => {
+  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'warn', () => {});
+  const fixture = gameFixture();
+  const { native, electron, clock } = fixture;
+  native.show({ type: 'power', on: true });
+  const window = electron.windows[0];
+  window.webContents.emit('did-finish-load');
+  native.show({ type: 'power', on: false });
+  t.mock.method(window.webContents, 'send', () => { throw new Error('renderer closed'); });
+  assert.doesNotThrow(() => clock.tick(34));
+  assert.equal(native.show({ type: 'power', on: true }), false);
+  assert.equal(fixture.fallbacks, 1);
+  assert.equal(window.painting, false);
+  native.dispose();
+  assert.equal(clock.size, 0);
+});
+
+test('native geometry updates still follow a display and scale change', t => {
+  t.mock.method(console, 'log', () => {});
+  const { native, electron, clock, calls } = gameFixture();
+  native.show({ type: 'power', on: true });
+  const window = electron.windows[0];
+  window.webContents.emit('did-finish-load');
+  t.mock.method(electron.screen, 'getDisplayNearestPoint', () => ({ bounds: { x: 1920, y: 0 }, scaleFactor: 2 }));
+  native.show({ type: 'brightness', percent: 70 });
+  clock.tick(34);
+  assert.deepEqual(window.position, [1920, 0, false]);
+  assert.deepEqual(calls.find(call => call[0] === 'bounds'), ['bounds', window.id, { x: 48, y: 48, width: 632, height: 224 }]);
+  native.dispose();
 });
 
 test('asynchronous game attachment failure falls back without extending expired feedback', () => {

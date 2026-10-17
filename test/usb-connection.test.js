@@ -348,3 +348,66 @@ test('default palette updates select the correct slot, while invalid and repeate
   assert.equal(reconnected.fromDevice('200', 'color=20,110,255&brightness=0.55&ledOn=1&index=1'), null, 'a new connection never compares against stale state');
   assert.deepEqual(reconnected.fromDevice('200', 'ledOn=0'), { type: 'power', on: false });
 });
+
+test('concurrent writes sharing a response code are serialized and update the right confirmed state', async t => {
+  const { instances, restore, usb, feedback } = loadUsbModule();
+  const app = { isQuitting: false };
+  const sentEvents = [];
+  t.after(async () => {
+    await usb.disconnectUsb(app, { reconnect: false, reason: 'test-cleanup' });
+    restore();
+  });
+  await usb.initializeUsb(createWindow(sentEvents), app, false);
+  await waitFor(() => instances[0]?.opening);
+  const port = instances[0];
+  port.responses.set('128', 'color=10,20,30&brightness=0.50&ledOn=1&index=0');
+  port.responses.set('129', 'color=10,20,30,1&color=20,110,255,1&index=0');
+  port.completeOpen();
+  await waitFor(() => sentEvents.includes('usb-connected'));
+  await usb.readDeviceState('test-baseline');
+  port.silentCommands.add('000');
+  const first = usb.writeCommand('000', '0100200300.801');
+  const second = usb.writeCommand('000', '0201102550.401');
+  assert.equal(port.writes.filter(value => value.startsWith('000')).length, 1);
+  port.parser.emit('data', '000:okay');
+  assert.equal(await first, 'okay');
+  await waitFor(() => port.writes.filter(value => value.startsWith('000')).length === 2);
+  assert.equal(usb.getDeviceControlState().brightness, 0.8);
+  port.parser.emit('data', '000:okay');
+  assert.equal(await second, 'okay');
+  const snapshot = usb.getDeviceControlState();
+  assert.equal(snapshot.brightness, 0.4);
+  assert.deepEqual(snapshot.color, { r: 20, g: 110, b: 255 });
+  assert.deepEqual(snapshot.defaultColors[1], { color: { r: 20, g: 110, b: 255 }, enabled: true });
+  snapshot.defaultColors[1].color.r = 0;
+  assert.equal(usb.getDeviceControlState().defaultColors[1].color.r, 20, 'cached state is not mutable by callers');
+  assert.equal(feedback.length, 0, 'acknowledged writes do not produce duplicate feedback');
+  port.responses.set('003', 'okay 1');
+  assert.equal(await usb.writeCommand('003', ' 1'), 'okay 1');
+  assert.equal(usb.getDeviceControlState().index, 1, 'firmware index acknowledgements update the confirmed slot');
+  port.parser.emit('data', '200:color=20,110,255,&brightness=0.40&ledOn=1&index=1');
+  assert.equal(feedback.length, 0, 'the next snapshot must not announce an already confirmed slot again');
+  for (const response of ['error', 'okay 1', 'okay 8', 'okay 1 extra']) {
+    port.responses.set('003', response);
+    await usb.writeCommand('003', ' 0');
+    assert.equal(usb.getDeviceControlState().index, 1, 'rejected or mismatched replies cannot alter the confirmed slot');
+  }
+  await usb.disconnectUsb(app, { reconnect: false, reason: 'test-disconnect' });
+  assert.equal(usb.getDeviceControlState(), null);
+});
+
+test('palette cache tracks acknowledged edits and unsolicited palette updates', () => {
+  const { createDeviceFeedback } = require('../src/electron/usb/device-feedback');
+  const feedback = createDeviceFeedback();
+  feedback.recordResponse('129', '', 'color=10,20,30,1&color=20,110,255,0&index=0');
+  assert.equal(feedback.snapshot().defaultColors[1].enabled, false);
+  feedback.recordResponse('002', '2550000001,0002550001', 'okay');
+  assert.deepEqual(feedback.snapshot().defaultColors, [
+    { color: { r: 255, g: 0, b: 0 }, enabled: true },
+    { color: { r: 0, g: 255, b: 0 }, enabled: true },
+  ]);
+  feedback.recordResponse('002', '0000002551', 'error');
+  assert.equal(feedback.snapshot().defaultColors.length, 2);
+  feedback.fromDevice('201', 'color=1,2,3,1&index=0');
+  assert.deepEqual(feedback.snapshot().defaultColors, [{ color: { r: 1, g: 2, b: 3 }, enabled: true }]);
+});
