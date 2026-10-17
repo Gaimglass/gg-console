@@ -973,6 +973,11 @@
   resolved "https://registry.npmjs.org/@gar/promisify/-/promisify-1.1.3.tgz"
   integrity sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==
 
+"@hamstu/electron-game-overlay@0.0.8":
+  version "0.0.8"
+  resolved "https://registry.npmjs.org/@hamstu/electron-game-overlay/-/electron-game-overlay-0.0.8.tgz#436d19cc675e73f3d2d29a977967491ff165be06"
+  integrity sha512-1+9V5vF+vjfJHAcaMlIFUzVYFep5I0TmySB7HceBpgoIdaHAVRsNiv0T7aXViL7xHtodR2VFbFtjL8zH465ElQ==
+
 "@humanfs/core@^0.19.1":
   version "0.19.1"
   resolved "https://registry.yarnpkg.com/@humanfs/core/-/core-0.19.1.tgz#17c55ca7d426733fe3c561906b8173c336b40a77"
@@ -4264,7 +4269,7 @@ keyv@^4.5.4:
   dependencies:
     json-buffer "3.0.1"
 
-koffi@^2.9.1:
+koffi@2.15.0, koffi@^2.9.1:
   version "2.15.0"
   resolved "https://registry.yarnpkg.com/koffi/-/koffi-2.15.0.tgz#258c993d235edf131022693e3c19e8c6ea1bb6d1"
   integrity sha512-174BTuWK7L42Om7nDWy9YOTXj6Dkm14veuFf5yhVS5VU6GjtOI1Wjf+K16Z0JvSuZ3/NpkVzFBjE1oKbthTIEA==

@@ -2,6 +2,8 @@ const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { SERIAL_COMMANDS } = require('./serial-codes');
 const { BrowserWindow } = require('electron');
+const { showActionOverlay } = require('../overlay');
+const { createDeviceFeedback } = require('./device-feedback');
 
 const RECONNECT_INTERVAL_MS = 800;
 const OPEN_TIMEOUT_MS = 5000;
@@ -21,6 +23,8 @@ let connectionGeneration = 0;
 let connectionAttempt = 0;
 let shouldReconnect = false;
 let repeatedOpenError = null;
+const commandFailures = new Map();
+const commandNames = new Map(Object.entries(SERIAL_COMMANDS).map(([name, code]) => [code, name]));
 
 function getPortState(serialPort) {
   if (!serialPort) {
@@ -73,18 +77,52 @@ function rejectPendingResponses(connection, error) {
   connection.pendingResponses.clear();
 }
 
-function writeCommandToConnection(connection, command, commandStr = '') {
-  const serialPort = connection?.port;
-  if (!serialPort || !serialPort.isOpen || serialPort.destroyed || connection.cancelled) {
-    return Promise.reject(new Error('Port not available'));
+function logCommandFailure(connection, command, error, elapsedMs) {
+  const now = Date.now();
+  const previousFailure = commandFailures.get(command);
+  const sameFailure = previousFailure?.attemptId === connection?.id && previousFailure?.message === error.message;
+  const failure = sameFailure ? previousFailure : {
+    attemptId: connection?.id,
+    message: error.message,
+    count: 0,
+    lastLoggedAt: 0,
+  };
+  failure.count++;
+  commandFailures.set(command, failure);
+
+  if (sameFailure && now - failure.lastLoggedAt < REPEATED_ERROR_LOG_INTERVAL_MS) {
+    return;
   }
 
-  const previousResponse = connection.pendingResponses.get(command);
-  if (previousResponse) {
-    previousResponse.reject(new Error(`Serial command ${command} was superseded`));
+  failure.lastLoggedAt = now;
+  const lastResponseAge = connection?.lastResponseAt ? now - connection.lastResponseAt : 'none';
+  console.warn(`[USB] attempt=${connection?.id ?? 'none'} command=${commandNames.get(command) || command}(${command}) failed: ${error.message}; elapsedMs=${elapsedMs}; failures=${failure.count}; lastResponseAgeMs=${lastResponseAge}; cancelled=${connection?.cancelled ?? false}; ${getPortState(connection?.port)}`);
+}
+
+function writeCommandToConnection(connection, command, commandStr = '') {
+  if (!connection) return performCommandToConnection(connection, command, commandStr);
+  // Replies carry only a command code. Keep one request per code in flight.
+  const previous = connection.commandQueues.get(command);
+  const run = () => performCommandToConnection(connection, command, commandStr);
+  const request = previous ? previous.then(run) : run();
+  const tail = request.then(() => {}, () => {});
+  connection.commandQueues.set(command, tail);
+  void tail.then(() => {
+    if (connection.commandQueues.get(command) === tail) connection.commandQueues.delete(command);
+  });
+  return request;
+}
+
+function performCommandToConnection(connection, command, commandStr) {
+  const serialPort = connection?.port;
+  if (!serialPort || !serialPort.isOpen || serialPort.destroyed || connection.cancelled) {
+    const error = new Error('Port not available');
+    logCommandFailure(connection, command, error, 0);
+    return Promise.reject(error);
   }
 
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
     let settled = false;
     let timeoutId = null;
 
@@ -103,8 +141,11 @@ function writeCommandToConnection(connection, command, commandStr = '') {
       }
 
       if (error) {
+        logCommandFailure(connection, command, error, Date.now() - startedAt);
         reject(error);
       } else {
+        commandFailures.delete(command);
+        connection.feedback.recordResponse(command, commandStr, value);
         resolve(value);
       }
     };
@@ -118,10 +159,6 @@ function writeCommandToConnection(connection, command, commandStr = '') {
     timeoutId = setTimeout(() => {
       finish(new Error('Serial port timed out'));
     }, SERIAL_RESPONSE_TIMEOUT_MS);
-
-    if (isDev) {
-      console.log('Write Command:', command, commandStr, serialPort.path);
-    }
 
     try {
       serialPort.write(`${command}${commandStr}\n`, error => {
@@ -140,13 +177,10 @@ function getDeviceInfo(connection) {
 }
 
 function handleParserData(connection, data) {
+  connection.lastResponseAt = Date.now();
   const parts = data.split(':');
   const messageId = parts[0].padStart(3, 0);
   const ggResponse = parts[1];
-
-  if (isDev) {
-    console.log('Gaimglass response:', { data });
-  }
 
   const pendingResponse = connection.pendingResponses.get(messageId);
   if (pendingResponse) {
@@ -154,8 +188,12 @@ function handleParserData(connection, data) {
     return;
   }
 
+  if ([SERIAL_COMMANDS.GET_MAIN_LED, SERIAL_COMMANDS.GET_DEFAULT_LEDS, SERIAL_COMMANDS.GET_DEVICE_INFO].includes(messageId)) {
+    console.warn(`[USB] attempt=${connection.id} response without pending request; command=${commandNames.get(messageId)}(${messageId}); ${getPortState(connection.port)}`);
+  }
+
   if (connection === activeConnection) {
-    handleUnprovokedMessages(messageId, ggResponse);
+    handleUnprovokedMessages(connection, messageId, ggResponse);
   }
 }
 
@@ -324,6 +362,8 @@ async function performConnect(mainWindow, app, generation, attemptId) {
     port: serialPort,
     parser: null,
     pendingResponses: new Map(),
+    commandQueues: new Map(),
+    feedback: createDeviceFeedback(),
     app,
     mainWindow,
     cancelled: false,
@@ -414,7 +454,9 @@ async function connectUsb(mainWindow, _isDev, app) {
 }
 
 // Messages directly from GG that are not provoked from the console, such as a device button press.
-function handleUnprovokedMessages(messageId, ggResponse) {
+function handleUnprovokedMessages(connection, messageId, ggResponse) {
+  const notification = connection.feedback.fromDevice(messageId, ggResponse);
+  if (notification) showActionOverlay(notification);
   const allWindows = BrowserWindow.getAllWindows();
 
   if (SERIAL_COMMANDS.UPDATE_MAIN_LED === messageId) {
@@ -501,8 +543,39 @@ async function writeCommand(command, commandStr = '') {
   return writeCommandToConnection(activeConnection, command, commandStr);
 }
 
+// Reload renderer state through the existing connection without resetting USB.
+async function readDeviceState(reason = 'requested') {
+  const connection = activeConnection;
+  const startedAt = Date.now();
+  console.log(`[USB] state read requested; reason=${reason}; attempt=${connection?.id ?? 'none'}; active=${getPortState(connection?.port)}; pending=${getPortState(pendingConnection?.port)}; connecting=${Boolean(connectPromise)}`);
+
+  try {
+    const mainLed = await writeCommandToConnection(connection, SERIAL_COMMANDS.GET_MAIN_LED);
+    const defaultColors = await writeCommandToConnection(connection, SERIAL_COMMANDS.GET_DEFAULT_LEDS);
+    if (connection !== activeConnection || connection.cancelled) {
+      throw new Error('Connection changed while reading device state');
+    }
+    if (!mainLed || !defaultColors) {
+      throw new Error('Incomplete device state response');
+    }
+
+    console.log(`[USB] state read succeeded; reason=${reason}; attempt=${connection.id}; elapsedMs=${Date.now() - startedAt}; ${getPortState(connection.port)}`);
+    return { ok: true, mainLed, defaultColors };
+  } catch (error) {
+    console.warn(`[USB] state read failed; reason=${reason}; attempt=${connection?.id ?? 'none'}; elapsedMs=${Date.now() - startedAt}; error=${error.message}; ${getPortState(connection?.port)}`);
+    return { ok: false, error: error.message };
+  }
+}
+
+function getDeviceControlState() {
+  if (!activeConnection || activeConnection.cancelled || !activeConnection.port.isOpen) return null;
+  return { connectionId: activeConnection.id, ...activeConnection.feedback.snapshot() };
+}
+
 module.exports = {
   initializeUsb,
   writeCommand,
   disconnectUsb,
+  readDeviceState,
+  getDeviceControlState,
 };

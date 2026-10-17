@@ -7,6 +7,7 @@ const { registerMouseEvents } = require('./events/mouse');
 const {setupController} = require('./events/controller');
 const { initializeUsb,  disconnectUsb } = require('./usb/usb');
 const { setLEDOn } = require('./usb/serial-commands');
+const { closeActionOverlay } = require('./overlay');
 
 // Module to control application life.
 const app = electron.app;
@@ -114,6 +115,7 @@ if (!gotTheLock) {
 
   app.on('before-quit', function () {
     app.isQuitting = true;
+    closeActionOverlay();
     void disconnectUsb(app, { reconnect: false, reason: 'app-quit' });
   });
 
@@ -225,6 +227,14 @@ async function createWindow() {
   
 
   mainWindow.loadURL(startUrl);
+
+  const notifyWindowActivated = () => {
+    if (!mainWindow.webContents.isDestroyed() && !mainWindow.webContents.isLoading()) {
+      mainWindow.webContents.send('window-activated');
+    }
+  };
+  mainWindow.on('show', notifyWindowActivated);
+  mainWindow.on('focus', notifyWindowActivated);
 
   // create the try in Windows
   if (process.platform !== 'darwin') {

@@ -1,29 +1,113 @@
 .container {
   display: flex;
-  color:#ccc;
-  
-  padding: 1em 2em 1em 2em;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: calc(100vh - 56px);
+  padding: 12px 24px 60px;
+  color: #ccc;
 }
+
 .bindings {
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
+
 .bindings h3 {
-  margin: 0;
-  margin-bottom: 1em;
+  margin: 0 0 8px;
   font-size: 1em;
 }
-.keybindingsTableWrapper {
-  
-  
+
+.help,
+.scope {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c0c4ce;
 }
+
+.scope {
+  color: #aab0bd;
+  margin-bottom: 12px;
+}
+
+.keybindingsTableWrapper {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 3px;
+}
+
 .keybindingsTable {
-  font-size: 0.8em;
+  width: 100%;
+  font-size: 12px;
   border-collapse: collapse;
 }
 
-.keybindingsTable td {
-  padding: 0.15em;
+.keybindingsTable th {
+  text-align: left;
+  font-weight: normal;
+  width: 145px;
+}
+
+.keybindingsTable td,
+.keybindingsTable th {
+  padding: 2px 0;
+  vertical-align: middle;
+}
+
+.bindingCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bindings input {
+  box-sizing: border-box;
+  width: 190px;
+  height: 25px;
+  padding: 3px 8px;
+  margin: 0;
+  font-size: 13px;
+  background: #1b1d23;
+  border: 1px solid #343944;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.bindings input:focus {
+  outline: 2px solid #6c8bff;
+  outline-offset: 0;
+}
+
+.bindings input[aria-invalid=true] {
+  border-color: #ff9292;
+}
+
+.bindings input::placeholder {
+  color: #969dab;
+}
+
+.clear {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.feedback {
+  padding-left: 12px !important;
+  line-height: 1.35;
+}
+
+.error {
+  color: #ffadad;
+}
+
+.status {
+  color: #b3c5ff;
 }
 
 .keyboard {
@@ -31,12 +115,4 @@
   width: 1.5em;
   vertical-align: bottom;
   margin-right: 0.5em;
-}
-
-.bindings input {
-  background-color: #1b1d23;
-  border: none;
-  padding: 0.5em;
-  margin-left: 1em;
-  
 }

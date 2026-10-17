@@ -25,7 +25,6 @@ function setDefaultIndex(index) {
 }
 
 function setLEDOn(on) {
-  console.log("+" + on.toString().padStart(2).substring(0,3) + "+");
   return writeCommand(SERIAL_COMMANDS.SET_LED_ON, on.toString().padStart(2));
 }
 

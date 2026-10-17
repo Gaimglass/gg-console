@@ -1,0 +1,17 @@
+.container { padding: 18px 24px; color: #ccc; font-size: 13px; }
+.container h3 { margin: 0 0 12px; font-size: 16px; }
+.container p { max-width: 550px; line-height: 1.6; margin: 0 0 18px; }
+.option { display: flex; align-items: center; gap: 16px; margin: 24px 0; }
+.option label { cursor: pointer; }
+.option:has(input:disabled) label { cursor: default; opacity: 0.5; }
+.switch { flex-shrink: 0; }
+.option small { margin-left: 8px; font-size: 11px; color: #b9c4d5; }
+.hint { color: #aab0bd; font-size: 12px; }
+.previews { border: 1px solid #454a55; border-radius: 6px; margin: 24px 0 0; padding: 16px; }
+.previews legend { padding: 0 6px; }
+.previews p { margin-bottom: 12px; }
+.previews div { display: flex; gap: 10px; }
+.previews button { padding: 8px 16px; }
+.previews:disabled { opacity: 0.5; }
+.previews button:disabled { cursor: default; }
+.error { color: #ffadad; padding-top: 12px; }

@@ -6,6 +6,7 @@ import WindowControls from './WindowsControls';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import UpdatesTabWrapper from './UpdatesTabWrapper.rsx';
 import KeyBindings from './KeyBindings';
+import OverlaySettings from './OverlaySettings';
 import ADS from './ADS';
 import Ambient from './Ambient';
 import BrightnessMonitor from './BrightnessMonitor.rsx';
@@ -30,7 +31,13 @@ function AppColorPicker() {
   const [version, setVersion] = useState('');
   const [isMac, setMac] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
   const [editSwatch, setEditSwatch] = useState(null);
+  const refreshInFlightRef = useRef(false);
+  const refreshGenerationRef = useRef(0);
+  const queuedRefreshRef = useRef(null);
+  const defaultColorsReadInFlightRef = useRef(false);
 
   // ADS transition variables - use refs to persist across renders
   const changeIntervalRef = useRef(null);
@@ -50,12 +57,13 @@ function AppColorPicker() {
   const TRANS_MULTIPLIER = 35;
   const ALL_COLORS = RED | GREEN | BLUE; // 7
 
-  const sendMainLEDStatus = useCallback((color, ledOn) => {
+  const sendMainLEDStatus = useCallback((color, ledOn, feedback) => {
     if (isConnected) {
       ipcRenderer.sendSync('set-led-state', {
         color,
         brightness: color.a,
         ledOn,
+        feedback,
       });
       // Broadcast to other windows (like calibrate window)
       ipcRenderer.send('broadcast-color-sync', color, ledOn);
@@ -68,6 +76,10 @@ function AppColorPicker() {
     }
   }, [isConnected, ambientSettings.exponent])
 
+  const sendDefaultIndex = useCallback((index, color) => {
+    if (isConnected) ipcRenderer.sendSync('set-default-index', index, color);
+  }, [isConnected]);
+
   // Stable function references for throttling
   const handleColorChangeStable = useCallback((newColor, defaultIndex = -1) => {
     // defaults don't have an alpha so use the current value
@@ -79,11 +91,12 @@ function AppColorPicker() {
     };
     setColor(finalColor);
     setLEDOn(true);
-    sendMainLEDStatus(finalColor, true);
+    const feedback = defaultIndex < 0 ? (alpha !== color.a ? 'brightness' : (!ledOn ? 'power' : undefined)) : undefined;
+    sendMainLEDStatus(finalColor, true, feedback);
     if (defaultIndex > -1) {
       // update the index position on the device so that the left and right color 
       // button on the device start from where this default color is.
-      sendDefaultIndex(defaultIndex);
+      sendDefaultIndex(defaultIndex, finalColor);
     }
 
     if (editSwatch !== null) {
@@ -96,7 +109,7 @@ function AppColorPicker() {
       dc[editSwatch] = c;
       setDefaultColors(dc);
     }
-  }, [color.a, sendMainLEDStatus, editSwatch, defaultColors]);
+  }, [color.a, ledOn, sendMainLEDStatus, sendDefaultIndex, editSwatch, defaultColors]);
 
 
   const handleUpdateGGStable = useCallback((message) => {
@@ -130,69 +143,14 @@ function AppColorPicker() {
   }, [ledOn, isConnected, sendAlphaValue]);
 
   const deactivateLED = useCallback(() => {
-    setLEDOn(() => {
-      sendMainLEDStatus(color, false);
-      return false;
-    });
+    setLEDOn(false);
+    sendMainLEDStatus(color, false);
   }, [color, sendMainLEDStatus]);
 
   const toggleLEDOn = useCallback(() => {
-    setLEDOn((on) => {
-      sendMainLEDStatus(color, !on);
-      return !on;
-    });
-  }, [color, sendMainLEDStatus]);
-
-  const switchColorShortcut = useCallback((index) => {
-    if (ledOn) {
-      const colorIndex = Number(index - 1);
-      if (colorIndex < 0) {
-        return;
-      }
-      const newColor = {
-        ...defaultColors[colorIndex].color,
-        a: color.a,
-      };
-      setColor(newColor);
-      sendMainLEDStatus(newColor, true);
-      sendDefaultIndex(colorIndex);
-    }
-  }, [ledOn, defaultColors, color.a, sendMainLEDStatus]);
-
-  const decreaseBrightnessShortcut = useCallback(() => {
-    if (ledOn) {
-      setColor((c) => {
-        let newAlpha = c.a - 0.05;
-        if (newAlpha < 0.075) {
-          newAlpha = 0.075;
-        }
-        const newColor = {
-          ...c,
-          a: newAlpha,
-        };
-        sendMainLEDStatus(newColor, true);
-        return newColor;
-      });
-    }
-  }, [ledOn, sendMainLEDStatus]);
-
-  const increaseBrightnessShortcut = useCallback(() => {
-    if (ledOn) {
-
-      setColor((c) => {
-        let newAlpha = c.a + 0.05;
-        if (newAlpha > 1) {
-          newAlpha = 1;
-        }
-        const newColor = {
-          ...c,
-          a: newAlpha,
-        };
-        sendMainLEDStatus(newColor, true);
-        return newColor;
-      });
-    }
-  }, [ledOn, sendMainLEDStatus]);
+    setLEDOn(!ledOn);
+    sendMainLEDStatus(color, !ledOn, 'power');
+  }, [color, ledOn, sendMainLEDStatus]);
 
 
   const onADSDown = useCallback(() => {
@@ -216,35 +174,86 @@ function AppColorPicker() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color, ledOn, adsSettings.speed]);
 
-  const getStateFromGG = () => {
-    loadMainLedFromGG();
-    loadDefaultColorsFromGG();
-  }
+  const getStateFromGG = useCallback(async (reason = 'requested') => {
+    if (refreshInFlightRef.current) {
+      // A connection event can arrive while an earlier read is still failing.
+      if (reason === 'usb-connected' || reason === 'mount') {
+        queuedRefreshRef.current = reason;
+      }
+      return;
+    }
+
+    refreshInFlightRef.current = true;
+    const generation = refreshGenerationRef.current;
+    setIsRefreshing(true);
+    setRefreshError('');
+    try {
+      const response = await ipcRenderer.invoke('get-device-state', reason);
+      if (generation !== refreshGenerationRef.current) {
+        return;
+      }
+      if (!response?.ok) {
+        setRefreshError('Could not read Gaimglass settings. Try refreshing again.');
+        return;
+      }
+      parseMainLedFromGG(response.mainLed);
+      parseDefaultColors(response.defaultColors);
+      setIsConnected(true);
+    } catch (error) {
+      if (generation === refreshGenerationRef.current) {
+        console.warn('Device state refresh failed:', error);
+        setRefreshError('Could not read Gaimglass settings. Try refreshing again.');
+      }
+    } finally {
+      refreshInFlightRef.current = false;
+      setIsRefreshing(false);
+      const queuedReason = queuedRefreshRef.current;
+      queuedRefreshRef.current = null;
+      if (queuedReason) {
+        void getStateFromGG(queuedReason);
+      }
+    }
+  }, []);
 
   // Setup once on mount
   useEffect(() => {
     getAppState();
     initialDefaults();
 
-    // this will error on first load bc port is most likely not ready, but we can ignore that
-    // because we also listen for 'usb-connected'
-    getStateFromGG();
-
     // Receive uninitiated messages from the gg device
     // these messages are prefixed with "update-" for organization
     ipcRenderer.on('update-default-colors-from-gg', parseDefaultColors);
-    ipcRenderer.on('usb-connected', getStateFromGG);
-
-    ipcRenderer.on('usb-disconnected', () => {
+    const handleConnected = () => { void getStateFromGG('usb-connected'); };
+    const handleDisconnected = () => {
+      refreshGenerationRef.current++;
       setIsConnected(false);
-    });
+      setRefreshError('');
+    };
+    ipcRenderer.on('usb-connected', handleConnected);
+    ipcRenderer.on('usb-disconnected', handleDisconnected);
+
+    // Also covers a USB connection event that happened before this UI mounted.
+    void getStateFromGG('mount');
 
     return () => {
       ipcRenderer.removeListener('update-default-colors-from-gg', parseDefaultColors);
-      ipcRenderer.removeListener('usb-connected', getStateFromGG);
+      ipcRenderer.removeListener('usb-connected', handleConnected);
+      ipcRenderer.removeListener('usb-disconnected', handleDisconnected);
+      refreshGenerationRef.current++;
+      queuedRefreshRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const retryDisconnectedState = () => {
+      if (!isConnected) {
+        void getStateFromGG('window-activated');
+      }
+    };
+    ipcRenderer.on('window-activated', retryDisconnectedState);
+    return () => ipcRenderer.removeListener('window-activated', retryDisconnectedState);
+  }, [isConnected, getStateFromGG]);
 
   // Separate effect for throttled LED state updates
   useEffect(() => {
@@ -262,38 +271,19 @@ function AppColorPicker() {
     colorRgbRef.current = { r: color.r, g: color.g, b: color.b };
   }, [color]);
 
-  // Send LED status when ledOn or color changes (while connected)
-  useEffect(() => {
-    if (ledOn && isConnected) {
-      sendMainLEDStatus(color, true);
-    }
-  }, [ledOn, isConnected, color, sendMainLEDStatus]);
-
   // Register all IPC listeners once - they use stable useCallback references
   useEffect(() => {
-    ipcRenderer.on('shortcut-toggle-led', toggleLEDOn);
     ipcRenderer.on('os-suspend', deactivateLED);
-    ipcRenderer.on('shortcut-increase-brightness', increaseBrightnessShortcut);
-    ipcRenderer.on('shortcut-decrease-brightness', decreaseBrightnessShortcut);
-    ipcRenderer.on('shortcut-switch-color', switchColorShortcut);
     ipcRenderer.on('update-ads-active', onADSDown);
     ipcRenderer.on('update-ads-inactive', onADSUp);
 
     return () => {
-      ipcRenderer.removeListener('shortcut-toggle-led', toggleLEDOn);
       ipcRenderer.removeListener('os-suspend', deactivateLED);
-      ipcRenderer.removeListener('shortcut-increase-brightness', increaseBrightnessShortcut);
-      ipcRenderer.removeListener('shortcut-decrease-brightness', decreaseBrightnessShortcut);
-      ipcRenderer.removeListener('shortcut-switch-color', switchColorShortcut);
       ipcRenderer.removeListener('update-ads-active', onADSDown);
       ipcRenderer.removeListener('update-ads-inactive', onADSUp);
     };
   }, [
-    toggleLEDOn,
     deactivateLED,
-    increaseBrightnessShortcut,
-    decreaseBrightnessShortcut,
-    switchColorShortcut,
     onADSDown,
     onADSUp
   ]);
@@ -339,11 +329,6 @@ function AppColorPicker() {
     setMac(result.isMac);
     setVersion(result.version);
   }
-
-  function sendDefaultIndex(index) {
-    ipcRenderer.sendSync('set-default-index', index);
-  }
-
 
   function sendDefaultColors(dc) {
     // This condition is preferred over useEffect so we have more control over writing to EPROM
@@ -399,6 +384,7 @@ function AppColorPicker() {
     sendDefaultColors(dc);
     const newColor = { r: c.color.r, g: c.color.g, b: c.color.b, a: color.a };
     setColor(newColor);
+    if (ledOn) sendMainLEDStatus(newColor, true);
   }
 
   // Non-throttled version for direct calls
@@ -532,21 +518,28 @@ function AppColorPicker() {
   }
 
 
-  async function loadMainLedFromGG() {
-    const result = ipcRenderer.sendSync('get-led-state');
-    if (result) {
-      parseMainLedFromGG(result);
-    }
-  }
-
   async function loadDefaultColorsFromGG() {
-    const response = ipcRenderer.sendSync('get-default-colors');
-    if (!response.ok) {
-      console.warn('get-default-colors failed:', response.error);
+    if (defaultColorsReadInFlightRef.current) {
       return;
     }
-    parseDefaultColors(response.data);
-    setIsConnected(true); // we just need to set this once on a successful response
+
+    defaultColorsReadInFlightRef.current = true;
+    const generation = refreshGenerationRef.current;
+    try {
+      const response = await ipcRenderer.invoke('get-default-colors');
+      if (generation !== refreshGenerationRef.current) {
+        return;
+      }
+      if (!response?.ok) {
+        console.warn('get-default-colors failed:', response?.error);
+        return;
+      }
+      parseDefaultColors(response.data);
+    } catch (error) {
+      console.warn('get-default-colors failed:', error);
+    } finally {
+      defaultColorsReadInFlightRef.current = false;
+    }
   }
 
   function changeRgb(e, colorComponent) {
@@ -572,7 +565,7 @@ function AppColorPicker() {
     };
     setColor(c);
     setLEDOn(true);
-    sendMainLEDStatus(c, true);
+    sendMainLEDStatus(c, true, !ledOn ? 'power' : undefined);
 
     if (updateKey) {
       e.target.value = newColorComponent;
@@ -592,7 +585,7 @@ function AppColorPicker() {
   function handleChangeToCalibrateTab() {
     // fixes a bug where if the user was editing a swatch color but didn't save to GG, the color
     // would be set in the UI, but not in GG, this reset the UI to match GG.
-    loadDefaultColorsFromGG();
+    void loadDefaultColorsFromGG();
   }
 
   function handleCalibrate() {
@@ -622,7 +615,7 @@ function AppColorPicker() {
     };
     setColor(c);
     setLEDOn(true);
-    sendMainLEDStatus(c, true);
+    sendMainLEDStatus(c, true, 'brightness');
 
     if (updateKey) {
       e.target.value = newColorComponent;
@@ -664,6 +657,7 @@ function AppColorPicker() {
                 <Tab tabIndex="-1"><button>ADS</button></Tab>
                 <Tab tabIndex="-1"><button>Ambient</button></Tab>
                 <Tab tabIndex="-1"><button>Shortcuts</button></Tab>
+                <Tab tabIndex="-1"><button>Overlay</button></Tab>
               </TabList>
             </UpdatesTabWrapper>
             <TabPanel className={styles.tabCalibrate}>
@@ -726,12 +720,26 @@ function AppColorPicker() {
             <TabPanel>
               <KeyBindings />
             </TabPanel>
+            <TabPanel>
+              <OverlaySettings />
+            </TabPanel>
           </Tabs>
         </div>
       )}
       {!isConnected && (
         <div className={styles.disconnected}>
           <span>Gaimglass not connected</span>
+          <button
+            type="button"
+            className={styles.refreshButton}
+            disabled={isRefreshing}
+            onClick={() => { void getStateFromGG('refresh-button'); }}
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <span className={styles.refreshStatus} role="status">
+            {refreshError}
+          </span>
         </div>
       )}
       {/* Brightness monitor runs independently when connected */}

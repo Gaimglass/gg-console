@@ -115,9 +115,29 @@
 .disconnected {
   height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   color: #ccc;
   justify-content: center;
+}
+
+.refreshButton {
+  margin-top: 1em;
+  padding: 0.6em 1.5em;
+}
+
+.refreshButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.refreshStatus {
+  min-height: 2.5em;
+  max-width: 28em;
+  margin-top: 1em;
+  padding: 0 1em;
+  text-align: center;
+  font-size: 0.85em;
 }
 
 .powerIcon {

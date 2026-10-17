@@ -1,6 +1,7 @@
 module.exports = {
   packagerConfig: {
-    asar: true,
+    // The native addon needs its DLLs and injector helpers on disk, outside the archive.
+    asar: { unpack: '**/node_modules/@hamstu/electron-game-overlay/**' },
     icon: './src/assets/gg_icon'
   },
   rebuildConfig: {},

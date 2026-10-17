@@ -2,13 +2,23 @@ const electron = require('electron');
 const { BrowserWindow } = require('electron');
 
 const { getMainLED, getDefaultLEDs, setMainLED, setAlpha, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
+const { readDeviceState } = require('../usb/usb');
 const { checkForUpdates, updateAndRestart } = require('../updates')
 const { toggleCalibrateWindow } = require('../calibrateWindow')
-const { disableShortcuts, enableShortcuts, enableShortcut } = require('./shortcuts')
+const { disableShortcuts, enableShortcuts, validateShortcut, resumeShortcuts } = require('./shortcuts')
 const { setADS } = require('./mouse')
+const { showActionOverlay, configureActionOverlay, getActionOverlayStatus } = require('../overlay');
 
 
 function registerUIEvents(mainWindow, app, isDev) {
+  electron.ipcMain.handle('get-device-state', (_event, reason) => readDeviceState(reason));
+
+  electron.ipcMain.handle('set-overlay-settings', (_event, settings) => {
+    configureActionOverlay(settings);
+  });
+  electron.ipcMain.handle('preview-action-overlay', (_event, notification) => showActionOverlay(notification));
+  electron.ipcMain.handle('get-overlay-status', () => getActionOverlayStatus());
+
   //
   // Synchronous events from UI to electron
   //
@@ -25,6 +35,9 @@ function registerUIEvents(mainWindow, app, isDev) {
     try {
       const result = await setMainLED(ledState.color, ledState.brightness, ledState.ledOn);
       event.returnValue = result;
+      // Only explicit user actions produce feedback; ADS, ambient and startup writes stay quiet.
+      if (ledState.feedback === 'brightness') showActionOverlay({ type: 'brightness', value: ledState.brightness });
+      else if (ledState.feedback === 'power') showActionOverlay({ type: 'power', on: ledState.ledOn });
     } catch(err) {
       event.returnValue = err;
     }
@@ -50,24 +63,16 @@ function registerUIEvents(mainWindow, app, isDev) {
     });
   });
   
-  electron.ipcMain.on('set-default-index', async (event, index) => {
+  electron.ipcMain.on('set-default-index', async (event, index, color) => {
     try {
       const result = await setDefaultIndex(index);
       event.returnValue = result;
+      showActionOverlay({ type: 'color-slot', slot: index + 1, color });
     } catch(err) {
       event.returnValue = err;
     }
   });
   
-  
-  electron.ipcMain.on('get-default-colors', async (event) => { 
-    try {
-      const ledStateStr = await getDefaultLEDs();
-      event.returnValue = { ok: true, data: ledStateStr };
-    } catch(err) {
-      event.returnValue = { ok: false, error: err.message || String(err) };
-    }
-  });
   
   electron.ipcMain.on('set-default-colors', async (event, colors) => {
     try {
@@ -127,6 +132,15 @@ function registerUIEvents(mainWindow, app, isDev) {
   // Non-blocking handlers
   //
 
+  electron.ipcMain.handle('get-default-colors', async () => {
+    try {
+      const ledStateStr = await getDefaultLEDs();
+      return { ok: true, data: ledStateStr };
+    } catch (err) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  });
+
   electron.ipcMain.handle('check-for-updates', async () => {
     try {
       const result = await checkForUpdates(app.getVersion(), isDev);
@@ -149,14 +163,16 @@ function registerUIEvents(mainWindow, app, isDev) {
     return enableShortcuts(mainWindow, bindings)
   });
 
-  electron.ipcMain.handle('set-enable-shortcut', async (event, command, value) => {
+  electron.ipcMain.handle('validate-shortcut', async (event, command, value) => {
     void event;
-    return enableShortcut(mainWindow, command, value)
+    return validateShortcut(mainWindow, command, value)
   });
 
   electron.ipcMain.handle('set-disable-shortcuts', async () => {
     disableShortcuts();
   });
+
+  electron.ipcMain.handle('set-resume-shortcuts', async () => resumeShortcuts(mainWindow));
 
 
   electron.ipcMain.handle('set-enable-ads', async (event, ads) => {
