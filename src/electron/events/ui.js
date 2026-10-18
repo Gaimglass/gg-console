@@ -3,14 +3,14 @@ const { BrowserWindow } = require('electron');
 
 const { getMainLED, getDefaultLEDs, setMainLED, setAlpha, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 const { readDeviceState } = require('../usb/usb');
-const { checkForUpdates, updateAndRestart } = require('../updates')
+const { checkForUpdates, updateAndRestart, getUpdateStatus } = require('../updates')
 const { toggleCalibrateWindow } = require('../calibrateWindow')
 const { disableShortcuts, enableShortcuts, validateShortcut, resumeShortcuts } = require('./shortcuts')
 const { setADS } = require('./mouse')
 const { showActionOverlay, configureActionOverlay, getActionOverlayStatus } = require('../overlay');
 
 
-function registerUIEvents(mainWindow, app, isDev) {
+function registerUIEvents(mainWindow, app) {
   electron.ipcMain.handle('get-device-state', (_event, reason) => readDeviceState(reason));
 
   electron.ipcMain.handle('set-overlay-settings', (_event, settings) => {
@@ -120,11 +120,11 @@ function registerUIEvents(mainWindow, app, isDev) {
 
   electron.ipcMain.handle('restart-and-update-app', async () => {
     try {
-      updateAndRestart(app);
+      updateAndRestart();
       return 'okay';
     } catch(err) {
       console.warn(err);
-      return { error: err.message };
+      return { error: err.message || String(err) };
     }
   });
 
@@ -141,15 +141,14 @@ function registerUIEvents(mainWindow, app, isDev) {
     }
   });
 
+  electron.ipcMain.handle('get-update-status', () => getUpdateStatus());
   electron.ipcMain.handle('check-for-updates', async () => {
     try {
-      const result = await checkForUpdates(app.getVersion(), isDev);
-      return {
-        ...result
-      };
+      return await checkForUpdates();
     } catch(err) {
       return {
-        error: err.message
+        ...getUpdateStatus(),
+        error: getUpdateStatus().error || err.message || String(err),
       };
     }
   });

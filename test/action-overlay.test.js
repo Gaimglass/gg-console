@@ -529,7 +529,7 @@ test('failed USB writes produce no feedback, and background writes stay quiet', 
       else delete require.cache[id];
     });
   });
-  require(uiPath).registerUIEvents({}, {}, true);
+  require(uiPath).registerUIEvents({}, {});
   const state = { color: { r: 20, g: 110, b: 255 }, brightness: 0.65, ledOn: true };
   await listeners.get('set-led-state')({}, state);
   assert.equal(feedback.length, 0);

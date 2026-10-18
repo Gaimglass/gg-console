@@ -5,6 +5,8 @@ import DefaultColors from './DefaultColors';
 import WindowControls from './WindowsControls';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import UpdatesTabWrapper from './UpdatesTabWrapper.rsx';
+import Updates from './Updates';
+import { useAppUpdates } from './useAppUpdates';
 import KeyBindings from './KeyBindings';
 import OverlaySettings from './OverlaySettings';
 import ADS from './ADS';
@@ -24,6 +26,8 @@ import './css/globalStyles.css';
 const ipcRenderer = window.ipcRenderer;
 
 function AppColorPicker() {
+  const updates = useAppUpdates();
+  const [selectedTab, setSelectedTab] = useState(0);
   const [color, setColor] = useState({ r: 255, g: 255, b: 255, a: 0 });
   const [defaultColors, setDefaultColors] = useState([]);
   const [ledOn, setLEDOn] = useState(false);
@@ -648,19 +652,20 @@ function AppColorPicker() {
         </div>
       </header>
 
-      {isConnected && (
         <div className={styles.mainContainer}>
-          <Tabs className={styles.tabContainer}>
-            <UpdatesTabWrapper>
+          <Tabs className={styles.tabContainer} selectedIndex={!isConnected && selectedTab !== 5 ? 0 : selectedTab} onSelect={setSelectedTab}>
+            <UpdatesTabWrapper updates={updates} onOpenUpdates={() => setSelectedTab(5)}>
               <TabList className={styles.tabControls}>
-                <Tab tabIndex="-1"><button onClick={handleChangeToCalibrateTab}>Calibrate</button></Tab>
-                <Tab tabIndex="-1"><button>ADS</button></Tab>
-                <Tab tabIndex="-1"><button>Ambient</button></Tab>
-                <Tab tabIndex="-1"><button>Shortcuts</button></Tab>
-                <Tab tabIndex="-1"><button>Overlay</button></Tab>
+                <Tab tabIndex="-1"><button onClick={isConnected ? handleChangeToCalibrateTab : undefined}>Calibrate</button></Tab>
+                <Tab tabIndex="-1" disabled={!isConnected}><button disabled={!isConnected}>ADS</button></Tab>
+                <Tab tabIndex="-1" disabled={!isConnected}><button disabled={!isConnected}>Ambient</button></Tab>
+                <Tab tabIndex="-1" disabled={!isConnected}><button disabled={!isConnected}>Shortcuts</button></Tab>
+                <Tab tabIndex="-1" disabled={!isConnected}><button disabled={!isConnected}>Overlay</button></Tab>
+                <Tab tabIndex="-1"><button>Updates</button></Tab>
               </TabList>
             </UpdatesTabWrapper>
             <TabPanel className={styles.tabCalibrate}>
+              {isConnected ? (
               <div className={styles.mainContent}>
                 <div className={styles.main}>
                   <div className={styles.mainControls}>
@@ -710,6 +715,15 @@ function AppColorPicker() {
                   />
                 </div>
               </div>
+              ) : (
+                <div className={styles.disconnected}>
+                  <span>Gaimglass not connected</span>
+                  <button type="button" className={styles.refreshButton} disabled={isRefreshing} onClick={() => { void getStateFromGG('refresh-button'); }}>
+                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                  <span className={styles.refreshStatus} role="status">{refreshError}</span>
+                </div>
+              )}
             </TabPanel>
             <TabPanel>
               <ADS />
@@ -723,25 +737,11 @@ function AppColorPicker() {
             <TabPanel>
               <OverlaySettings />
             </TabPanel>
+            <TabPanel>
+              <Updates updates={updates} />
+            </TabPanel>
           </Tabs>
         </div>
-      )}
-      {!isConnected && (
-        <div className={styles.disconnected}>
-          <span>Gaimglass not connected</span>
-          <button
-            type="button"
-            className={styles.refreshButton}
-            disabled={isRefreshing}
-            onClick={() => { void getStateFromGG('refresh-button'); }}
-          >
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
-          <span className={styles.refreshStatus} role="status">
-            {refreshError}
-          </span>
-        </div>
-      )}
       {/* Brightness monitor runs independently when connected */}
       {isConnected && (
         <>

@@ -1,44 +1,5 @@
-.container {
-  width: 100%;
-  padding: 0.2em 0;
-  text-align: center;
-  display: flex;
-  justify-content: space-between;
-  background-color: rgba(0,0,0,0.2);
-}
-
-.container.restartRequired {
-  background-color: #306ce1;
-}
-.container.error {
-  background-color: #e13030;
-}
-
-
-.update {
-  margin-left: 2em;
-}
-
-.errorWrapper {
-  width: 100%;
-}
-
-.buttonContainer {
-  margin-right: 1em;
-}
-.button {
-  float: right;
-  width: auto;
-  height: auto;
-  background-color: transparent;
-  padding: 0.2em 0.4em ;
-  margin-right: 0.5em;
-}
-
-.restart {
-  width: 0.75em;
-  margin-right: 0.5em;
-}
-.button svg {
-  width: 0.75em;
-}
+.container { width: 100%; background-color: rgba(0, 0, 0, 0.2); }
+.ready, .error { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; padding: 6px 14px; font-size: 12px; }
+.ready { background-color: #244e87; color: white; }
+.error { background-color: #66383d; }
+.ready button, .error button { padding: 5px 10px; font-size: 12px; }

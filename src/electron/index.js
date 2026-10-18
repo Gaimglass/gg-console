@@ -8,6 +8,7 @@ const {setupController} = require('./events/controller');
 const { initializeUsb,  disconnectUsb } = require('./usb/usb');
 const { setLEDOn } = require('./usb/serial-commands');
 const { closeActionOverlay } = require('./overlay');
+const { startUpdateChecks } = require('./updates');
 
 // Module to control application life.
 const app = electron.app;
@@ -94,7 +95,8 @@ if (!gotTheLock) {
   // Some APIs can only be used after this event occurs.
   app.on('ready', ()=>{
     createWindow();
-    registerUIEvents(mainWindow, app, isDev)
+    registerUIEvents(mainWindow, app)
+    startUpdateChecks();
     registerMouseEvents(mainWindow, mouseState)
     setupController(mainWindow);
     /*electron.powerMonitor.on("lock-screen", () => {
