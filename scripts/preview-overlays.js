@@ -65,7 +65,7 @@ app.whenReady().then(async () => {
 
   // Keep the cards visible and refresh this comparison when the overlay files change.
   watcher = fs.watch(overlayDirectory, (_event, filename) => {
-    if (!['index.html', 'overlay.css', 'renderer.js', 'preload.js'].includes(String(filename))) return;
+    if (!['index.html', 'overlay.css', 'renderer.js', 'preload.js', 'frame-marker.js'].includes(String(filename))) return;
     clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       for (const view of views) {

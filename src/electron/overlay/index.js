@@ -2,15 +2,17 @@ const path = require('node:path');
 const { normalizeNotification } = require('./notification');
 const { createGameOverlay } = require('./game');
 const { loadOverlayPage } = require('./page');
+const { getOverlayTiming, closeOverlayTiming } = require('./timing');
 const DURATION_MS = 2500;
 const FADE_MS = 160;
 
-function createActionOverlay(electron, { setTimer = setTimeout, clearTimer = clearTimeout, nativeFactory = createGameOverlay, platform = process.platform, logger = console } = {}) {
+function createActionOverlay(electron, { setTimer = setTimeout, clearTimer = clearTimeout, nativeFactory = createGameOverlay, platform = process.platform, logger = console, timing = null } = {}) {
   const { BrowserWindow, screen, app } = electron;
   let settings = { enabled: true, fullscreenGames: true };
   let window;
   let ready = false;
   let latest = null;
+  let latestTrace = null;
   let usingGame = false;
   let native;
   let hideTimer;
@@ -35,7 +37,8 @@ function createActionOverlay(electron, { setTimer = setTimeout, clearTimer = cle
     if (!ready || !latest || usingGame || !window || window.isDestroyed() || app.isQuitting) return;
     const { bounds } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     window.setPosition(bounds.x + 24, bounds.y + 24, false);
-    window.webContents.send('action-overlay:show', latest);
+    if (timing) timing.send(window, latest, latestTrace, 'desktop');
+    else window.webContents.send('action-overlay:show', latest);
     window.showInactive();
   }
 
@@ -47,6 +50,7 @@ function createActionOverlay(electron, { setTimer = setTimeout, clearTimer = cle
       webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false },
     });
     window.setIgnoreMouseEvents(true);
+    timing?.attach(window, 'desktop');
     window.setAlwaysOnTop(true, 'screen-saver');
     if (platform === 'darwin') window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     const createdWindow = window;
@@ -61,6 +65,7 @@ function createActionOverlay(electron, { setTimer = setTimeout, clearTimer = cle
   }
 
   function hide() {
+    timing?.mark(latestTrace, 'overlay.expired');
     latest = null;
     usingGame = false;
     native?.fade();
@@ -72,6 +77,7 @@ function createActionOverlay(electron, { setTimer = setTimeout, clearTimer = cle
   }
 
   function dismiss() {
+    if (latest) timing?.mark(latestTrace, 'overlay.dismissed');
     clearTimers();
     latest = null;
     usingGame = false;
@@ -108,27 +114,32 @@ function createActionOverlay(electron, { setTimer = setTimeout, clearTimer = cle
         fallbackToDesktop();
       }
     },
-    show(value) {
+    show(value, trace) {
       const notification = normalizeNotification(value);
       if (!notification || !settings.enabled || app.isQuitting) return false;
+      trace ||= timing?.begin('overlay', { type: notification.type });
+      timing?.mark(trace, 'overlay.request', { notification });
       clearTimers();
       latest = notification;
+      latestTrace = trace;
       usingGame = false;
       let inGame = false;
       if (settings.fullscreenGames && platform === 'win32') {
         try {
-          native ||= nativeFactory({ ...electron, logger, onDiagnostic: value => { diagnostic = value; }, onUnavailable: fallbackToDesktop });
-          inGame = native.show(notification);
+          native ||= nativeFactory({ ...electron, logger, timing, onDiagnostic: value => { diagnostic = value; }, onUnavailable: fallbackToDesktop });
+          inGame = native.show(notification, trace);
         } catch (error) {
           diagnostic = { reason: 'native-error', error: error.message };
           logger.warn('[OSD] game feedback failed; using desktop:', error.message);
         }
       } else diagnostic = { reason: platform === 'win32' ? 'native-disabled' : 'unsupported-platform' };
       if (inGame) {
+        timing?.mark(trace, 'overlay.route', { route: 'game', reason: diagnostic.reason });
         reportRoute('native-game');
         usingGame = true;
         if (window && !window.isDestroyed()) window.hide();
       } else {
+        timing?.mark(trace, 'overlay.route', { route: 'desktop', reason: diagnostic.reason });
         reportRoute('desktop');
         native?.hide();
         if (!window || window.isDestroyed()) createDesktop();
@@ -146,17 +157,17 @@ let instance;
 function getOverlay() {
   if (!instance) {
     const logger = require('electron-log/main');
-    instance = createActionOverlay(require('electron'), { logger });
+    instance = createActionOverlay(require('electron'), { logger, timing: getOverlayTiming() });
     logger.log(`[OSD] backend initialized; revision=fullscreen-v2; pid=${process.pid}; log=${logger.transports.file.getFile().path}`);
   }
   return instance;
 }
-function showActionOverlay(notification) {
-  try { return getOverlay().show(notification); }
+function showActionOverlay(notification, trace) {
+  try { return getOverlay().show(notification, trace); }
   catch (error) { console.warn('[OSD] display failed:', error.message); return false; }
 }
 function configureActionOverlay(settings) { getOverlay().configure(settings); }
-function closeActionOverlay() { instance?.dispose(); instance = null; }
+function closeActionOverlay() { instance?.dispose(); instance = null; closeOverlayTiming(); }
 function getActionOverlayStatus() { return getOverlay().status(); }
 
 module.exports = { createActionOverlay, showActionOverlay, configureActionOverlay, closeActionOverlay, getActionOverlayStatus, DURATION_MS, FADE_MS };

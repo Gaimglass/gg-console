@@ -8,7 +8,7 @@ function loadOverlayPage(window, { watch = false, logger = console } = {}) {
     let timer;
     try {
       watcher = fs.watch(__dirname, { persistent: false }, (_event, filename) => {
-        if (filename && !['index.html', 'overlay.css', 'renderer.js', 'preload.js'].includes(String(filename))) return;
+        if (filename && !['index.html', 'overlay.css', 'renderer.js', 'preload.js', 'frame-marker.js'].includes(String(filename))) return;
         clearTimeout(timer);
         timer = setTimeout(() => {
           if (window.isDestroyed()) return;

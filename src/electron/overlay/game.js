@@ -6,13 +6,14 @@ const { loadOverlayPage } = require('./page');
 const FRAME_RATE = 30;
 const FRAME_INTERVAL_MS = Math.ceil(1000 / FRAME_RATE);
 
-function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => require('@hamstu/electron-game-overlay'), now = Date.now, attach = attachToWindow, getForegroundWindow = foregroundWindow, getWindowLayout = windowLayout, onUnavailable = () => {}, onDiagnostic = () => {}, logger = console, setTimer = setTimeout, clearTimer = clearTimeout }) {
+function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => require('@hamstu/electron-game-overlay'), now = Date.now, attach = attachToWindow, getForegroundWindow = foregroundWindow, getWindowLayout = windowLayout, onUnavailable = () => {}, onDiagnostic = () => {}, logger = console, timing = null, setTimer = setTimeout, clearTimer = clearTimeout }) {
   let addon;
   let host;
   let window;
   let ready = false;
   let registered = false;
   let pending = null;
+  let pendingTrace = null;
   let renderTimer;
   let lastRenderAt = -Infinity;
   let painting = false;
@@ -35,6 +36,7 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
   const retryAfter = new Map();
   const connectionTimers = new Map();
   const description = value => `pid=${value.processId}; window=${JSON.stringify(value.title || '')}; graphics=${value.graphics?.summary || 'unknown'}`;
+  const measure = (trace, stage, operation) => timing ? timing.measure(trace, stage, operation) : operation();
 
   function report(reason, details = {}) {
     const diagnostic = { reason, ...details };
@@ -47,12 +49,13 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
   }
 
   function closeSurface() {
-    try { if (registered) host.closeWindow(window.id); }
+    try { if (registered) measure(pendingTrace, 'native.close-window', () => host.closeWindow(window.id)); }
     catch (error) { logger.warn('[OSD] could not close game feedback:', error.message); }
     registered = false;
   }
 
   function hide() {
+    if (pending) timing?.mark(pendingTrace, 'game.hidden', { firstPaint: pendingTrace?.firstPaint ?? false, firstVisiblePaint: pendingTrace?.firstVisiblePaint ?? false });
     pending = null;
     clearTimer(renderTimer);
     renderTimer = null;
@@ -60,7 +63,7 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
     clearTimer(focusTimer);
     focusTimer = null;
     closeSurface();
-    if (painting && window && !window.isDestroyed()) window.webContents.stopPainting();
+    if (painting && window && !window.isDestroyed()) measure(pendingTrace, 'capture.stop', () => window.webContents.stopPainting());
     painting = false;
   }
 
@@ -84,6 +87,7 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
     // Render the latest state at the card's frame rate, without delaying USB actions.
     const wait = FRAME_INTERVAL_MS - (now() - lastRenderAt);
     if (wait > 0) {
+      timing?.mark(pendingTrace, 'render.deferred', { waitMs: wait });
       if (!renderTimer) renderTimer = setTimer(() => {
         renderTimer = null;
         try { render(); }
@@ -94,33 +98,35 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
     clearTimer(renderTimer);
     renderTimer = null;
     lastRenderAt = now();
-    const display = targetDisplay();
+    timing?.mark(pendingTrace, 'render.begin', { processId: target?.processId, connected: connectedProcesses.has(target?.processId) });
+    const display = measure(pendingTrace, 'target.display', targetDisplay);
     const scale = display.scaleFactor || 1;
     const rect = { x: Math.round(24 * scale), y: Math.round(24 * scale), width: Math.round(316 * scale), height: Math.round(112 * scale) };
     const position = { x: display.bounds.x, y: display.bounds.y };
     if (!lastPosition || position.x !== lastPosition.x || position.y !== lastPosition.y) {
-      window.setPosition(position.x, position.y, false);
+      measure(pendingTrace, 'window.position', () => window.setPosition(position.x, position.y, false));
       lastPosition = position;
     }
     if (scale !== lastScale) {
-      host.setScaleFactor(scale);
+      measure(pendingTrace, 'native.scale', () => host.setScaleFactor(scale));
       lastScale = scale;
     }
     if (!registered) {
-      host.addWindow(window.id, {
+      measure(pendingTrace, 'native.add-window', () => host.addWindow(window.id, {
         name: 'GaimglassActions', nativeHandle: window.getNativeWindowHandle().readUInt32LE(0),
         transparent: true, resizable: false, dragBorderWidth: 0,
         minWidth: 0, minHeight: 0, maxWidth: rect.width, maxHeight: rect.height, rect,
-      });
+      }));
       registered = true;
     } else if (!lastBounds || Object.keys(rect).some(key => rect[key] !== lastBounds[key])) {
-      host.sendWindowBounds(window.id, rect);
+      measure(pendingTrace, 'native.bounds', () => host.sendWindowBounds(window.id, rect));
     }
     lastBounds = rect;
-    window.webContents.send('action-overlay:show', pending);
+    if (timing) timing.send(window, pending, pendingTrace, 'game');
+    else window.webContents.send('action-overlay:show', pending);
     // startPainting restarts Electron's video capturer, even when already active.
     if (!painting) {
-      window.webContents.startPainting();
+      measure(pendingTrace, 'capture.start', () => window.webContents.startPainting());
       painting = true;
     }
   }
@@ -130,8 +136,8 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
     focusTimer = setTimer(() => {
       if (!pending) return;
       try {
-        const foreground = getForegroundWindow();
-        if (foreground !== target?.hwnd || !isFullscreenLayout(getWindowLayout(foreground))) {
+        const foreground = measure(pendingTrace, 'focus.foreground', getForegroundWindow);
+        if (foreground !== target?.hwnd || !isFullscreenLayout(measure(pendingTrace, 'focus.layout', () => getWindowLayout(foreground)))) {
           report('focus-or-fullscreen-lost', { foreground });
           hide();
           onUnavailable();
@@ -141,12 +147,13 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
   }
 
   function startHost() {
-    host = new addon.Overlay();
+    host = measure(pendingTrace, 'native.create', () => new addon.Overlay());
     host.setEventCallback((event, payload) => {
       if (unavailable) return;
+      timing?.nativeEvent(event, payload);
       try {
         if (event === 'client.connect' || event === 'game.process') {
-          host.sendCommand({ command: 'input.intercept', intercept: false });
+          measure(pendingTrace, 'native.input-command', () => host.sendCommand({ command: 'input.intercept', intercept: false }));
           logger.log(`[OSD] game ${event}`, payload);
           if (event === 'client.connect') {
             connectedProcesses.add(payload.pid);
@@ -164,14 +171,15 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
         }
       } catch (error) { fail(error); }
     });
-    host.start();
-    host.sendCommand({ command: 'input.intercept', intercept: false });
+    measure(pendingTrace, 'native.start', () => host.start());
+    measure(pendingTrace, 'native.input-command', () => host.sendCommand({ command: 'input.intercept', intercept: false }));
     const display = targetDisplay();
-    window = new BrowserWindow({
+    window = measure(pendingTrace, 'window.create', () => new BrowserWindow({
       x: display.bounds.x, y: display.bounds.y, width: 316, height: 112,
       show: false, frame: false, transparent: true, focusable: false, skipTaskbar: true,
       webPreferences: { offscreen: true, preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false },
-    });
+    }));
+    timing?.attach(window, 'game');
     window.webContents.setFrameRate(FRAME_RATE);
     window.webContents.stopPainting();
     window.webContents.on('paint', (_event, _dirty, image) => {
@@ -179,7 +187,10 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
       try {
         const size = image.getSize();
         if (size.width <= 0 || size.height <= 0) return;
-        host.sendFrameBuffer(window.id, image.getBitmap(), size.width, size.height);
+        if (timing) timing.transfer(window, image, (bitmap, width, height) => host.sendFrameBuffer(window.id, bitmap, width, height), {
+          processId: target?.processId, connectedProcesses: [...connectedProcesses],
+        });
+        else host.sendFrameBuffer(window.id, image.getBitmap(), size.width, size.height);
         if (!firstFrameSent) {
           firstFrameSent = true;
           logger.log(`[OSD] first game frame transferred; width=${size.width}; height=${size.height}`);
@@ -187,6 +198,7 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
       } catch (error) { fail(error); }
     });
     window.webContents.on('did-start-loading', () => {
+      timing?.mark(pendingTrace, 'renderer.loading', { windowId: window.id });
       ready = false;
       clearTimer(renderTimer);
       renderTimer = null;
@@ -197,6 +209,7 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
     window.webContents.on('did-finish-load', () => {
       if (!window || window.isDestroyed()) return;
       ready = true;
+      timing?.mark(pendingTrace, 'renderer.ready', { windowId: window.id });
       try { render(); }
       catch (error) { fail(error); }
     });
@@ -204,8 +217,11 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
   }
 
   function attachTarget(value) {
+    const trace = pendingTrace;
+    timing?.mark(trace, 'attachment.begin', { processId: value.processId });
     attachingProcesses.add(value.processId);
     void attach(value).then(result => {
+      timing?.mark(trace, 'attachment.end', { processId: value.processId, success: result.success, error: result.error });
       attachingProcesses.delete(value.processId);
       if (unavailable) return;
       if (!result.success) {
@@ -228,19 +244,21 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
   }
 
   return {
-    show(notification) {
+    show(notification, trace) {
       if (unavailable) return false;
+      trace ||= timing?.begin('game-overlay', { type: notification.type });
       try {
-        const foreground = getForegroundWindow();
-        layout = getWindowLayout(foreground);
+        timing?.mark(trace, 'game.request');
+        const foreground = measure(trace, 'target.foreground', getForegroundWindow);
+        layout = measure(trace, 'target.layout', () => getWindowLayout(foreground));
         if (!isFullscreenLayout(layout)) {
           report('not-fullscreen', { foreground, layout });
           target = null;
           return false;
         }
-        addon ||= loadAddon();
+        addon ||= measure(trace, 'native.load-addon', loadAddon);
         if (now() >= nextScanAt || foreground !== lastForeground) {
-          candidates = addon.getTopWindows(true);
+          candidates = measure(trace, 'target.scan', () => addon.getTopWindows(true));
           lastForeground = foreground;
           for (const pid of attachedProcesses) {
             if (!candidates.some(value => value.processId === pid)) {
@@ -254,7 +272,7 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
           }
           nextScanAt = now() + 1500;
         }
-        const ownedProcessIds = [process.pid, ...(app?.getAppMetrics?.() || []).map(value => value.pid)];
+        const ownedProcessIds = [process.pid, ...measure(trace, 'target.app-metrics', () => app?.getAppMetrics?.() || []).map(value => value.pid)];
         target = selectGameWindow(candidates, foreground, ownedProcessIds);
         if (!target) {
           const candidate = candidates.find(value => value.hwnd === foreground);
@@ -266,6 +284,8 @@ function createGameOverlay({ BrowserWindow, screen, app, loadAddon = () => requi
           return false;
         }
         report('native-selected', { processId: target.processId, title: target.title, graphics: target.graphics, layout });
+        if (pendingTrace && pendingTrace !== trace) timing?.mark(pendingTrace, 'game.superseded', { bySequence: trace?.sequence });
+        pendingTrace = trace;
         if (!host) startHost();
         pending = notification;
         render();

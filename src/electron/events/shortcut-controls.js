@@ -7,20 +7,26 @@ function usableState(state) {
 }
 
 // Device actions stay on Electron's main process, independently of renderer scheduling.
-function createShortcutControls({ getState, readState, writeState, writeIndex, showFeedback, broadcast, isQuitting = () => false, logger = console }) {
+function createShortcutControls({ getState, readState, writeState, writeIndex, showFeedback, broadcast, isQuitting = () => false, logger = console, timing = null }) {
   let pending = [];
   let running;
 
   async function drain() {
     while (pending.length && !isQuitting()) {
       let batch;
+      let trace;
       try {
+        trace = pending[0]?.trace;
+        timing?.mark(trace, 'shortcut.drain');
         let snapshot = getState();
         if (!usableState(snapshot) || (pending.some(action => /^s[1-8]$/.test(action.command)) && !snapshot.defaultColors)) {
+          timing?.mark(trace, 'device.read.begin');
           await readState('shortcut-state');
+          timing?.mark(trace, 'device.read.end');
           snapshot = getState();
         }
         batch = pending.splice(0);
+        timing?.mark(trace, 'shortcut.batch', { sequences: batch.map(action => action.trace?.sequence), commands: batch.map(action => action.command) });
         if (!usableState(snapshot)) throw new Error('Device state is unavailable');
         const state = { ...snapshot, color: { ...snapshot.color } };
         let notification;
@@ -47,18 +53,24 @@ function createShortcutControls({ getState, readState, writeState, writeIndex, s
           } else continue;
         }
         if (!notification) continue;
+        timing?.mark(trace, 'device.write.begin');
         const result = await writeState(state);
+        timing?.mark(trace, 'device.write.end');
         if (!isCommandAcknowledged(SERIAL_COMMANDS.SET_MAIN_LED, '', result)) throw new Error(`Device rejected LED state: ${result}`);
         if (getState()?.connectionId !== snapshot.connectionId) throw new Error('Connection changed during shortcut');
         if (Number.isInteger(state.index) && state.index !== getState().index) {
+          timing?.mark(trace, 'device.index.begin');
           const result = await writeIndex(state.index);
+          timing?.mark(trace, 'device.index.end');
           if (!isCommandAcknowledged(SERIAL_COMMANDS.SET_DEFAULT_INDEX, state.index, result)) throw new Error(`Device rejected color index: ${result}`);
           if (getState()?.connectionId !== snapshot.connectionId) throw new Error('Connection changed during shortcut');
         }
         const confirmed = getState();
-        broadcast(confirmed);
-        showFeedback(notification);
+        if (timing) timing.measure(trace, 'shortcut.broadcast', () => broadcast(confirmed));
+        else broadcast(confirmed);
+        showFeedback(notification, trace);
       } catch (error) {
+        timing?.mark(trace, 'shortcut.error', { error: error.message });
         if (!batch) pending = [];
         logger.warn('[Shortcuts] device action failed:', error.message);
       }
@@ -69,7 +81,8 @@ function createShortcutControls({ getState, readState, writeState, writeIndex, s
   return {
     run(command) {
       if (isQuitting()) return Promise.resolve();
-      pending.push({ command, connectionId: getState()?.connectionId });
+      const trace = timing?.begin('shortcut', { command });
+      pending.push({ command, connectionId: getState()?.connectionId, trace });
       return schedule();
     },
   };
@@ -109,6 +122,7 @@ function runDeviceShortcut(command) {
       },
       isQuitting: () => app.isQuitting,
       logger: require('electron-log/main'),
+      timing: require('../overlay/timing').getOverlayTiming(),
     });
   }
   return controls.run(command);
