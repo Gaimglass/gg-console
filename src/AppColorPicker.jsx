@@ -42,6 +42,7 @@ function AppColorPicker() {
   const refreshGenerationRef = useRef(0);
   const queuedRefreshRef = useRef(null);
   const defaultColorsReadInFlightRef = useRef(false);
+  const pickerInteractionRef = useRef(false);
 
   // ADS transition variables - use refs to persist across renders
   const changeIntervalRef = useRef(null);
@@ -69,9 +70,9 @@ function AppColorPicker() {
         ledOn,
         feedback,
       });
-      // Broadcast to other windows (like calibrate window)
-      ipcRenderer.send('broadcast-color-sync', color, ledOn);
     }
+    // React state stays in sync across windows, including while disconnected.
+    ipcRenderer.send('broadcast-color-sync', color, ledOn);
   }, [isConnected])
 
   const sendAlphaValue = useCallback((value) => {
@@ -84,8 +85,8 @@ function AppColorPicker() {
     if (isConnected) ipcRenderer.sendSync('set-default-index', index, color);
   }, [isConnected]);
 
-  // Stable function references for throttling
-  const handleColorChangeStable = useCallback((newColor, defaultIndex = -1) => {
+  // Fullscreen calibration changes only the current color, even while editing a swatch.
+  const handleCurrentColorChange = useCallback((newColor, showFeedback = true) => {
     // defaults don't have an alpha so use the current value
     let alpha = newColor?.a ?? color.a;
 
@@ -95,8 +96,14 @@ function AppColorPicker() {
     };
     setColor(finalColor);
     setLEDOn(true);
-    const feedback = defaultIndex < 0 ? (alpha !== color.a ? 'brightness' : (!ledOn ? 'power' : undefined)) : undefined;
+    const feedback = showFeedback ? (alpha !== color.a ? 'brightness' : (!ledOn ? 'power' : undefined)) : undefined;
     sendMainLEDStatus(finalColor, true, feedback);
+    return finalColor;
+  }, [color.a, ledOn, sendMainLEDStatus]);
+
+  // Stable function references for throttling
+  const handleColorChangeStable = useCallback((newColor, defaultIndex = -1) => {
+    const finalColor = handleCurrentColorChange(newColor, defaultIndex < 0);
     if (defaultIndex > -1) {
       // update the index position on the device so that the left and right color 
       // button on the device start from where this default color is.
@@ -113,7 +120,7 @@ function AppColorPicker() {
       dc[editSwatch] = c;
       setDefaultColors(dc);
     }
-  }, [color.a, ledOn, sendMainLEDStatus, sendDefaultIndex, editSwatch, defaultColors]);
+  }, [handleCurrentColorChange, sendDefaultIndex, editSwatch, defaultColors]);
 
 
   const handleUpdateGGStable = useCallback((message) => {
@@ -122,6 +129,31 @@ function AppColorPicker() {
 
   const handleColorChangeThrottled = useThrottle(handleColorChangeStable, 50);
   const handleUpdateGGThrottled = useThrottle(handleUpdateGGStable, 50);
+
+  const handleCalibrationColorChange = useCallback((newColor) => {
+    // Controlled picker updates can emit delayed onChange callbacks. Only a new
+    // interaction in the main picker may resume editing the selected swatch.
+    pickerInteractionRef.current = false;
+    handleColorChangeThrottled.cancel();
+    handleCurrentColorChange(newColor);
+  }, [handleColorChangeThrottled, handleCurrentColorChange]);
+
+  useEffect(() => {
+    const syncCurrentColor = () => ipcRenderer.send('broadcast-color-sync', color, ledOn);
+    ipcRenderer.on('request-color-sync', syncCurrentColor);
+    ipcRenderer.on('change-current-color', handleCalibrationColorChange);
+    return () => {
+      ipcRenderer.removeListener('request-color-sync', syncCurrentColor);
+      ipcRenderer.removeListener('change-current-color', handleCalibrationColorChange);
+    };
+  }, [color, ledOn, handleCalibrationColorChange]);
+
+  useEffect(() => {
+    const syncDefaultColors = () => ipcRenderer.send('broadcast-default-colors-sync', defaultColors);
+    ipcRenderer.on('request-default-colors-sync', syncDefaultColors);
+    syncDefaultColors();
+    return () => ipcRenderer.removeListener('request-default-colors-sync', syncDefaultColors);
+  }, [defaultColors]);
 
   // Event handler callbacks - defined before useEffects that reference them
   const handleAmbientBrightness = useCallback((brightness) => {
@@ -519,6 +551,7 @@ function AppColorPicker() {
     });
     setColor(c);
     setLEDOn(led);
+    ipcRenderer.send('broadcast-color-sync', c, led);
   }
 
 
@@ -690,7 +723,15 @@ function AppColorPicker() {
 
                   </div>
 
-                  <RgbaColorPicker color={color} onChange={handleColorChangeThrottled} />
+                  <RgbaColorPicker
+                    color={color}
+                    onMouseDownCapture={() => { pickerInteractionRef.current = true; }}
+                    onTouchStartCapture={() => { pickerInteractionRef.current = true; }}
+                    onKeyDownCapture={() => { pickerInteractionRef.current = true; }}
+                    onChange={(newColor) => {
+                      if (pickerInteractionRef.current) handleColorChangeThrottled(newColor);
+                    }}
+                  />
                   <div className={styles.rgbInputs}>
                     <label>R</label>
                     <input onChange={(e) => changeRgb(e, 'r')} value={color.r} type="text" />

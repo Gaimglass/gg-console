@@ -76,6 +76,16 @@
   width: 6em;
 }
 
+.readOnly .swatches {
+  width: auto;
+}
+
+.readOnly .swatch {
+  box-sizing: content-box;
+  padding: 0;
+  margin-right: 0;
+}
+
 .plusIcon {
   fill: white;
   padding: 8px;

@@ -1,138 +1,108 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { RgbaColorPicker } from 'react-colorful';
+import DefaultColors from './DefaultColors';
 
 import styles from './css/AppCalibrate.module.css';
 import Close from './assets/xmark-solid.svg?react';
 import { useThrottle } from './Utils';
 import { Crosshairs } from './Crosshairs';
 
-const ipcRenderer  = window.ipcRenderer;
+const ipcRenderer = window.ipcRenderer;
 
 export default function AppCalibrate() {
+  const [color, setColor] = useState(null);
+  const [defaultColors, setDefaultColors] = useState([]);
   const canvasRef = useRef(null);
-  const prevTimeRef = useRef(0);
-  const renderQueueRef = useRef([]);
   const xhairsRef = useRef(null);
+  const pendingColorRef = useRef(null);
+  const enabledDefaultColors = defaultColors.filter(swatch => swatch.enabled).slice(0, 8);
 
-  // Copied from AppColorPicker
-  function parseMainLedFromGG(message) {
-    if (!message || typeof message !== 'string') {
-      console.warn('parseMainLedFromGG: Invalid message', message);
-      return { r: 80, g: 255, b: 40, a: 1 }; // Return default color
-    }
-    const params = message.split('&');
-    const c = {};
-    params.forEach((param) => {
-      const [key, value] = param.split('=');
-      switch (key) {
-        case 'color': {
-          const [r, g, b] = value.split(',');
-          c.r = Number(r);
-          c.g = Number(g);
-          c.b = Number(b);
-          break;
-        }
-        case 'brightness':
-          c.a = Number(value);
-          break;
-        default:
-          break;
-      }
-    });
-    return c;
-  }
-
-  const handleUpdateColor = useCallback((message) => {
-    // listen for 'update-main-led-state-from-gg' IPC messages and updates the crosshairs color
-    const color = parseMainLedFromGG(message);
-    if (xhairsRef.current) {
-      xhairsRef.current.setColor(color);
-    }
+  const sendColorChange = useCallback((newColor) => {
+    // Use the main picker's current-color path so saved swatches are untouched.
+    ipcRenderer.send('change-current-color', newColor);
   }, []);
+  const sendColorChangeThrottled = useThrottle(sendColorChange, 50);
 
-  const handleUpdateColorThrottled = useThrottle(handleUpdateColor, 50);
-  
-  const handleColorSync = useCallback((color, ledOn) => {
-    if (xhairsRef.current && ledOn) {
-      xhairsRef.current.setColor(color);
+  const handleColorChange = useCallback((newColor) => {
+    pendingColorRef.current = newColor;
+    setColor(newColor);
+    sendColorChangeThrottled(newColor);
+  }, [sendColorChangeThrottled]);
+
+  const handleColorSync = useCallback((newColor) => {
+    const pending = pendingColorRef.current;
+    if (pending) {
+      // Earlier device writes can finish while a newer color is still queued.
+      // Keep the immediate React preview until the latest color is acknowledged.
+      if (['r', 'g', 'b', 'a'].every(channel => pending[channel] === newColor[channel])) {
+        pendingColorRef.current = null;
+      }
+      return;
     }
+    setColor(newColor);
   }, []);
 
   useEffect(() => {
-    document.getElementsByTagName('body')[0].classList.add(styles.bodyCalibrate);
-    document.addEventListener('keydown', handleClick);
+    if (color) xhairsRef.current?.setColor(color);
+  }, [color]);
 
-    const canvas = document.getElementById('canvas');
-    if (canvas) {
-      canvas.style.display = '';
-    }
+  useEffect(() => {
+    document.body.classList.add(styles.bodyCalibrate);
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') window.close();
+    };
+    document.addEventListener('keydown', handleKeyDown);
 
-    loadMainLedFromGG();
+    const ctx = canvasRef.current.getContext('2d');
+    xhairsRef.current = new Crosshairs(ctx, { r: 80, g: 255, b: 40, a: 1 });
+    let previousTime;
+    let animationFrame;
+    const render = (time) => {
+      const dt = previousTime === undefined ? 0 : time - previousTime;
+      ctx.save();
+      xhairsRef.current.draw(dt, time);
+      ctx.restore();
+      previousTime = time;
+      animationFrame = window.requestAnimationFrame(render);
+    };
+    animationFrame = window.requestAnimationFrame(render);
 
-    // Listen for real-time color updates from the device
-    ipcRenderer.on('update-main-led-state-from-gg', handleUpdateColorThrottled);
-
-    // Listen for color changes from other windows (e.g., AppColorPicker)
+    // Seed from the main React state without reading or writing the device.
     ipcRenderer.on('color-sync-from-other-window', handleColorSync);
+    ipcRenderer.on('default-colors-sync-from-other-window', setDefaultColors);
+    ipcRenderer.send('request-color-sync');
+    ipcRenderer.send('request-default-colors-sync');
 
     return () => {
-      document.removeEventListener('keydown', handleClick);
-      document.getElementsByTagName('body')[0].classList.remove(styles.bodyCalibrate);
-      ipcRenderer.removeListener('update-main-led-state-from-gg', handleUpdateColorThrottled);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.classList.remove(styles.bodyCalibrate);
       ipcRenderer.removeListener('color-sync-from-other-window', handleColorSync);
-      handleUpdateColorThrottled.cancel?.(); // Cancel any pending throttled calls
+      ipcRenderer.removeListener('default-colors-sync-from-other-window', setDefaultColors);
+      sendColorChangeThrottled.cancel?.();
+      window.cancelAnimationFrame(animationFrame);
+      xhairsRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function close() {
-    window.close();
-  }
-
-  function handleClick(event) {
-    if (event.key === 'Escape' || event.keyCode === 27) {
-      close();
-    }
-  }
-
-  function initXhairs(color) {
-    const ctx = canvasRef.current.getContext('2d');
-    xhairsRef.current = new Crosshairs(ctx, color);
-    renderQueueRef.current.push(xhairsRef.current);
-    window.requestAnimationFrame(render);
-  }
-
-  function render(time) {
-    if (prevTimeRef.current === 0) {
-      prevTimeRef.current = time;
-    }
-    const dt = time - prevTimeRef.current;
-    const ctx = canvasRef.current?.getContext('2d');
-    
-    if (ctx) {
-      ctx.save();
-      renderQueueRef.current.forEach((r) => {
-        r.draw(dt, time);
-      });
-      ctx.restore();
-    }
-    
-    prevTimeRef.current = time;
-    window.requestAnimationFrame(render);
-  }
-
-  // Copied from AppColorPicker
-  function loadMainLedFromGG() {
-    const result = ipcRenderer.sendSync('get-led-state');
-    const color = parseMainLedFromGG(result);
-    initXhairs(color);
-  }
+  }, [handleColorSync, sendColorChangeThrottled]);
 
   return (
     <div id="container">
-      <button onClick={close} className={styles.close}>
+      <canvas ref={canvasRef} width="1" height="1" id="canvas" className={styles.canvas} style={{ opacity: color?.a ?? 1 }} />
+      {color && (
+        <div className={styles.colorPicker} role="group" aria-label="Current color">
+          <RgbaColorPicker color={color} onChange={handleColorChange} />
+          {enabledDefaultColors.length > 0 && (
+            <DefaultColors
+              readOnly
+              colors={enabledDefaultColors}
+              selectedColor={color}
+              onChangeColor={newColor => handleColorChange({ ...newColor, a: color.a })}
+            />
+          )}
+        </div>
+      )}
+      <button onClick={() => window.close()} className={styles.close} aria-label="Close calibration">
         <Close />
       </button>
-      <canvas ref={canvasRef} width="1" height="1" id="canvas" />
     </div>
   );
 }

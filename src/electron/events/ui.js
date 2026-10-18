@@ -52,6 +52,17 @@ function registerUIEvents(mainWindow, app) {
     }
   });
 
+  // The main React picker owns the current color and all device writes.
+  electron.ipcMain.on('request-color-sync', () => {
+    mainWindow.webContents.send('request-color-sync');
+  });
+  electron.ipcMain.on('request-default-colors-sync', () => {
+    mainWindow.webContents.send('request-default-colors-sync');
+  });
+  electron.ipcMain.on('change-current-color', (_event, color) => {
+    mainWindow.webContents.send('change-current-color', color);
+  });
+
   // Broadcast color changes to other windows (not sender)
   electron.ipcMain.on('broadcast-color-sync', (event, color, ledOn) => {
     const senderWebContentsId = event.sender.id;
@@ -59,6 +70,14 @@ function registerUIEvents(mainWindow, app) {
     allWindows.forEach(win => {
       if (win.webContents.id !== senderWebContentsId) {
         win.webContents.send('color-sync-from-other-window', color, ledOn);
+      }
+    });
+  });
+
+  electron.ipcMain.on('broadcast-default-colors-sync', (event, colors) => {
+    BrowserWindow.getAllWindows().forEach(win => {
+      if (win.webContents.id !== event.sender.id) {
+        win.webContents.send('default-colors-sync-from-other-window', colors);
       }
     });
   });

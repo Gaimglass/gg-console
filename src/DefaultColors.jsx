@@ -11,6 +11,12 @@ import DefaultRevertConfirm from './DefaultRevertConfirm'
 
 
 function DefaultColors(props) {
+  const { readOnly = false, selectedColor } = props;
+  const Swatch = readOnly ? 'button' : 'div';
+  const activeSwatch = readOnly
+    ? props.colors.findIndex(swatch => swatch.enabled !== false && selectedColor &&
+      ['r', 'g', 'b'].every(channel => swatch.color[channel] === selectedColor[channel]))
+    : props.editSwatch;
   
   const canvasRef = useRef(null);
   const swatchRefs = useRef([]);
@@ -19,7 +25,7 @@ function DefaultColors(props) {
   useEffect(() => {
     return ()=>{
       // cancel out of editing swatches if unmounting
-      props.onSetEditSwatch(null);
+      props.onSetEditSwatch?.(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -37,7 +43,7 @@ function DefaultColors(props) {
       const yc = s.offsetTop + (s.clientHeight/2);
 
       ctx.beginPath()
-      if(props.editSwatch===i) {
+      if(activeSwatch===i) {
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgba(255,255,255,1)';  
       } else {
@@ -49,10 +55,10 @@ function DefaultColors(props) {
       ctx.bezierCurveTo(100/2, 200, 100/2, yc, 100, yc);
       ctx.stroke();
     }
-  }, [props.editSwatch, props.colors]);
+  }, [activeSwatch, props.colors]);
 
   function changeColor(swatch) {
-    if (props.editSwatch === null) {
+    if (readOnly || props.editSwatch === null) {
       props.onChangeColor(props.colors[swatch].color, swatch);
     }
     
@@ -88,10 +94,10 @@ function DefaultColors(props) {
   for(let i = 0; i < props.colors.length; i++) {
     let disabledSwatch = false;
     let editingSwatch = false;
-    if (props.editSwatch === i) {
+    if (activeSwatch === i) {
       editingSwatch = true;
     }
-    if (props.editSwatch !== null && props.editSwatch !== i) {
+    if (!readOnly && props.editSwatch !== null && props.editSwatch !== i) {
         disabledSwatch = true;
     }
 
@@ -102,7 +108,11 @@ function DefaultColors(props) {
 
     Swatches.push(
       <div className={styles.swatchWrapper} key={i}>
-      <div
+      <Swatch
+        type={readOnly ? 'button' : undefined}
+        aria-label={readOnly ? `Default color ${i + 1}` : undefined}
+        aria-pressed={readOnly ? editingSwatch : undefined}
+        title={readOnly ? `Default color ${i + 1}: RGB(${props.colors[i].color.r}, ${props.colors[i].color.g}, ${props.colors[i].color.b})` : undefined}
         style={{
           backgroundColor: colorToCss(props.colors[i]?.color),
           opacity: disabledSwatch ? 0.2 : 1
@@ -114,13 +124,13 @@ function DefaultColors(props) {
           [styles.swatch]: true,
           [styles.swatchEdit]: editingSwatch
         })}>
-      </div>
-        { (props.editSwatch !== i) &&
+      </Swatch>
+        { !readOnly && (props.editSwatch !== i) &&
           <button onClick={()=>{
             edit(i);
           }} className={styles.button + ' ' + styles.editButton}><Edit className={styles.editIcon}></Edit></button>
         }
-        { (props.editSwatch === i) &&
+        { !readOnly && (props.editSwatch === i) &&
           <>
           <button onClick={()=>{save(i)}} className={styles.button  + ' ' +  styles.checkButton}><Check className={styles.editIcon}></Check></button>
           <button onClick={()=>{cancel()}} className={styles.button  + ' ' +  styles.cancelButton}><Cancel className={styles.editIcon}></Cancel></button>
@@ -132,21 +142,25 @@ function DefaultColors(props) {
    
   return (
     
-    <div className={styles.defaultColors}>
+    <div
+      className={classNames(styles.defaultColors, { [styles.readOnly]: readOnly })}
+      role={readOnly ? 'group' : undefined}
+      aria-label={readOnly ? 'Default colors' : undefined}
+    >
       <div className={styles.curves}>
         {/* This much match .defaultColors class height value */}
-        <canvas height="320" width="100" ref={canvasRef}></canvas> 
+        <canvas height="320" width="100" ref={canvasRef} aria-hidden="true"></canvas>
       </div>
 
       <div className={styles.swatches}> 
         {Swatches}
         
-          <button onClick={props.onAddDefaultColor} style={{
+          {!readOnly && <button onClick={props.onAddDefaultColor} style={{
             visibility: showPlus ? 'visible' : 'hidden' 
-          }}className={styles.button  + ' ' +  styles.addButton}><Plus className={styles.plusIcon}></Plus></button>
+          }}className={styles.button  + ' ' +  styles.addButton}><Plus className={styles.plusIcon}></Plus></button>}
         
       </div>
-      { (props.editSwatch !== null) &&
+      { !readOnly && (props.editSwatch !== null) &&
         <DefaultRevertConfirm onDelete={props.editSwatch !== 0 ? ()=>{
           props.onDeleteDefaultColor()
           props.onSetEditSwatch(null);
@@ -162,13 +176,15 @@ function DefaultColors(props) {
 
 DefaultColors.propTypes = {
   onChangeColor: PropTypes.func.isRequired,
-  onSetEditSwatch: PropTypes.func.isRequired,
+  readOnly: PropTypes.bool,
+  selectedColor: PropTypes.shape({ r: PropTypes.number, g: PropTypes.number, b: PropTypes.number }),
+  onSetEditSwatch: PropTypes.func,
   colors: PropTypes.array.isRequired,
   editSwatch: PropTypes.number,
-  onSaveDefaultColor: PropTypes.func.isRequired,
-  onDeleteDefaultColor: PropTypes.func.isRequired,
-  onAddDefaultColor: PropTypes.func.isRequired,
-  onResetDefaultColor: PropTypes.func.isRequired
+  onSaveDefaultColor: PropTypes.func,
+  onDeleteDefaultColor: PropTypes.func,
+  onAddDefaultColor: PropTypes.func,
+  onResetDefaultColor: PropTypes.func
 }
 
 
