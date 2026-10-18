@@ -127,6 +127,39 @@ test('native exceptions retain a begin and failed end, and a logging failure can
   broken.timing.dispose();
 });
 
+test('clock round trips bound renderer execution separately from delayed acknowledgements', () => {
+  const { timing, window, records, advance } = fixture();
+  let token;
+  window.webContents.send = (channel, value) => { if (channel === 'action-overlay:clock') token = value; };
+  const trace = timing.begin('overlay');
+  timing.send(window, { type: 'power', on: true }, trace, 'game');
+  advance(4);
+  window.webContents.emit('ipc-message', {}, 'action-overlay:timing', { stage: 'clock', token, rendererMs: 102 });
+  advance(996);
+  window.webContents.emit('ipc-message', {}, 'action-overlay:timing', {
+    id: trace.id, sequence: trace.sequence, stage: 'dom-updated', rendererMs: 120, durationMs: 5,
+  });
+  const result = records.find(record => record.stage === 'renderer.dom-updated');
+  assert.equal(result.rendererElapsedMinMs, 17);
+  assert.equal(result.rendererElapsedMaxMs, 23);
+  assert.equal(result.ackDelayMinMs, 977);
+  assert.equal(result.ackDelayMaxMs, 983);
+  assert.equal(result.clockUncertaintyMs, 6);
+  timing.dispose();
+});
+
+test('a delayed main heartbeat records a stall independently of renderer acknowledgements', () => {
+  const { timing, records, advance, timers } = fixture();
+  timing.begin('overlay');
+  const [timerId, callback] = [...timers][0];
+  timers.delete(timerId);
+  advance(1250);
+  callback();
+  assert.equal(records.find(record => record.stage === 'main.loop-lag').lagMs, 1000);
+  timing.dispose();
+  assert.equal(timers.size, 0);
+});
+
 test('native Present logs remain contextual and noisy per-frame/input messages are excluded', () => {
   const { timing, records } = fixture();
   timing.nativeEvent('log', { level: 'info', message: 'Present hook: 300 frames rendered', timestamp: 123 });

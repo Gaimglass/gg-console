@@ -4,6 +4,9 @@ const { Worker } = require('node:worker_threads');
 const { readAndErase } = require('./frame-marker');
 
 const round = value => Math.round(value * 1000) / 1000;
+// Chromium can reduce performance.now() precision. Pad the RTT bounds rather
+// than claiming sub-millisecond cross-process accuracy from a rounded sample.
+const CLOCK_MARGIN_MS = 1;
 const RENDERER_STAGES = new Set(['received', 'dom-updated', 'animation-callback', 'superseded-before-animation', 'loop-lag', 'hidden']);
 
 function createTimingWriter(filePath, { logger = console, maxBytes = 8 * 1024 * 1024 } = {}) {
@@ -28,15 +31,17 @@ function createTimingWriter(filePath, { logger = console, maxBytes = 8 * 1024 * 
       return new Promise(resolve => {
         worker.once('exit', resolve);
         worker.ref();
+        if (dropped) worker.postMessage({ stage: 'diagnostics.dropped', droppedRecords: dropped });
         worker.postMessage(null);
       });
     },
   };
 }
 
-function createOverlayTiming({ write, now = () => performance.now(), wallNow = Date.now, setTimer = setTimeout, clearTimer = clearTimeout, session = `${process.pid}-${Date.now().toString(36)}`, maxTraces = 128 } = {}) {
+function createOverlayTiming({ write, now = () => performance.now(), wallNow = Date.now, setTimer = setTimeout, clearTimer = clearTimeout, session = `${process.pid}-${Date.now().toString(36)}`, maxTraces = 512 } = {}) {
   let sequence = 0;
   let paintSequence = 0;
+  let clockSequence = 0;
   let heartbeat;
   let watchUntil = 0;
   let disposed = false;
@@ -87,9 +92,22 @@ function createOverlayTiming({ write, now = () => performance.now(), wallNow = D
   }
 
   function attach(window, backend) {
-    const state = { backend, trace: null, lastPaintAt: null };
+    const state = { backend, trace: null, lastPaintAt: null, pings: new Map(), clock: null };
     const receive = (_event, channel, sample) => {
-      if (channel !== 'action-overlay:timing' || !sample || !RENDERER_STAGES.has(sample.stage)) return;
+      if (channel !== 'action-overlay:timing' || !sample) return;
+      if (sample.stage === 'clock') {
+        const sentAt = state.pings.get(sample.token);
+        if (sentAt === undefined || !Number.isFinite(sample.rendererMs) || sample.rendererMs < 0) return;
+        state.pings.delete(sample.token);
+        const at = now();
+        const roundTripMs = at - sentAt;
+        if (!state.clock || at - state.clock.at > 30000 || roundTripMs < state.clock.roundTripMs) {
+          state.clock = { at, roundTripMs, minOffset: sentAt - sample.rendererMs - CLOCK_MARGIN_MS, maxOffset: at - sample.rendererMs + CLOCK_MARGIN_MS };
+          event('clock.sync', { backend, windowId: window.id, roundTripMs: round(roundTripMs), marginMs: CLOCK_MARGIN_MS });
+        }
+        return;
+      }
+      if (!RENDERER_STAGES.has(sample.stage)) return;
       const trace = traces.get(sample.sequence);
       if (!trace || sample.id !== trace.id || !state.sent?.has(trace.id)) return;
       // Keep renderer-local times separate from main receipt time: a late IPC ACK
@@ -100,20 +118,38 @@ function createOverlayTiming({ write, now = () => performance.now(), wallNow = D
       }
       if (typeof sample.hidden === 'boolean') details.hidden = sample.hidden;
       if (['visible', 'hidden', 'prerender'].includes(sample.visibility)) details.visibility = sample.visibility;
+      if (state.clock && now() - state.clock.at <= 30000 && Number.isFinite(sample.rendererMs)) {
+        const earliest = sample.rendererMs + state.clock.minOffset;
+        const latest = sample.rendererMs + state.clock.maxOffset;
+        Object.assign(details, { rendererElapsedMinMs: round(earliest - trace.startedAt), rendererElapsedMaxMs: round(latest - trace.startedAt),
+          ackDelayMinMs: round(Math.max(0, now() - latest)), ackDelayMaxMs: round(Math.max(0, now() - earliest)),
+          clockUncertaintyMs: round(state.clock.maxOffset - state.clock.minOffset) });
+      }
       event(`renderer.${sample.stage}`, details, trace);
     };
     state.receive = receive;
     windows.set(window, state);
     window.webContents.on('ipc-message', receive);
+    window.webContents.on('did-start-loading', () => { state.clock = null; state.pings.clear(); });
+    window.webContents.on('did-finish-load', () => { for (let index = 0; index < 3; index++) ping(window, state); });
     window.once('closed', () => { windows.delete(window); });
     window.webContents.on('render-process-gone', (_event, details) => event('renderer.gone', { backend, ...details }, state.trace));
     window.webContents.on('unresponsive', () => event('renderer.unresponsive', { backend }, state.trace));
     window.webContents.on('responsive', () => event('renderer.responsive', { backend }, state.trace));
   }
 
+  function ping(window, state) {
+    const token = ++clockSequence;
+    state.pings.set(token, now());
+    if (state.pings.size > 8) state.pings.delete(state.pings.keys().next().value);
+    try { window.webContents.send('action-overlay:clock', token); }
+    catch { state.pings.delete(token); }
+  }
+
   function send(window, notification, trace, backend) {
     const state = windows.get(window);
     if (state) {
+      ping(window, state);
       state.trace = trace;
       state.sent ||= new Set();
       state.sent.add(trace.id);
@@ -145,7 +181,7 @@ function createOverlayTiming({ write, now = () => performance.now(), wallNow = D
     const sampleY = Math.min(size.height - 1, Math.floor(size.height * 90 / 112));
     const panelAlpha = bitmap.length === size.width * size.height * 4 ? bitmap[(sampleY * size.width + sampleX) * 4 + 3] : null;
     Object.assign(details, { capturedSequence, panelAlpha, bitmapMs: round(bitmapMs), markerMs: round(markerMs),
-      correlation: trace ? 'pixel-stamp' : 'unidentified', firstPaint: !!trace && !trace.firstPaint,
+      correlation: trace ? 'pixel-stamp' : capturedSequence === null ? 'unidentified' : 'pixel-stamp-untracked', firstPaint: !!trace && !trace.firstPaint,
       firstVisiblePaint: !!trace && !trace.firstVisiblePaint && panelAlpha > 0 });
     if (trace) {
       trace.firstPaint = true;
@@ -187,8 +223,7 @@ function getOverlayTiming() {
     const filePath = path.join(path.dirname(logger.transports.file.getFile().path), 'overlay-timing.log');
     writer = createTimingWriter(filePath, { logger });
     instance = createOverlayTiming({ write: writer.write });
-    instance.event('session.begin', { appVersion: app.getVersion(), versions: process.versions,
-      hardwareAcceleration: app.isHardwareAccelerationEnabled(), gpuFeatures: app.getGPUFeatureStatus(),
+    instance.event('session.begin', { appVersion: app.getVersion(), versions: process.versions, gpuFeatures: app.getGPUFeatureStatus(),
       displayAcknowledgements: false });
     app.getGPUInfo('basic').then(info => instance?.event('session.gpu', { info })).catch(() => {});
     logger.log(`[OSD] frame timing enabled; log=${filePath}; per-frame game display acknowledgement unavailable`);
@@ -200,8 +235,9 @@ function closeOverlayTiming() {
   instance?.event('session.end');
   instance?.dispose();
   instance = null;
-  void writer?.close();
+  const closing = writer?.close();
   writer = null;
+  return closing;
 }
 
 module.exports = { createOverlayTiming, createTimingWriter, getOverlayTiming, closeOverlayTiming };

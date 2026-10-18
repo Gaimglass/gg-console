@@ -168,3 +168,17 @@ test('shutdown does not send any additional device writes', async () => {
   assert.equal(f.writes.length, 0);
   assert.equal(f.feedback.length, 0);
 });
+
+test('shortcut timing follows the oldest request through a batch and USB completion into feedback', async () => {
+  const { createOverlayTiming } = require('../src/electron/overlay/timing');
+  const records = [];
+  const timing = createOverlayTiming({ write: record => records.push(record) });
+  let feedbackTrace;
+  const f = fixture({ timing, showFeedback: (_notification, trace) => { feedbackTrace = trace; } });
+  await Promise.all([f.controller.run('brightness+'), f.controller.run('brightness+')]);
+  assert.deepEqual(records.find(record => record.stage === 'shortcut.batch').sequences, [1, 2]);
+  assert.equal(feedbackTrace.sequence, 1);
+  assert.ok(records.find(record => record.stage === 'device.write.end'));
+  assert.equal(f.writes.length, 1);
+  timing.dispose();
+});

@@ -546,3 +546,26 @@ test('failed USB writes produce no feedback, and background writes stay quiet', 
   assert.equal(feedback.length, 3);
   assert.match(event.returnValue.message, /disconnected/);
 });
+
+test('enabled native timing carries the request into IPC and identifies expiration without a captured frame', () => {
+  const { createOverlayTiming } = require('../src/electron/overlay/timing');
+  const clock = fakeClock();
+  const records = [];
+  const timing = createOverlayTiming({ ...clock, write: record => records.push(record) });
+  const { native, electron } = gameFixture({ ...clock, timing, logger: { log() {}, warn() {} } });
+  native.show({ type: 'brightness', percent: 65 });
+  const window = electron.windows[0];
+  window.webContents.emit('did-finish-load');
+  const message = window.sent.find(entry => entry[0] === 'action-overlay:show');
+  assert.deepEqual(message[1], { type: 'brightness', percent: 65 });
+  assert.equal(message[2].sequence, records.find(record => record.stage === 'action.begin').sequence);
+  assert.equal(message[2].frameMarker, true);
+  assert.equal(window.sent.some(entry => entry[0] === 'action-overlay:clock'), true);
+  native.hide();
+  const hidden = records.find(record => record.stage === 'game.hidden');
+  assert.equal(hidden.firstPaint, false);
+  assert.equal(hidden.firstVisiblePaint, false);
+  native.dispose();
+  timing.dispose();
+  assert.equal(clock.size, 0);
+});
