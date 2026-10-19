@@ -1,5 +1,5 @@
 const { globalShortcut} = require('electron')
-const { toggleCalibrateWindow } = require('../calibrateWindow');
+const { toggleCalibrationFullscreen } = require('../calibrateFullscreen');
 const { runDeviceShortcut } = require('./shortcut-controls');
 let currentBindings = {};
 let shortcutsPaused = false;
@@ -106,8 +106,8 @@ function getActionForCommand(command) {
         void runDeviceShortcut(command);
       }
     case "calibrate":
-      return ()=>{
-        toggleCalibrateWindow();
+      return (mainWindow)=>{
+        toggleCalibrationFullscreen(mainWindow);
       }
     default:
       console.warn(`Unknown command name: ${command}`)

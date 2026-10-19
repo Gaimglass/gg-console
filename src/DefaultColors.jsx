@@ -7,7 +7,6 @@ import Check from './assets/check-solid.svg?react';
 import Plus from './assets/plus-solid.svg?react';
 import classNames from 'classnames';
 
-import DefaultRevertConfirm from './DefaultRevertConfirm'
 
 
 function DefaultColors(props) {
@@ -31,31 +30,29 @@ function DefaultColors(props) {
   }, [])
   
   useEffect(() => {
-    var c = canvasRef.current;
-    var ctx = c.getContext('2d');
-    ctx.clearRect(0, 0, c.width, c.height);
+    const c = canvasRef.current;
+    const ctx = c.getContext('2d');
+    const drawCurves = () => {
+      ctx.clearRect(0, 0, c.width, c.height);
+      for (let i = 0; i < props.colors.length; i++) {
+        if (props.colors[i]?.enabled === false) continue;
+        const swatch = swatchRefs.current[i];
+        const yc = swatch.offsetTop + swatch.clientHeight / 2;
 
-    for (let i = 0; i < props.colors.length; i++) {
-      if (props.colors[i]?.enabled === false) {
-        continue
+        ctx.beginPath();
+        ctx.lineWidth = activeSwatch === i ? 2 : 1;
+        ctx.strokeStyle = activeSwatch === i ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.2)';
+        ctx.moveTo(0, 200);
+        ctx.bezierCurveTo(50, 200, 50, yc, 100, yc);
+        ctx.stroke();
       }
-      var s = swatchRefs.current[i];
-      const yc = s.offsetTop + (s.clientHeight/2);
-
-      ctx.beginPath()
-      if(activeSwatch===i) {
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(255,255,255,1)';  
-      } else {
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      }
-      ctx.moveTo(0, 200);
-      
-      ctx.bezierCurveTo(100/2, 200, 100/2, yc, 100, yc);
-      ctx.stroke();
-    }
-  }, [activeSwatch, props.colors]);
+    };
+    drawCurves();
+    // Shared tabs stay mounted while hidden; measure again when this tab appears.
+    const observer = new ResizeObserver(drawCurves);
+    observer.observe(c);
+    return () => observer.disconnect();
+  }, [activeSwatch, props.colors, readOnly]);
 
   function changeColor(swatch) {
     if (readOnly || props.editSwatch === null) {
@@ -126,14 +123,14 @@ function DefaultColors(props) {
         })}>
       </Swatch>
         { !readOnly && (props.editSwatch !== i) &&
-          <button onClick={()=>{
+          <button aria-label={`Edit default color ${i + 1}`} onClick={()=>{
             edit(i);
           }} className={styles.button + ' ' + styles.editButton}><Edit className={styles.editIcon}></Edit></button>
         }
         { !readOnly && (props.editSwatch === i) &&
           <>
-          <button onClick={()=>{save(i)}} className={styles.button  + ' ' +  styles.checkButton}><Check className={styles.editIcon}></Check></button>
-          <button onClick={()=>{cancel()}} className={styles.button  + ' ' +  styles.cancelButton}><Cancel className={styles.editIcon}></Cancel></button>
+          <button aria-label={`Save default color ${i + 1}`} onClick={()=>{save(i)}} className={styles.button  + ' ' +  styles.checkButton}><Check className={styles.editIcon}></Check></button>
+          <button aria-label={`Cancel editing default color ${i + 1}`} onClick={()=>{cancel()}} className={styles.button  + ' ' +  styles.cancelButton}><Cancel className={styles.editIcon}></Cancel></button>
           </>
         }
       </div>
@@ -155,21 +152,11 @@ function DefaultColors(props) {
       <div className={styles.swatches}> 
         {Swatches}
         
-          {!readOnly && <button onClick={props.onAddDefaultColor} style={{
+          {!readOnly && <button aria-label="Add default color" onClick={props.onAddDefaultColor} style={{
             visibility: showPlus ? 'visible' : 'hidden' 
           }}className={styles.button  + ' ' +  styles.addButton}><Plus className={styles.plusIcon}></Plus></button>}
         
       </div>
-      { !readOnly && (props.editSwatch !== null) &&
-        <DefaultRevertConfirm onDelete={props.editSwatch !== 0 ? ()=>{
-          props.onDeleteDefaultColor()
-          props.onSetEditSwatch(null);
-          } : null
-        } onReset={()=>{
-          props.onResetDefaultColor()
-          props.onSetEditSwatch(null);
-        }}></DefaultRevertConfirm>
-      }
     </div>
   );
 }
@@ -182,9 +169,7 @@ DefaultColors.propTypes = {
   colors: PropTypes.array.isRequired,
   editSwatch: PropTypes.number,
   onSaveDefaultColor: PropTypes.func,
-  onDeleteDefaultColor: PropTypes.func,
   onAddDefaultColor: PropTypes.func,
-  onResetDefaultColor: PropTypes.func
 }
 
 

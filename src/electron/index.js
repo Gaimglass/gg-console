@@ -9,6 +9,7 @@ const { initializeUsb,  disconnectUsb } = require('./usb/usb');
 const { setLEDOn } = require('./usb/serial-commands');
 const { closeActionOverlay } = require('./overlay');
 const { startUpdateChecks } = require('./updates');
+const { initializeCalibrationFullscreen, exitCalibrationFullscreen } = require('./calibrateFullscreen');
 
 // Module to control application life.
 const app = electron.app;
@@ -181,7 +182,7 @@ async function createWindow() {
     minWidth:700, */
     //autoHideMenuBar: true, //https://stackoverflow.com/questions/45850802/hiding-the-window-menu-when-app-is-full-screen-on-windows
     maximizable: false,
-    fullscreenable: false,
+    fullscreenable: true,
     resizable: false,
     backgroundColor: '#282c34',
     titleBarStyle: 'hidden',
@@ -198,6 +199,8 @@ async function createWindow() {
   });
 
   //const appIcon = new electron.Tray('./assets/gg_icon.png')
+  initializeCalibrationFullscreen(mainWindow);
+
   if (isDev) {
     // Open the DevTools
     const devtools = new BrowserWindow({ width: 900, height: 500 });
@@ -248,6 +251,10 @@ async function createWindow() {
     if (!app.isQuitting) {
       // just hide the app, don't close it
       e.preventDefault();
+      if (mainWindow.isFullScreen()) {
+        exitCalibrationFullscreen(mainWindow);
+        return;
+      }
       mainWindow.setSkipTaskbar(true);
       mainWindow.hide();
     } else {

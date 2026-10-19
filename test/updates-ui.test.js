@@ -5,19 +5,7 @@ const vm = require('node:vm');
 const test = require('node:test');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
-const { transformSync } = require('esbuild');
-const { transformSync: transformRsx } = require('@babel/core');
-
-function loadJsx(filename, mocks = {}) {
-  const module = { exports: {} };
-  let source = fs.readFileSync(path.join(__dirname, '..', filename), 'utf8');
-  if (filename.endsWith('.rsx')) source = transformRsx(source, { filename,
-    plugins: [require('@lms5400/babel-plugin-rsx')], parserOpts: { plugins: ['jsx'] }, configFile: false, babelrc: false }).code;
-  const { code } = transformSync(source, { loader: 'jsx', format: 'cjs', jsx: 'automatic' });
-  vm.runInNewContext(code, { module, exports: module.exports, window: { ipcRenderer: {} }, console,
-    require: name => name in mocks ? mocks[name] : name.endsWith('.css') ? {} : require(name) });
-  return module.exports.default;
-}
+const { loadJsx } = require('./helpers/load-jsx.cjs');
 
 const Updates = loadJsx('src/Updates.jsx');
 const UpdatesTabWrapper = loadJsx('src/UpdatesTabWrapper.rsx');
@@ -71,11 +59,13 @@ test('the Updates tab stays accessible when no Gaimglass device is connected', (
     './SettingsProvider': { useSettings: () => ({ ambientSettings: {}, adsSettings: {} }) },
     './UpdatesTabWrapper.rsx': { default: UpdatesTabWrapper, __esModule: true },
   };
-  for (const name of ['DefaultColors', 'WindowsControls', 'KeyBindings', 'OverlaySettings', 'ADS', 'Ambient', 'ControllerMonitor']) mocks[`./${name}`] = emptyComponent;
+  for (const name of ['CalibrationCanvas', 'CalibratePanel', 'WindowsControls', 'KeyBindings', 'OverlaySettings', 'ADS', 'Ambient', 'ControllerMonitor']) mocks[`./${name}`] = emptyComponent;
   mocks['./Updates'] = Updates;
   mocks['./BrightnessMonitor.rsx'] = emptyComponent;
-  for (const name of ['./assets/power-off-solid.svg?react', './assets/crosshair.svg?react']) mocks[name] = emptyComponent;
-  const App = loadJsx('src/AppColorPicker.jsx', mocks);
+  mocks['./assets/xmark-solid.svg?react'] = emptyComponent;
+  mocks['./assets/logo.png'] = 'logo.png';
+  mocks['./GaimglassPanel'] = loadJsx('src/GaimglassPanel.jsx', mocks);
+  const App = loadJsx('src/GaimglassApp.jsx', mocks);
   const html = renderToStaticMarkup(React.createElement(App));
   assert.match(html, /Gaimglass not connected/);
   assert.match(html, /<button>Updates<\/button>/);

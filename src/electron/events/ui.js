@@ -1,10 +1,9 @@
 const electron = require('electron');
-const { BrowserWindow } = require('electron');
 
 const { getMainLED, getDefaultLEDs, setMainLED, setAlpha, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 const { readDeviceState } = require('../usb/usb');
 const { checkForUpdates, updateAndRestart, getUpdateStatus } = require('../updates')
-const { toggleCalibrateWindow } = require('../calibrateWindow')
+const { toggleCalibrationFullscreen, exitCalibrationFullscreen } = require('../calibrateFullscreen');
 const { disableShortcuts, enableShortcuts, validateShortcut, resumeShortcuts } = require('./shortcuts')
 const { setADS } = require('./mouse')
 const { showActionOverlay, configureActionOverlay, getActionOverlayStatus } = require('../overlay');
@@ -52,36 +51,6 @@ function registerUIEvents(mainWindow, app) {
     }
   });
 
-  // The main React picker owns the current color and all device writes.
-  electron.ipcMain.on('request-color-sync', () => {
-    mainWindow.webContents.send('request-color-sync');
-  });
-  electron.ipcMain.on('request-default-colors-sync', () => {
-    mainWindow.webContents.send('request-default-colors-sync');
-  });
-  electron.ipcMain.on('change-current-color', (_event, color) => {
-    mainWindow.webContents.send('change-current-color', color);
-  });
-
-  // Broadcast color changes to other windows (not sender)
-  electron.ipcMain.on('broadcast-color-sync', (event, color, ledOn) => {
-    const senderWebContentsId = event.sender.id;
-    const allWindows = BrowserWindow.getAllWindows();
-    allWindows.forEach(win => {
-      if (win.webContents.id !== senderWebContentsId) {
-        win.webContents.send('color-sync-from-other-window', color, ledOn);
-      }
-    });
-  });
-
-  electron.ipcMain.on('broadcast-default-colors-sync', (event, colors) => {
-    BrowserWindow.getAllWindows().forEach(win => {
-      if (win.webContents.id !== event.sender.id) {
-        win.webContents.send('default-colors-sync-from-other-window', colors);
-      }
-    });
-  });
-  
   electron.ipcMain.on('set-default-index', async (event, index, color) => {
     try {
       const result = await setDefaultIndex(index);
@@ -108,6 +77,7 @@ function registerUIEvents(mainWindow, app) {
   electron.ipcMain.on('get-app-state', async (event) => {
     event.returnValue = {
       isMaximized: mainWindow.isMaximized(),
+      isFullscreen: mainWindow.isFullScreen(),
       isMac: process.platform === 'darwin',
       version: app.getVersion()
       // add others... 
@@ -130,6 +100,11 @@ function registerUIEvents(mainWindow, app) {
   });
   
   electron.ipcMain.on('window-close', async (event) => {
+    if (mainWindow.isFullScreen()) {
+      exitCalibrationFullscreen(mainWindow);
+      event.returnValue = 'okay';
+      return;
+    }
     // hide to try, not exit
     mainWindow.setSkipTaskbar(true);
     mainWindow.hide();
@@ -173,8 +148,10 @@ function registerUIEvents(mainWindow, app) {
   });
 
   electron.ipcMain.handle('calibrate-gaimglass', async () => {
-    toggleCalibrateWindow()
+    toggleCalibrationFullscreen(mainWindow);
   });
+
+  electron.ipcMain.handle('exit-calibrate-fullscreen', () => exitCalibrationFullscreen(mainWindow));
 
   electron.ipcMain.handle('set-enable-shortcuts', async (event, bindings) => {
     void event;

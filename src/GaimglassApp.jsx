@@ -1,37 +1,33 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { RgbaColorPicker } from 'react-colorful';
 import classNames from 'classnames';
-import DefaultColors from './DefaultColors';
+import CalibratePanel from './CalibratePanel';
+import CalibrationCanvas from './CalibrationCanvas';
+import GaimglassPanel from './GaimglassPanel';
 import WindowControls from './WindowsControls';
-import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
-import UpdatesTabWrapper from './UpdatesTabWrapper.rsx';
-import Updates from './Updates';
 import { useAppUpdates } from './useAppUpdates';
-import KeyBindings from './KeyBindings';
-import OverlaySettings from './OverlaySettings';
-import ADS from './ADS';
-import Ambient from './Ambient';
 import BrightnessMonitor from './BrightnessMonitor.rsx';
 import ControllerMonitor from './ControllerMonitor';
 import { useSettings } from './SettingsProvider';
 
-import styles from './css/AppColorPicker.module.css';
+import styles from './css/GaimglassApp.module.css';
 
-import PowerSwitch from './assets/power-off-solid.svg?react';
-import CrosshairsIcon from './assets/crosshair.svg?react';
+import Close from './assets/xmark-solid.svg?react';
+import logo from './assets/logo.png';
 import { useThrottle } from './Utils';
 import './css/globalStyles.css';
 
 
 const ipcRenderer = window.ipcRenderer;
 
-function AppColorPicker() {
+function GaimglassApp() {
   const updates = useAppUpdates();
   const [selectedTab, setSelectedTab] = useState(0);
+  const [calibrationTab, setCalibrationTab] = useState(0);
   const [color, setColor] = useState({ r: 255, g: 255, b: 255, a: 0 });
   const [defaultColors, setDefaultColors] = useState([]);
   const [ledOn, setLEDOn] = useState(false);
   const [isMaximized, setMaximized] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [version, setVersion] = useState('');
   const [isMac, setMac] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -42,14 +38,12 @@ function AppColorPicker() {
   const refreshGenerationRef = useRef(0);
   const queuedRefreshRef = useRef(null);
   const defaultColorsReadInFlightRef = useRef(false);
-  const pickerInteractionRef = useRef(false);
 
   // ADS transition variables - use refs to persist across renders
   const changeIntervalRef = useRef(null);
   const currentTransitionColorRef = useRef({ ...color });
   const finalTransitionColorRef = useRef({});
   const adsFlagsRef = useRef(0);
-  const colorRgbRef = useRef({ r: color.r, g: color.g, b: color.b });
   const prevAmbientValueRef = useRef(null);
 
   const { ambientSettings, adsSettings } = useSettings();
@@ -71,9 +65,44 @@ function AppColorPicker() {
         feedback,
       });
     }
-    // React state stays in sync across windows, including while disconnected.
-    ipcRenderer.send('broadcast-color-sync', color, ledOn);
   }, [isConnected])
+
+  // React updates immediately; only the device writes are throttled during a drag.
+  const sendPickerColorThrottled = useThrottle(sendMainLEDStatus, 50);
+
+  const parseMainLedFromGG = useCallback((message) => {
+    if (!message || typeof message !== 'string') {
+      console.warn('parseMainLedFromGG: ', message?.message);
+      return;
+    }
+    sendPickerColorThrottled.cancel();
+    const params = message.split('&');
+    const c = {};
+    let led;
+    params.forEach((param) => {
+      const [key, value] = param.split('=');
+      switch (key) {
+        case 'color': {
+          const [r, g, b] = value.split(',');
+          c.r = Number(r);
+          c.g = Number(g);
+          c.b = Number(b);
+          break;
+        }
+        case 'ledOn':
+          led = Boolean(Number(value));
+          break;
+        case 'brightness':
+          c.a = Number(value);
+          break;
+        default:
+          break;
+      }
+    });
+    setColor(c);
+    setLEDOn(led);
+  }, [sendPickerColorThrottled]);
+
 
   const sendAlphaValue = useCallback((value) => {
     if (isConnected) {
@@ -85,8 +114,9 @@ function AppColorPicker() {
     if (isConnected) ipcRenderer.sendSync('set-default-index', index, color);
   }, [isConnected]);
 
-  // Fullscreen calibration changes only the current color, even while editing a swatch.
+  // Default RGB swatches inherit the current brightness.
   const handleCurrentColorChange = useCallback((newColor, showFeedback = true) => {
+    sendPickerColorThrottled.cancel();
     // defaults don't have an alpha so use the current value
     let alpha = newColor?.a ?? color.a;
 
@@ -99,10 +129,9 @@ function AppColorPicker() {
     const feedback = showFeedback ? (alpha !== color.a ? 'brightness' : (!ledOn ? 'power' : undefined)) : undefined;
     sendMainLEDStatus(finalColor, true, feedback);
     return finalColor;
-  }, [color.a, ledOn, sendMainLEDStatus]);
+  }, [color.a, ledOn, sendMainLEDStatus, sendPickerColorThrottled]);
 
-  // Stable function references for throttling
-  const handleColorChangeStable = useCallback((newColor, defaultIndex = -1) => {
+  const handleDefaultColorChange = useCallback((newColor, defaultIndex = -1) => {
     const finalColor = handleCurrentColorChange(newColor, defaultIndex < 0);
     if (defaultIndex > -1) {
       // update the index position on the device so that the left and right color 
@@ -122,38 +151,45 @@ function AppColorPicker() {
     }
   }, [handleCurrentColorChange, sendDefaultIndex, editSwatch, defaultColors]);
 
+  const handlePickerColorChange = useCallback((newColor) => {
+    const finalColor = { ...newColor, a: newColor.a ?? color.a };
+    setColor(finalColor);
+    setLEDOn(true);
+    if (editSwatch !== null) {
+      setDefaultColors(previous => previous.map((swatch, index) => index === editSwatch
+        ? { color: { r: finalColor.r, g: finalColor.g, b: finalColor.b }, enabled: true }
+        : swatch));
+    }
+    const feedback = finalColor.a !== color.a ? 'brightness' : (!ledOn ? 'power' : undefined);
+    sendPickerColorThrottled(finalColor, true, feedback);
+  }, [color.a, ledOn, editSwatch, sendPickerColorThrottled]);
 
-  const handleUpdateGGStable = useCallback((message) => {
-    parseMainLedFromGG(message);
+
+  const handleUpdateGGThrottled = useThrottle(parseMainLedFromGG, 50);
+
+  const exitCalibration = useCallback(() => {
+    void ipcRenderer.invoke('exit-calibrate-fullscreen');
   }, []);
 
-  const handleColorChangeThrottled = useThrottle(handleColorChangeStable, 50);
-  const handleUpdateGGThrottled = useThrottle(handleUpdateGGStable, 50);
-
-  const handleCalibrationColorChange = useCallback((newColor) => {
-    // Controlled picker updates can emit delayed onChange callbacks. Only a new
-    // interaction in the main picker may resume editing the selected swatch.
-    pickerInteractionRef.current = false;
-    handleColorChangeThrottled.cancel();
-    handleCurrentColorChange(newColor);
-  }, [handleColorChangeThrottled, handleCurrentColorChange]);
+  useEffect(() => {
+    ipcRenderer.on('calibrate-fullscreen-changed', setIsFullscreen);
+    return () => ipcRenderer.removeListener('calibrate-fullscreen-changed', setIsFullscreen);
+  }, []);
 
   useEffect(() => {
-    const syncCurrentColor = () => ipcRenderer.send('broadcast-color-sync', color, ledOn);
-    ipcRenderer.on('request-color-sync', syncCurrentColor);
-    ipcRenderer.on('change-current-color', handleCalibrationColorChange);
-    return () => {
-      ipcRenderer.removeListener('request-color-sync', syncCurrentColor);
-      ipcRenderer.removeListener('change-current-color', handleCalibrationColorChange);
+    if (!isFullscreen) return;
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') exitCalibration();
     };
-  }, [color, ledOn, handleCalibrationColorChange]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullscreen, exitCalibration]);
 
   useEffect(() => {
-    const syncDefaultColors = () => ipcRenderer.send('broadcast-default-colors-sync', defaultColors);
-    ipcRenderer.on('request-default-colors-sync', syncDefaultColors);
-    syncDefaultColors();
-    return () => ipcRenderer.removeListener('request-default-colors-sync', syncDefaultColors);
-  }, [defaultColors]);
+    return () => sendPickerColorThrottled.cancel();
+  }, [sendPickerColorThrottled]);
 
   // Event handler callbacks - defined before useEffects that reference them
   const handleAmbientBrightness = useCallback((brightness) => {
@@ -179,14 +215,16 @@ function AppColorPicker() {
   }, [ledOn, isConnected, sendAlphaValue]);
 
   const deactivateLED = useCallback(() => {
+    sendPickerColorThrottled.cancel();
     setLEDOn(false);
     sendMainLEDStatus(color, false);
-  }, [color, sendMainLEDStatus]);
+  }, [color, sendMainLEDStatus, sendPickerColorThrottled]);
 
   const toggleLEDOn = useCallback(() => {
+    sendPickerColorThrottled.cancel();
     setLEDOn(!ledOn);
     sendMainLEDStatus(color, !ledOn, 'power');
-  }, [color, ledOn, sendMainLEDStatus]);
+  }, [color, ledOn, sendMainLEDStatus, sendPickerColorThrottled]);
 
 
   const onADSDown = useCallback(() => {
@@ -249,7 +287,7 @@ function AppColorPicker() {
         void getStateFromGG(queuedReason);
       }
     }
-  }, []);
+  }, [parseMainLedFromGG]);
 
   // Setup once on mount
   useEffect(() => {
@@ -261,6 +299,7 @@ function AppColorPicker() {
     ipcRenderer.on('update-default-colors-from-gg', parseDefaultColors);
     const handleConnected = () => { void getStateFromGG('usb-connected'); };
     const handleDisconnected = () => {
+      sendPickerColorThrottled.cancel();
       refreshGenerationRef.current++;
       setIsConnected(false);
       setRefreshError('');
@@ -293,9 +332,7 @@ function AppColorPicker() {
 
   // Separate effect for throttled LED state updates
   useEffect(() => {
-    ipcRenderer.on('update-main-led-state-from-gg', (message) => {
-      handleUpdateGGThrottled(message);
-    });
+    ipcRenderer.on('update-main-led-state-from-gg', handleUpdateGGThrottled);
     return () => {
       ipcRenderer.removeListener('update-main-led-state-from-gg', handleUpdateGGThrottled);
     };
@@ -304,7 +341,6 @@ function AppColorPicker() {
   // Update currentTransitionColorRef when color changes
   useEffect(() => {
     currentTransitionColorRef.current = { ...color };
-    colorRgbRef.current = { r: color.r, g: color.g, b: color.b };
   }, [color]);
 
   // Register all IPC listeners once - they use stable useCallback references
@@ -362,6 +398,7 @@ function AppColorPicker() {
   async function getAppState() {
     const result = ipcRenderer.sendSync('get-app-state');
     setMaximized(result.isMaximized);
+    setIsFullscreen(Boolean(result.isFullscreen));
     setMac(result.isMac);
     setVersion(result.version);
   }
@@ -402,12 +439,13 @@ function AppColorPicker() {
       ];
       setDefaultColors(dc);
       sendDefaultColors(dc);
-      handleColorChange(c, dc.length - 1);
+      handleDefaultColorChange(c, dc.length - 1);
       setEditSwatch(dc.length - 1);
     }
   }
 
   function handleResetDefaultColor() {
+    sendPickerColorThrottled.cancel();
     const initialDefaultColors = createDefaultColors();
     const resetColor = initialDefaultColors[editSwatch];
     const c = {
@@ -422,12 +460,6 @@ function AppColorPicker() {
     setColor(newColor);
     if (ledOn) sendMainLEDStatus(newColor, true);
   }
-
-  // Non-throttled version for direct calls
-  function handleColorChange(_newColor, defaultIndex = -1) {
-    handleColorChangeStable(_newColor, defaultIndex);
-  }
-
 
   /**
    * Smooth color/brightness transition
@@ -521,40 +553,6 @@ function AppColorPicker() {
     setDefaultColors(defaults);
   }
 
-  function parseMainLedFromGG(message) {
-    if (!message || typeof message !== 'string') {
-      console.warn('parseMainLedFromGG: ', message?.message);
-      return;
-    }
-    const params = message.split('&');
-    const c = {};
-    let led;
-    params.forEach((param) => {
-      const [key, value] = param.split('=');
-      switch (key) {
-        case 'color': {
-          const [r, g, b] = value.split(',');
-          c.r = Number(r);
-          c.g = Number(g);
-          c.b = Number(b);
-          break;
-        }
-        case 'ledOn':
-          led = Boolean(Number(value));
-          break;
-        case 'brightness':
-          c.a = Number(value);
-          break;
-        default:
-          break;
-      }
-    });
-    setColor(c);
-    setLEDOn(led);
-    ipcRenderer.send('broadcast-color-sync', c, led);
-  }
-
-
   async function loadDefaultColorsFromGG() {
     if (defaultColorsReadInFlightRef.current) {
       return;
@@ -580,6 +578,7 @@ function AppColorPicker() {
   }
 
   function changeRgb(e, colorComponent) {
+    sendPickerColorThrottled.cancel();
     const rawString = e.target.value.trim();
     let updateKey = false; // Force an update on the input field if clamped
     let newColorComponent = parseInt(rawString, 10);
@@ -612,7 +611,7 @@ function AppColorPicker() {
       // When editing a default color, update that color in real time
       const dc = [...defaultColors];
       dc[editSwatch] = {
-        color: { ...c },
+        color: { r: c.r, g: c.g, b: c.b },
         enabled: true,
       };
       setDefaultColors(dc);
@@ -630,6 +629,7 @@ function AppColorPicker() {
   }
 
   function changeAlpha(e) {
+    sendPickerColorThrottled.cancel();
     const rawString = e.target.value.trim();
     let updateKey = false;
     let newColorComponent = parseFloat(rawString);
@@ -669,8 +669,12 @@ function AppColorPicker() {
   }
 
   return (
-    <div className={styles.App}>
-      <header className={styles.header}>
+    <div className={classNames(styles.app, { [styles.fullscreen]: isFullscreen })}>
+      {isFullscreen && <>
+        <CalibrationCanvas color={color} />
+        <img src={logo} alt="Gaimglass" className={styles.fullscreenLogo} draggable={false} />
+      </>}
+      {!isFullscreen && <header className={styles.header}>
         <div className={styles.drag}>
           <div
             className={classNames({
@@ -683,106 +687,42 @@ function AppColorPicker() {
           </div>
           <WindowControls maximized={isMaximized} showControls={!isMac} />
         </div>
-      </header>
-
-        <div className={styles.mainContainer}>
-          <Tabs className={styles.tabContainer} selectedIndex={!isConnected && selectedTab !== 5 ? 0 : selectedTab} onSelect={setSelectedTab}>
-            <UpdatesTabWrapper updates={updates} onOpenUpdates={() => setSelectedTab(5)}>
-              <TabList className={styles.tabControls}>
-                <Tab tabIndex="-1"><button onClick={isConnected ? handleChangeToCalibrateTab : undefined}>Calibrate</button></Tab>
-                <Tab tabIndex="-1" disabled={!isConnected}><button disabled={!isConnected}>ADS</button></Tab>
-                <Tab tabIndex="-1" disabled={!isConnected}><button disabled={!isConnected}>Ambient</button></Tab>
-                <Tab tabIndex="-1" disabled={!isConnected}><button disabled={!isConnected}>Shortcuts</button></Tab>
-                <Tab tabIndex="-1" disabled={!isConnected}><button disabled={!isConnected}>Overlay</button></Tab>
-                <Tab tabIndex="-1"><button>Updates</button></Tab>
-              </TabList>
-            </UpdatesTabWrapper>
-            <TabPanel className={styles.tabCalibrate}>
-              {isConnected ? (
-              <div className={styles.mainContent}>
-                <div className={styles.main}>
-                  <div className={styles.mainControls}>
-                    {/* <button onClick={readDefault}>Get Default Color</button> */}
-
-                    {/* <button onClick={(()=>handleAmbientBrightness(1))}>TEST ALPPHA</button> */}
-                    <button className={classNames({
-                      [styles.power]: true,
-                      [styles.enabled]: ledOn
-                    })} onClick={toggleLEDOn}>
-                      <PowerSwitch className={styles.powerIcon}></PowerSwitch>
-                      <span className={styles.powerText}>LED: {ledOn ? " ON " : "OFF"}</span>
-                    </button>
-                    <button className={classNames({
-                      [styles.calibrate]: true,
-                    })} onClick={() => {
-                      handleCalibrate();
-                    }}>
-                      <CrosshairsIcon className={styles.crosshairIcon}></CrosshairsIcon>
-                    </button>
-
-
-                  </div>
-
-                  <RgbaColorPicker
-                    color={color}
-                    onMouseDownCapture={() => { pickerInteractionRef.current = true; }}
-                    onTouchStartCapture={() => { pickerInteractionRef.current = true; }}
-                    onKeyDownCapture={() => { pickerInteractionRef.current = true; }}
-                    onChange={(newColor) => {
-                      if (pickerInteractionRef.current) handleColorChangeThrottled(newColor);
-                    }}
-                  />
-                  <div className={styles.rgbInputs}>
-                    <label>R</label>
-                    <input onChange={(e) => changeRgb(e, 'r')} value={color.r} type="text" />
-                    <label>G</label>
-                    <input onChange={(e) => changeRgb(e, 'g')} value={color.g} type="text" />
-                    <label>B</label>
-                    <input onChange={(e) => changeRgb(e, 'b')} value={color.b} type="text" />
-                    <label>A</label>
-                    <input onChange={changeAlpha} value={color.a} type="text" />
-                  </div>
-                </div>
-                <div className={styles.colors}>
-                  <DefaultColors
-                    colors={defaultColors}
-                    onChangeColor={handleColorChange}
-                    onSetEditSwatch={handleEditSwatch}
-                    editSwatch={editSwatch}
-                    onSaveDefaultColor={handleSaveDefaultColor}
-                    onDeleteDefaultColor={handleDeleteDefaultColor}
-                    onAddDefaultColor={handleAddDefaultColor}
-                    onResetDefaultColor={handleResetDefaultColor}
-                  />
-                </div>
-              </div>
-              ) : (
-                <div className={styles.disconnected}>
-                  <span>Gaimglass not connected</span>
-                  <button type="button" className={styles.refreshButton} disabled={isRefreshing} onClick={() => { void getStateFromGG('refresh-button'); }}>
-                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
-                  </button>
-                  <span className={styles.refreshStatus} role="status">{refreshError}</span>
-                </div>
-              )}
-            </TabPanel>
-            <TabPanel>
-              <ADS />
-            </TabPanel>
-            <TabPanel>
-              <Ambient />
-            </TabPanel>
-            <TabPanel>
-              <KeyBindings />
-            </TabPanel>
-            <TabPanel>
-              <OverlaySettings />
-            </TabPanel>
-            <TabPanel>
-              <Updates updates={updates} />
-            </TabPanel>
-          </Tabs>
-        </div>
+      </header>}
+      <GaimglassPanel
+        fullscreen={isFullscreen}
+        connected={isConnected}
+        selectedTab={isFullscreen ? calibrationTab : selectedTab}
+        onSelectTab={isFullscreen ? setCalibrationTab : setSelectedTab}
+        onCalibrateSelect={handleChangeToCalibrateTab}
+        updates={updates}
+        calibratePanel={isConnected || isFullscreen ? <CalibratePanel
+          fullscreen={isFullscreen}
+          color={color}
+          ledOn={ledOn}
+          onTogglePower={toggleLEDOn}
+          onOpenFullscreen={handleCalibrate}
+          onPickerColorChange={handlePickerColorChange}
+          onRgbChange={changeRgb}
+          onAlphaChange={changeAlpha}
+          defaultColors={defaultColors}
+          onDefaultColorChange={handleDefaultColorChange}
+          editSwatch={editSwatch}
+          onSetEditSwatch={handleEditSwatch}
+          onSaveDefaultColor={handleSaveDefaultColor}
+          onDeleteDefaultColor={handleDeleteDefaultColor}
+          onAddDefaultColor={handleAddDefaultColor}
+          onResetDefaultColor={handleResetDefaultColor}
+        /> : <div className={styles.disconnected}>
+          <span>Gaimglass not connected</span>
+          <button type="button" className={styles.refreshButton} disabled={isRefreshing} onClick={() => { void getStateFromGG('refresh-button'); }}>
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <span className={styles.refreshStatus} role="status">{refreshError}</span>
+        </div>}
+      />
+      {isFullscreen && <button onClick={exitCalibration} className={styles.close} aria-label="Exit fullscreen calibration">
+        <Close />
+      </button>}
       {/* Brightness monitor runs independently when connected */}
       {isConnected && (
         <>
@@ -803,5 +743,5 @@ function AppColorPicker() {
 }
 
 
-export default AppColorPicker;
+export default GaimglassApp;
 

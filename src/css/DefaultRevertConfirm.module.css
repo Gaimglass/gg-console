@@ -1,11 +1,6 @@
 .confirmWrapper {
-  position: fixed;
-  width: 100%;
-  display: block;
-  bottom: 0;
-  left: 0;
-  flex-direction: row;
-  display: block;
+  margin-top: auto;
+  flex-shrink: 0;
   text-align: center;
 }
 .confirm {

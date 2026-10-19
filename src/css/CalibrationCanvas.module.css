@@ -1,0 +1,11 @@
+.canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.bodyCalibrate {
+  margin: 0;
+  overflow: hidden !important;
+  background: #111;
+}

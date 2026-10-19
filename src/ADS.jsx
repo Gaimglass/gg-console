@@ -196,7 +196,7 @@ export default function ADS() {
               <tr>
                 <td>Mouse Button</td>
                 <td>
-                  <select defaultValue={adsSettings.adsMouseButton} onChange={handleOnChangeMouse} type="text">
+                  <select value={adsSettings.adsMouseButton} onChange={handleOnChangeMouse} type="text">
                     <option value="1">Mouse 1</option>
                     <option value="2">Mouse 2</option>
                     <option value="3">Mouse 3</option>
@@ -208,10 +208,10 @@ export default function ADS() {
                 {controllerConnected && <tr>
                   <td>Controller Button</td>
                   <td>
-                    <select defaultValue={adsSettings.adsControllerButton} onChange={handleOnChangeController} type="text">
+                    <select value={adsSettings.adsControllerButton} onChange={handleOnChangeController} type="text">
                       {
                         controllerButtons?.map(([key, name])=>(
-                          <option defaultValue={adsSettings.adsControllerButton === key} key={key} value={key}>{name}</option>
+                          <option key={key} value={key}>{name}</option>
                         ))
                       }
                     </select>

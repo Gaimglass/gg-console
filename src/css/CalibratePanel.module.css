@@ -1,0 +1,91 @@
+.content {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  padding: 0 1em 2em;
+  margin: 3em auto 0;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+}
+
+.mainControls {
+  width: 100%;
+  display: flex;
+}
+
+.power, .calibrate {
+  margin: 0 0 1em;
+  background: #1b1d23;
+  border: 1px solid black;
+  border-radius: 8px;
+}
+
+.power {
+  width: 80%;
+  margin-right: 0.5em;
+  color: #888;
+}
+
+.calibrate { width: 20%; }
+.fullWidth { width: 100%; margin-right: 0; }
+
+.powerIcon {
+  width: 30px;
+  position: relative;
+  top: 2px;
+  fill: #888;
+}
+
+.crosshairIcon {
+  width: 30px;
+  height: 30px;
+  position: relative;
+  top: 2px;
+  fill: white;
+  stroke: white;
+}
+
+.enabled {
+  background: #2948c4;
+  box-shadow: 0 0 25px 10px #456aff24;
+  color: white;
+}
+
+.enabled .powerIcon { fill: white; }
+
+.powerText {
+  width: 100px;
+  display: inline-block;
+  position: relative;
+  top: -5px;
+  text-align: left;
+  margin-left: 1em;
+}
+
+.rgbInputs {
+  margin-top: 1em;
+  white-space: nowrap;
+}
+
+.rgbInputs label { color: #777; }
+
+.rgbInputs input {
+  width: 2em;
+  border: none;
+  background: #1b1d23;
+  margin: 0 5px 0 3px;
+  padding: 0.5em;
+  color: #ccc;
+  font-size: 1.1em;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+

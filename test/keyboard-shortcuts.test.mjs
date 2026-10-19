@@ -54,7 +54,7 @@ function loadShortcuts(t) {
   };
   const replacements = [
     [require.resolve('electron'), { globalShortcut }],
-    [require.resolve('../src/electron/calibrateWindow.js'), { toggleCalibrateWindow: () => {} }],
+    [require.resolve('../src/electron/calibrateFullscreen.js'), { toggleCalibrationFullscreen: () => {} }],
     [require.resolve('../src/electron/events/shortcut-controls.js'), { runDeviceShortcut: command => actions.push(command) }],
   ];
   const originals = replacements.map(([id]) => require.cache[id]);

@@ -31,7 +31,7 @@ class Pulse {
     this.hide = false;
     this.segments = {};
     this.hideUntil = 0;
-    this.activeIndex=1;
+    this.activeIndex = 1;
     this.segmentInterval = props.interval; // 4
     this.segmentFadeFactor = props.fadeFactor; // 1.8 - higher number = faster fade
 
@@ -40,8 +40,8 @@ class Pulse {
     this.initForce = initForce;
     this.initPos = initPos;
     this.boundry = boundry;
-    this.onEnd =  onEnd;
-    this.onBoundry =  onBoundry;
+    this.onEnd = onEnd;
+    this.onBoundry = onBoundry;
     this.init();
   }
 
@@ -313,8 +313,12 @@ class Crosshairs {
 
     const ctx = this.ctx;
 
-    ctx.canvas.width = window.innerWidth;
-    ctx.canvas.height = window.innerHeight;
+    // Changing a canvas dimension resets its entire buffer and drawing state.
+    // Resize only when the viewport changes; clear the existing buffer per frame.
+    if (ctx.canvas.width !== window.innerWidth) ctx.canvas.width = window.innerWidth;
+    if (ctx.canvas.height !== window.innerHeight) ctx.canvas.height = window.innerHeight;
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.beginPath();
 
     // Basic crosshairs
     renderLine(
@@ -406,7 +410,6 @@ class Crosshairs {
     }
   }
 }
-
 class Spinner {
   constructor(ctx) {
     this.ctx = ctx;

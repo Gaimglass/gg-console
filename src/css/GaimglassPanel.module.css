@@ -1,0 +1,66 @@
+.panel {
+  height: calc(100dvh - 24px);
+  margin-top: 24px;
+  background: #282c34;
+  color: #ccc;
+}
+
+.fullscreen {
+  --frame-width: min(720px, calc(100vw - 32px));
+  --frame-height: min(585px, calc(100dvh - 80px));
+  position: fixed;
+  /* Target the lower-right quadrant's center, keeping the whole frame onscreen. */
+  right: max(16px, calc(25vw - var(--frame-width) / 2));
+  bottom: max(16px, calc(25dvh - var(--frame-height) / 2));
+  z-index: 1;
+  box-sizing: border-box;
+  width: var(--frame-width);
+  height: var(--frame-height);
+  margin: 0;
+  border: 1px solid #48545c;
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.tabControls {
+  display: flex;
+  flex-shrink: 0;
+  list-style: none;
+  padding: 0 0.75em;
+  margin: 0;
+}
+
+.tabControls li {
+  padding: 0;
+}
+
+.tabControls li[aria-selected=true] button {
+  color: white;
+}
+
+.tabControls li button {
+  background: transparent;
+}
+
+.tabControls li[aria-disabled=true] button {
+  cursor: default;
+}
+
+.tabPanel {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.selectedPanel {
+  display: block;
+}
