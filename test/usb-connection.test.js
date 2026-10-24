@@ -104,6 +104,7 @@ function loadUsbModule({ windows = [] } = {}) {
         callback?.(null);
         const command = data.slice(0, 3);
         if (this.responses.has(command) && !this.silentCommands.has(command)) {
+          this.emit('data', `${command}:${this.responses.get(command)}\r\n`);
           this.parser.emit('data', `${command}:${this.responses.get(command)}`);
         }
       });
@@ -410,4 +411,129 @@ test('palette cache tracks acknowledged edits and unsolicited palette updates', 
   assert.equal(feedback.snapshot().defaultColors.length, 2);
   feedback.fromDevice('201', 'color=1,2,3,1&index=0');
   assert.deepEqual(feedback.snapshot().defaultColors, [{ color: { r: 1, g: 2, b: 3 }, enabled: true }]);
+});
+
+// TEMPORARY: these checks belong to the USB investigation flight recorder.
+test('temporary USB history remains bounded during sustained traffic and truncates payload samples', () => {
+  const { createUsbDiagnostics } = require('../src/electron/usb/diagnostics');
+  const recorder = createUsbDiagnostics();
+  const payload = 'x'.repeat(10000);
+  for (let index = 0; index < 300; index++) {
+    const request = recorder.queued('000', 'shortcut');
+    recorder.start(request);
+    recorder.writeCallback(request);
+    recorder.bytes(payload);
+    recorder.line(payload, '000', true);
+    recorder.complete(request, null, payload);
+  }
+  const snapshot = recorder.snapshot(true);
+  assert.equal(snapshot.recent.length, 48);
+  assert.equal(snapshot.counts.rxBytes, 3000000);
+  assert.equal(snapshot.counts.replies, 300);
+  assert.equal(snapshot.pending, 0);
+  assert.equal(snapshot.active, 0);
+  assert.deepEqual(snapshot.inFlight, []);
+  assert.ok(JSON.stringify(snapshot).length < 20000);
+  assert.ok(snapshot.recent.filter(event => event.sample).every(event => event.sample.length <= 128));
+  assert.ok(snapshot.recent.filter(event => event.prefixHex).every(event => event.prefixHex.length <= 48));
+  assert.equal('recent' in recorder.snapshot(), false, 'normal health summaries omit the event history');
+});
+
+test('temporary USB timings distinguish queue wait, missing driver completion and partial input', () => {
+  const { createUsbDiagnostics } = require('../src/electron/usb/diagnostics');
+  let time = 0;
+  const recorder = createUsbDiagnostics({ now: () => time, wallNow: () => 1000 + time });
+  const first = recorder.queued('000', 'shortcut');
+  const second = recorder.queued('000', 'renderer');
+  time = 2;
+  recorder.start(first);
+  time = 10;
+  recorder.bytes(Buffer.from('000:ok'));
+  let snapshot = recorder.snapshot();
+  assert.equal(snapshot.pending, 2);
+  assert.equal(snapshot.waiting, 1);
+  assert.equal(snapshot.counts.rxChunks, 1);
+  assert.equal(snapshot.counts.lines, 0, 'raw partial input must not masquerade as a parsed response');
+  assert.equal(snapshot.inFlight[0].driverCallbackMs, null);
+  time = 152;
+  recorder.complete(first, new Error('Serial port timed out'));
+  time = 160;
+  recorder.start(second);
+  time = 165;
+  recorder.writeCallback(second);
+  recorder.line('000:okay', '000', true);
+  recorder.complete(second, null, 'okay');
+  time = 170;
+  recorder.writeCallback(first);
+  snapshot = recorder.snapshot(true);
+  assert.equal(snapshot.maxQueueWaitMs, 160);
+  assert.equal(snapshot.counts.timeouts, 1);
+  assert.equal(snapshot.counts.replies, 1);
+  const timeout = snapshot.recent.find(event => event.result === 'timeout');
+  assert.equal(timeout.responseWaitMs, 150);
+  assert.equal(timeout.queueWaitMs, 2);
+  assert.equal(timeout.driverCallbackMs, null);
+  const late = snapshot.recent.find(event => event.stage === 'write.callback' && event.request === first.id);
+  assert.equal(late.afterResult, true);
+  assert.equal(late.driverCallbackMs, 168);
+});
+
+test('temporary diagnostics capture the failure without changing recovery or flooding logs', async t => {
+  const { instances, restore, usb } = loadUsbModule();
+  const app = { isQuitting: false };
+  const sentEvents = [];
+  const logs = [];
+  const warnings = [];
+  t.mock.method(console, 'log', message => logs.push(message));
+  t.mock.method(console, 'warn', message => warnings.push(message));
+  t.after(async () => {
+    await usb.disconnectUsb(app, { reconnect: false, reason: 'test-cleanup' });
+    restore();
+  });
+  await usb.initializeUsb(createWindow(sentEvents), app, false);
+  await waitFor(() => instances[0]?.opening);
+  const port = instances[0];
+  port.completeOpen();
+  await waitFor(() => sentEvents.includes('usb-connected'));
+  await usb.readDeviceState('test-baseline');
+  assert.equal(port.listenerCount('data'), 1);
+
+  const writesBeforePowerLog = port.writes.length;
+  const power = usb.logUsbDiagnostics('os-resume');
+  assert.equal(power.attempt, 1);
+  assert.equal(power.power.event, 'os-resume');
+  assert.ok(power.sinceResumeMs >= 0);
+  assert.equal(port.writes.length, writesBeforePowerLog, 'logging power events must not probe USB');
+
+  const write = port.write.bind(port);
+  port.write = (data, callback) => {
+    if (data.startsWith('000')) {
+      port.writes.push(data); // Simulate a driver that never completes the write.
+      return false;
+    }
+    return write(data, callback);
+  };
+  port.emit('data', Buffer.from('partial reply without CRLF'));
+  const results = await Promise.allSettled([
+    usb.writeCommand('000', '0100200300.501', 'shortcut'),
+    usb.writeCommand('005', '0.501.6', 'renderer'),
+    usb.writeCommand('003', ' 1', 'renderer'),
+  ]);
+  assert.ok(results.every(result => result.status === 'rejected'));
+  const snapshots = logs.filter(message => message.startsWith('[USB][Diagnostics] '))
+    .map(message => JSON.parse(message.slice('[USB][Diagnostics] '.length)));
+  const failures = snapshots.filter(snapshot => snapshot.reason === 'command-failure');
+  assert.equal(failures.length, 1, 'multiple failing command codes share a failure-history rate limit');
+  const recent = failures[0].transport.recent;
+  const outgoing = recent.find(event => event.stage === 'write.begin' && event.command === '000');
+  assert.equal(outgoing.bytes, Buffer.byteLength('0000100200300.501\n'));
+  assert.equal(outgoing.prefixHex, Buffer.from('0000100200300.501\n').toString('hex'));
+  assert.ok(recent.some(event => event.stage === 'write.backpressure' && event.source === 'shortcut'));
+  assert.ok(recent.some(event => event.stage === 'rx.bytes' && event.bytes === 26));
+  assert.ok(recent.some(event => event.result === 'timeout' && event.command === '000' && event.driverCallbackMs === null));
+  assert.ok(warnings.some(message => message.includes('source=shortcut') && message.includes('driverCallbackMs=pending')));
+  assert.equal(port.closeCalls, 0, 'this patch must observe the original failure without adding recovery');
+  assert.equal(instances.length, 1);
+  await usb.disconnectUsb(app, { reconnect: false, reason: 'test-cleanup' });
+  assert.equal(port.listenerCount('data'), 0, 'raw-byte listeners must be cleaned up with the connection');
 });

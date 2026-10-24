@@ -111,8 +111,9 @@ function runDeviceShortcut(command) {
     controls = createShortcutControls({
       getState: getDeviceControlState,
       readState: readDeviceState,
-      writeState: state => setMainLED(state.color, state.brightness, state.on),
-      writeIndex: setDefaultIndex,
+      // TEMPORARY: tag the caller in the USB flight recorder.
+      writeState: state => setMainLED(state.color, state.brightness, state.on, 'shortcut'),
+      writeIndex: index => setDefaultIndex(index, 'shortcut'),
       showFeedback: showActionOverlay,
       broadcast: state => {
         const message = formatControlState(state);
