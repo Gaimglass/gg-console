@@ -26,11 +26,10 @@ test('the Updates panel distinguishes a download from a ready update and prevent
   assert.match(ready, /<button[^>]*disabled=""[^>]*>Check for updates/);
 });
 
-test('failures remain visible with escaped details and an enabled retry button', () => {
+test('failures stay silent with a neutral status and an enabled retry button', () => {
   const html = render({ phase: 'error', errorDetails: 'DNS failure <server>' }, { error: 'Could not check for updates.' });
-  assert.match(html, /role="alert"/);
-  assert.match(html, /Could not check for updates/);
-  assert.match(html, /DNS failure &lt;server&gt;/);
+  assert.match(html, /Ready to check for updates/);
+  assert.doesNotMatch(html, /role="alert"|<details|Could not check for updates|DNS failure|Error details|did not complete/);
   assert.match(html, /<button type="button">Check for updates/);
   assert.doesNotMatch(html, /You’re up to date/);
 });
@@ -44,11 +43,16 @@ test('development explains unavailable updates and successful checks display the
   assert.match(checked, /Last successful check/);
 });
 
-test('the existing tab banner exposes background failures and ready updates', () => {
-  const show = updates => renderToStaticMarkup(React.createElement(UpdatesTabWrapper, { updates, onOpenUpdates() {} }, 'Tabs'));
-  assert.match(show({ status: { phase: 'error' }, error: 'Failed' }), /Update check failed — view details/);
+test('the tab banner ignores background failures and still shows ready updates', () => {
+  const show = updates => renderToStaticMarkup(React.createElement(UpdatesTabWrapper, { updates }, 'Tabs'));
+  const failed = show({ status: { phase: 'error' }, error: 'Failed' });
+  assert.match(failed, /Tabs/);
+  assert.doesNotMatch(failed, /role="status"|<button|failed|error/i);
   assert.match(show({ status: { updateAvailable: true, releaseName: '1.6.3' } }), /Update ready: 1\.6\.3/);
   assert.match(show({ status: { updateAvailable: true }, installing: true }), /<button[^>]*disabled=""[^>]*>Restarting/);
+  const ready = show({ status: { updateAvailable: true, releaseName: '1.6.3' }, error: 'Install failed' });
+  assert.match(ready, /Update ready: 1\.6\.3/);
+  assert.doesNotMatch(ready, /failed|error/i);
 });
 
 test('the Updates tab stays accessible when no Gaimglass device is connected', () => {
@@ -72,7 +76,7 @@ test('the Updates tab stays accessible when no Gaimglass device is connected', (
   assert.match(html, /<button disabled="">ADS<\/button>/);
 });
 
-test('manual updater IPC returns a visible error and exposes the latest status snapshot', async () => {
+test('manual updater IPC retains diagnostics without displaying a failure', async () => {
   const handlers = new Map();
   const status = { phase: 'error', revision: 4, error: 'The update request failed.', errorDetails: 'Network failure' };
   const module = { exports: {} };
@@ -88,4 +92,7 @@ test('manual updater IPC returns a visible error and exposes the latest status s
   assert.equal(result.phase, 'error');
   assert.equal(result.error, 'The update request failed.');
   assert.equal(result.errorDetails, 'Network failure');
+  const html = render(result);
+  assert.match(html, /Ready to check for updates/);
+  assert.doesNotMatch(html, /role="alert"|request failed|Network failure/);
 });

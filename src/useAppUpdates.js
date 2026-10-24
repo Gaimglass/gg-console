@@ -4,12 +4,11 @@ const ipcRenderer = window.ipcRenderer;
 
 export function useAppUpdates() {
   const [status, setStatus] = useState({ phase: 'idle', revision: -1 });
-  const [requestError, setRequestError] = useState('');
   const [requestPending, setRequestPending] = useState(false);
   const [installing, setInstalling] = useState(false);
   const mounted = useRef(false);
   const acceptStatus = useCallback(value => {
-    if (!value?.phase) throw new Error('Fully exit Gaimglass from its tray menu and reopen it to load the updater.');
+    if (!value?.phase) return;
     setStatus(previous => value.revision >= previous.revision ? value : previous);
   }, []);
 
@@ -17,17 +16,12 @@ export function useAppUpdates() {
     let active = true;
     mounted.current = true;
     const receiveStatus = value => {
-      if (active) {
-        acceptStatus(value);
-        setRequestError('');
-      }
+      if (active) acceptStatus(value);
     };
     ipcRenderer.on('update-status', receiveStatus);
     void ipcRenderer.invoke('get-update-status').then(value => {
       if (active) acceptStatus(value);
-    }).catch(() => {
-      if (active) setRequestError('Could not contact the updater. Fully exit Gaimglass from its tray menu and reopen it.');
-    });
+    }).catch(() => {});
     return () => {
       active = mounted.current = false;
       ipcRenderer.removeListener('update-status', receiveStatus);
@@ -35,26 +29,23 @@ export function useAppUpdates() {
   }, [acceptStatus]);
 
   const check = useCallback(async () => {
-    setRequestError('');
     setRequestPending(true);
     try {
       const result = await ipcRenderer.invoke('check-for-updates');
       if (mounted.current) acceptStatus(result);
-    } catch (error) {
-      if (mounted.current) setRequestError(error.message || 'Could not check for updates. Try again.');
+    } catch {
+      // Ignore updater failures and allow later checks to retry.
     } finally {
       if (mounted.current) setRequestPending(false);
     }
   }, [acceptStatus]);
 
   const restart = useCallback(async () => {
-    setRequestError('');
     setInstalling(true);
     try {
-      const result = await ipcRenderer.invoke('restart-and-update-app');
-      if (result?.error) throw new Error(result.error);
-    } catch (error) {
-      if (mounted.current) setRequestError(error.message || 'Could not restart to install the update. Try again.');
+      await ipcRenderer.invoke('restart-and-update-app');
+    } catch {
+      // Leave the downloaded update available for another install attempt.
     } finally {
       if (mounted.current) setInstalling(false);
     }
@@ -63,6 +54,5 @@ export function useAppUpdates() {
   return {
     status, check, restart, installing,
     busy: requestPending || ['checking', 'downloading'].includes(status.phase),
-    error: requestError || status.error || '',
   };
 }

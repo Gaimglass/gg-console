@@ -34,7 +34,7 @@ export default function GaimglassPanel({
   return (
     <section aria-label="Gaimglass controls" className={classNames(styles.panel, { [styles.fullscreen]: fullscreen })}>
       <Tabs className={styles.tabs} selectedIndex={activeTab} onSelect={onSelectTab}>
-        {fullscreen ? tabList : <UpdatesTabWrapper updates={updates} onOpenUpdates={() => onSelectTab(5)}>
+        {fullscreen ? tabList : <UpdatesTabWrapper updates={updates}>
           {tabList}
         </UpdatesTabWrapper>}
         {tabs.map(({ name, content }, index) => <TabPanel

@@ -1,5 +1,4 @@
 .container { width: 100%; background-color: rgba(0, 0, 0, 0.2); }
-.ready, .error { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; padding: 6px 14px; font-size: 12px; }
+.ready { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; padding: 6px 14px; font-size: 12px; }
 .ready { background-color: #244e87; color: white; }
-.error { background-color: #66383d; }
-.ready button, .error button { padding: 5px 10px; font-size: 12px; }
+.ready button { padding: 5px 10px; font-size: 12px; }

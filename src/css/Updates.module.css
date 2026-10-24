@@ -4,9 +4,4 @@
 .actions { display: flex; gap: 12px; margin: 20px 0; }
 .actions button { padding: 8px 16px; }
 .actions button:disabled { opacity: 0.55; cursor: default; }
-.error { padding: 12px 14px; border: 1px solid #a65d62; border-radius: 6px; color: #ffb6bc; }
-.error p { margin-bottom: 0; }
-.error details { margin-top: 10px; }
-.error summary { cursor: pointer; }
-.error pre { max-height: 110px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
 .hint { color: #aab0bd; font-size: 12px; }
