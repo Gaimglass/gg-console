@@ -4,30 +4,28 @@ const {SERIAL_COMMANDS} = require('./serial-codes');
 
 // Commands
 
-// TEMPORARY: source labels distinguish Electron shortcuts from renderer writes.
-// Remove these labels with the USB investigation diagnostics.
-function setMainLED(color, brightness, ledOn, source = 'renderer') {
+function setMainLED(color, brightness, ledOn) {
   const commandStr = 
     `${color.r}`.padStart(3, 0) + 
     `${color.g}`.padStart(3, 0) +
     `${color.b}`.padStart(3, 0) +
     `${brightness.toFixed(2)}` +
     Number(ledOn);
-    return writeCommand(SERIAL_COMMANDS.SET_MAIN_LED, commandStr, source);
+    return writeCommand(SERIAL_COMMANDS.SET_MAIN_LED, commandStr);
 }
 
 function setAlpha(ambientValue, exponent) {
 
   const commandStr = `${ambientValue.toFixed(2)}${exponent.toFixed(1)}` // e.g. "0.851.6" = 85% ambient, exponent 1.6
-  return writeCommand(SERIAL_COMMANDS.SET_AMBIENT, commandStr, 'renderer');
+  return writeCommand(SERIAL_COMMANDS.SET_AMBIENT, commandStr);
 }
 
-function setDefaultIndex(index, source = 'renderer') {
-  return writeCommand(SERIAL_COMMANDS.SET_DEFAULT_INDEX, index.toString().padStart(2), source);
+function setDefaultIndex(index) {
+  return writeCommand(SERIAL_COMMANDS.SET_DEFAULT_INDEX, index.toString().padStart(2));
 }
 
 function setLEDOn(on) {
-  return writeCommand(SERIAL_COMMANDS.SET_LED_ON, on.toString().padStart(2), 'shutdown');
+  return writeCommand(SERIAL_COMMANDS.SET_LED_ON, on.toString().padStart(2));
 }
 
 
@@ -55,15 +53,15 @@ function setDefaultColors(colors) {
     defaultColorStrs.push(`000`+`000`+`000`+`0`)
   }
     const commandStr = defaultColorStrs.join(',')
-    return writeCommand(SERIAL_COMMANDS.SET_DEFAULT_LEDS, commandStr, 'renderer');
+  return writeCommand(SERIAL_COMMANDS.SET_DEFAULT_LEDS, commandStr);
 }
 
 function getMainLED() {
-  return writeCommand(SERIAL_COMMANDS.GET_MAIN_LED, '', 'renderer');
+  return writeCommand(SERIAL_COMMANDS.GET_MAIN_LED);
 }
 
 function getDefaultLEDs() {
-  return writeCommand(SERIAL_COMMANDS.GET_DEFAULT_LEDS, '', 'renderer');
+  return writeCommand(SERIAL_COMMANDS.GET_DEFAULT_LEDS);
 }
 
 module.exports = {

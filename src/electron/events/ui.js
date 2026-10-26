@@ -1,11 +1,11 @@
 const electron = require('electron');
 
-const { getMainLED, getDefaultLEDs, setMainLED, setAlpha, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
+const { getMainLED, getDefaultLEDs, setAlpha, setDefaultColors, setDefaultIndex, } = require('../usb/serial-commands');
 const { readDeviceState } = require('../usb/usb');
 const { checkForUpdates, updateAndRestart, getUpdateStatus } = require('../updates')
 const { toggleCalibrationFullscreen, exitCalibrationFullscreen } = require('../calibrateFullscreen');
 const { disableShortcuts, enableShortcuts, validateShortcut, resumeShortcuts } = require('./shortcuts')
-const { setADS } = require('./mouse')
+const { getAdsControls } = require('../ads-controls');
 const { showActionOverlay, configureActionOverlay, getActionOverlayStatus } = require('../overlay');
 
 
@@ -32,7 +32,7 @@ function registerUIEvents(mainWindow, app) {
   
   electron.ipcMain.on('set-led-state', async (event, ledState) => {
     try {
-      const result = await setMainLED(ledState.color, ledState.brightness, ledState.ledOn);
+      const result = await getAdsControls().setState({ color: ledState.color, brightness: ledState.brightness, on: ledState.ledOn });
       event.returnValue = result;
       // Only explicit user actions produce feedback; ADS, ambient and startup writes stay quiet.
       if (ledState.feedback === 'brightness') showActionOverlay({ type: 'brightness', value: ledState.brightness });
@@ -172,7 +172,7 @@ function registerUIEvents(mainWindow, app) {
 
   electron.ipcMain.handle('set-enable-ads', async (event, ads) => {
     void event;
-    return setADS(mainWindow, ads)
+    return getAdsControls().configure(ads);
   });
 
   electron.ipcMain.handle('get-screen-sources', async () => {

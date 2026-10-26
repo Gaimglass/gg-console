@@ -39,22 +39,9 @@ function GaimglassApp() {
   const queuedRefreshRef = useRef(null);
   const defaultColorsReadInFlightRef = useRef(false);
 
-  // ADS transition variables - use refs to persist across renders
-  const changeIntervalRef = useRef(null);
-  const currentTransitionColorRef = useRef({ ...color });
-  const finalTransitionColorRef = useRef({});
-  const adsFlagsRef = useRef(0);
   const prevAmbientValueRef = useRef(null);
 
-  const { ambientSettings, adsSettings } = useSettings();
-
-  // Transition constants
-  const RED = 1;
-  const GREEN = 2;
-  const BLUE = 4;
-  //const ALPHA = 8;
-  const TRANS_MULTIPLIER = 35;
-  const ALL_COLORS = RED | GREEN | BLUE; // 7
+  const { ambientSettings } = useSettings();
 
   const sendMainLEDStatus = useCallback((color, ledOn, feedback) => {
     if (isConnected) {
@@ -214,39 +201,12 @@ function GaimglassApp() {
 
   }, [ledOn, isConnected, sendAlphaValue]);
 
-  const deactivateLED = useCallback(() => {
-    sendPickerColorThrottled.cancel();
-    setLEDOn(false);
-    sendMainLEDStatus(color, false);
-  }, [color, sendMainLEDStatus, sendPickerColorThrottled]);
-
   const toggleLEDOn = useCallback(() => {
     sendPickerColorThrottled.cancel();
     setLEDOn(!ledOn);
     sendMainLEDStatus(color, !ledOn, 'power');
   }, [color, ledOn, sendMainLEDStatus, sendPickerColorThrottled]);
 
-
-  const onADSDown = useCallback(() => {
-    adsFlagsRef.current = 0;
-    finalTransitionColorRef.current = {
-      ...adsSettings.color,
-      a: color.a // ads does not control brightness, just match the current value
-    };
-    if (ledOn) {
-      changeColorTo(adsSettings.speed);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [color.a, ledOn, adsSettings.speed, adsSettings.color]);
-
-  const onADSUp = useCallback(() => {
-    adsFlagsRef.current = 0;
-    finalTransitionColorRef.current = { ...color };
-    if (ledOn) {
-      changeColorTo(adsSettings.speed);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [color, ledOn, adsSettings.speed]);
 
   const getStateFromGG = useCallback(async (reason = 'requested') => {
     if (refreshInFlightRef.current) {
@@ -338,27 +298,14 @@ function GaimglassApp() {
     };
   }, [handleUpdateGGThrottled]);
 
-  // Update currentTransitionColorRef when color changes
   useEffect(() => {
-    currentTransitionColorRef.current = { ...color };
-  }, [color]);
-
-  // Register all IPC listeners once - they use stable useCallback references
-  useEffect(() => {
-    ipcRenderer.on('os-suspend', deactivateLED);
-    ipcRenderer.on('update-ads-active', onADSDown);
-    ipcRenderer.on('update-ads-inactive', onADSUp);
-
-    return () => {
-      ipcRenderer.removeListener('os-suspend', deactivateLED);
-      ipcRenderer.removeListener('update-ads-active', onADSDown);
-      ipcRenderer.removeListener('update-ads-inactive', onADSUp);
+    const handleSuspend = () => {
+      sendPickerColorThrottled.cancel();
+      setLEDOn(false);
     };
-  }, [
-    deactivateLED,
-    onADSDown,
-    onADSUp
-  ]);
+    ipcRenderer.on('os-suspend', handleSuspend);
+    return () => ipcRenderer.removeListener('os-suspend', handleSuspend);
+  }, [sendPickerColorThrottled]);
 
   useEffect(() => {
     if (!ambientSettings.enabled) {
@@ -459,70 +406,6 @@ function GaimglassApp() {
     const newColor = { r: c.color.r, g: c.color.g, b: c.color.b, a: color.a };
     setColor(newColor);
     if (ledOn) sendMainLEDStatus(newColor, true);
-  }
-
-  /**
-   * Smooth color/brightness transition
-   * @param {number} speed - Transition speed
-   */
-  function changeColorTo(speed) {
-    if (changeIntervalRef.current) {
-      clearInterval(changeIntervalRef.current);
-    }
-
-    let prevTime = Date.now();
-    changeIntervalRef.current = setInterval(step, 1);
-
-    function step() {
-      const timestamp = Date.now();
-      const dt = (timestamp - prevTime) / 1000;
-      prevTime = timestamp;
-
-      const current = currentTransitionColorRef.current;
-      const final = finalTransitionColorRef.current;
-
-      const rs = final.r > current.r ? 1 : -1;
-      const gs = final.g > current.g ? 1 : -1;
-      const bs = final.b > current.b ? 1 : -1;
-      //const as = final.a > current.a ? 1 : -1;
-
-      current.r += speed * dt * rs * TRANS_MULTIPLIER;
-      current.g += speed * dt * gs * TRANS_MULTIPLIER;
-      current.b += speed * dt * bs * TRANS_MULTIPLIER;
-      //current.a += speed * dt * as * TRANS_MULTIPLIER;
-
-      if ((rs === -1 && current.r <= final.r) || (rs === 1 && current.r >= final.r)) {
-        adsFlagsRef.current |= RED;
-        current.r = final.r;
-      }
-      if ((gs === -1 && current.g <= final.g) || (gs === 1 && current.g >= final.g)) {
-        adsFlagsRef.current |= GREEN;
-        current.g = final.g;
-      }
-      if ((bs === -1 && current.b <= final.b) || (bs === 1 && current.b >= final.b)) {
-        adsFlagsRef.current |= BLUE;
-        current.b = final.b;
-      }
-      /*if ((as === -1 && current.a <= final.a) || (as === 1 && current.a >= final.a)) {
-        adsFlagsRef.current |= ALPHA;
-        current.a = final.a;
-      }*/
-
-      sendMainLEDStatus(
-        {
-          r: Math.round(current.r),
-          g: Math.round(current.g),
-          b: Math.round(current.b),
-          a: current.a,
-        },
-        ledOn
-      );
-
-      if (adsFlagsRef.current === ALL_COLORS) {
-        clearInterval(changeIntervalRef.current);
-        changeIntervalRef.current = null;
-      }
-    }
   }
 
   function parseDefaultColors(message) {
@@ -726,10 +609,7 @@ function GaimglassApp() {
       {/* Brightness monitor runs independently when connected */}
       {isConnected && (
         <>
-          <ControllerMonitor
-            onADSDown={onADSDown}
-            onADSUp={onADSUp}
-          />
+          <ControllerMonitor />
           <BrightnessMonitor
             onBrightnessChange={handleAmbientBrightness}
             enabled={ambientSettings.enabled}

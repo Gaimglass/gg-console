@@ -1,5 +1,6 @@
 const HID = require("node-hid");
 const XInput = require("xinput-ffi");
+const { getAdsControls } = require('../ads-controls');
 
 //let subscribers = [];
 let mainWindow = null;
@@ -12,41 +13,29 @@ const ENABLE_HID_BACKEND = false;
 
 let lastPacket = null;
 function startXInput() {
+  const controls = getAdsControls();
+  let polling = false;
   setInterval(async () => {
-    let state;
-    
-    
+    if (polling) return;
+    polling = true;
     try {
-      state = await XInput.getState(0); // controller 0
-    } catch {
-      // Controller disconnected
-      if(lastPacket) {
-        // let the client know
-        mainWindow.webContents.send("update-controller-event", {
-          type: null,
-          state: {}
-        });
-        lastPacket = null;
+      let state;
+      try {
+        state = await XInput.getState(0);
+      } catch {
+        state = null;
       }
-      return;
+      const packet = state?.gamepad ? { type: 'xinput', state: state.gamepad } : { type: null, state: {} };
+      // Process on main even when the renderer cannot handle controller updates.
+      controls.controller(packet);
+      const number = state?.gamepad ? state.dwPacketNumber : null;
+      if (number === lastPacket) return;
+      lastPacket = number;
+      mainWindow.webContents.send('update-controller-event', packet);
+    } finally {
+      polling = false;
     }
-
-    // If we got here, controller IS connected
-    if (!state || !state.gamepad) return;
-    
-
-    
-    if (state.dwPacketNumber === lastPacket) return;
-    lastPacket = state.dwPacketNumber;
-
-
-    // Send to renderer if needed
-    mainWindow.webContents.send("update-controller-event", {
-      type: "xinput",
-      state: state?.gamepad 
-  });
-
-  }, 16); // ~60Hz
+  }, 16);
 }
 
 // -----------------------

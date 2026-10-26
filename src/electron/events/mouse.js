@@ -1,50 +1,17 @@
-// This works only on WINDOWS
+const { getAdsControls } = require('../ads-controls');
 
-let mouseEvents = {
-  on: ()=>{} // stub
-}
-
-let adsSettings = {
-  enabled: false,
-  color: {},
-  speed: 0,
-  adsMouseButton: '',
-  adsControllerButton: '',
-}
-
-try {
-  const globalMouseEvents = require("global-mouse-events");
-  mouseEvents = globalMouseEvents;
-} catch {
-  // Mac is not supported ATM
-}
-
-// These events can be used for mouse2 effects such as dimming when pressing ADS.
-function registerMouseEvents(mainWindow, mouseState) {
-  mouseEvents.on("mouseup", event => {
-  if (mouseState.down && adsSettings.adsMouseButton === event.button) {
-    mainWindow.webContents.send('update-ads-inactive');
-    mouseState.down = false;
+// The native hook runs on its own thread; ADS never waits for renderer IPC.
+function registerMouseEvents() {
+  let mouseEvents;
+  try {
+    mouseEvents = require('global-mouse-events');
+  } catch {
+    // This capture backend is Windows-only.
+    return;
   }
-  });
-
-  mouseEvents.on("mousedown", event => {
-    if (!mouseState.down) {
-      if(adsSettings.adsMouseButton === event.button && adsSettings.enabled) {
-        mainWindow.webContents.send('update-ads-active');
-        mouseState.down = true;
-      }
-    }
-  });
+  const controls = getAdsControls();
+  mouseEvents.on('mousedown', event => controls.mouse(event.button, true));
+  mouseEvents.on('mouseup', event => controls.mouse(event.button, false));
 }
 
-function setADS(mainWindow, ads) {
-  adsSettings = {...ads};
-}
-
-
-module.exports = {
-  registerMouseEvents,
-  setADS,
-  adsSettings // expose for reading only
-}
+module.exports = { registerMouseEvents };

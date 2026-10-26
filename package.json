@@ -1,6 +1,6 @@
 {
   "name": "Gaimglass",
-  "version": "1.6.6",
+  "version": "1.6.7",
   "private": false,
   "license": "BUSL-1.1",
   "author": "Gaimglass",
@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test test/calibrate-fullscreen.test.js test/calibration-panel.test.js test/calibration-canvas.test.js test/usb-connection.test.js test/keyboard-shortcuts.test.mjs test/shortcut-controls.test.js test/action-overlay.test.js test/overlay-timing.test.js test/updates.test.js test/updates-ui.test.js",
+    "test": "node --test test/calibrate-fullscreen.test.js test/calibration-panel.test.js test/calibration-canvas.test.js test/usb-connection.test.js test/keyboard-shortcuts.test.mjs test/shortcut-controls.test.js test/ads-controls.test.js test/action-overlay.test.js test/overlay-timing.test.js test/updates.test.js test/updates-ui.test.js",
     "electron": "electron .",
     "electron-dev": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:3000 electron .",
     "preview:overlays": "electron scripts/preview-overlays.js",

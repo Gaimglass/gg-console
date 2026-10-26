@@ -3,10 +3,7 @@ const { ReadlineParser } = require('@serialport/parser-readline');
 const { SERIAL_COMMANDS } = require('./serial-codes');
 const { BrowserWindow } = require('electron');
 const { showActionOverlay } = require('../overlay');
-const { createDeviceFeedback } = require('./device-feedback');
-// TEMPORARY USB investigation: observation only; remove with diagnostics.js.
-const { createUsbDiagnostics } = require('./diagnostics');
-const { performance } = require('node:perf_hooks');
+const { createDeviceFeedback, formatControlState } = require('./device-feedback');
 
 const RECONNECT_INTERVAL_MS = 800;
 const OPEN_TIMEOUT_MS = 5000;
@@ -26,60 +23,9 @@ let connectionGeneration = 0;
 let connectionAttempt = 0;
 let shouldReconnect = false;
 let repeatedOpenError = null;
+let deviceStateObserver;
 const commandFailures = new Map();
 const commandNames = new Map(Object.entries(SERIAL_COMMANDS).map(([name, code]) => [code, name]));
-
-// TEMPORARY: one health summary per minute and at most one failure history per
-// 30 seconds across all connections. No probes or additional USB writes.
-let diagnosticLastTick = null;
-let diagnosticMaxLoopLagMs = 0;
-let diagnosticNextSummary = 0;
-let diagnosticLastFailure = -Infinity;
-let diagnosticPowerEvent = null;
-let diagnosticLastResume = null;
-
-function logUsbDiagnostics(reason, { connection = activeConnection || pendingConnection, history = false } = {}) {
-  try {
-    const now = performance.now();
-    if (history) {
-      if (now - diagnosticLastFailure < REPEATED_ERROR_LOG_INTERVAL_MS) return;
-      diagnosticLastFailure = now;
-    }
-    if (reason === 'os-resume' || reason === 'os-suspend') {
-      diagnosticPowerEvent = { event: reason, at: Date.now() };
-      if (reason === 'os-resume') diagnosticLastResume = Date.now();
-      // Sleep time is not a main-process scheduling stall.
-      diagnosticLastTick = now;
-      diagnosticMaxLoopLagMs = 0;
-    }
-    const memory = process.memoryUsage();
-    const snapshot = { revision: 'usb-sleep-v1', reason, at: Date.now(), pid: process.pid,
-      appVersion: electronAppRef?.getVersion?.() ?? null, uptimeSeconds: Math.round(process.uptime()),
-      attempt: connection?.id ?? null, port: getPortState(connection?.port),
-      writableBytes: connection?.port.writableLength ?? null, readableBytes: connection?.port.readableLength ?? null,
-      mainLoopMaxLagMs: Math.round(diagnosticMaxLoopLagMs), rssMiB: Math.round(memory.rss / 1048576),
-      heapUsedMiB: Math.round(memory.heapUsed / 1048576), power: diagnosticPowerEvent,
-      sinceResumeMs: diagnosticLastResume === null ? null : Date.now() - diagnosticLastResume,
-      windowVisible: mainWindowRef?.isDestroyed?.() ? null : mainWindowRef?.isVisible?.() ?? null,
-      webContentsDestroyed: mainWindowRef?.webContents?.isDestroyed?.() ?? null,
-      transport: connection?.diagnostics.snapshot(history) ?? null };
-    console.log(`[USB][Diagnostics] ${JSON.stringify(snapshot)}`);
-    return snapshot;
-  } catch { /* Temporary diagnostics must not interrupt USB or shutdown. */ }
-}
-
-function sampleUsbDiagnostics() {
-  const now = performance.now();
-  if (diagnosticLastTick !== null) {
-    diagnosticMaxLoopLagMs = Math.max(diagnosticMaxLoopLagMs, now - diagnosticLastTick - RECONNECT_INTERVAL_MS);
-  }
-  diagnosticLastTick = now;
-  if (now >= diagnosticNextSummary) {
-    logUsbDiagnostics('periodic');
-    diagnosticNextSummary = now + 60000;
-    diagnosticMaxLoopLagMs = 0;
-  }
-}
 
 function getPortState(serialPort) {
   if (!serialPort) {
@@ -132,7 +78,7 @@ function rejectPendingResponses(connection, error) {
   connection.pendingResponses.clear();
 }
 
-function logCommandFailure(connection, command, error, elapsedMs, request) {
+function logCommandFailure(connection, command, error, elapsedMs) {
   const now = Date.now();
   const previousFailure = commandFailures.get(command);
   const sameFailure = previousFailure?.attemptId === connection?.id && previousFailure?.message === error.message;
@@ -151,20 +97,14 @@ function logCommandFailure(connection, command, error, elapsedMs, request) {
 
   failure.lastLoggedAt = now;
   const lastResponseAge = connection?.lastResponseAt ? now - connection.lastResponseAt : 'none';
-  const diagnostic = request && connection.diagnostics.details(request);
-  const requestInfo = diagnostic ? `; request=${diagnostic.request}; source=${diagnostic.source}; queueWaitMs=${diagnostic.queueWaitMs}; driverCallbackMs=${diagnostic.driverCallbackMs ?? 'pending'}` : '';
-  console.warn(`[USB] attempt=${connection?.id ?? 'none'} command=${commandNames.get(command) || command}(${command}) failed: ${error.message}; elapsedMs=${elapsedMs}; failures=${failure.count}; lastResponseAgeMs=${lastResponseAge}; cancelled=${connection?.cancelled ?? false}; ${getPortState(connection?.port)}${requestInfo}`);
-  // TEMPORARY: preserve the successful traffic and driver callbacks that led up
-  // to the failure, rather than logging every ambient/ADS write to disk.
-  if (connection && !connection.cancelled) logUsbDiagnostics('command-failure', { connection, history: true });
+  console.warn(`[USB] attempt=${connection?.id ?? 'none'} command=${commandNames.get(command) || command}(${command}) failed: ${error.message}; elapsedMs=${elapsedMs}; failures=${failure.count}; lastResponseAgeMs=${lastResponseAge}; cancelled=${connection?.cancelled ?? false}; ${getPortState(connection?.port)}`);
 }
 
-function writeCommandToConnection(connection, command, commandStr = '', source = 'unspecified') {
+function writeCommandToConnection(connection, command, commandStr = '') {
   if (!connection) return performCommandToConnection(connection, command, commandStr);
-  const diagnosticRequest = connection.diagnostics.queued(command, source);
   // Replies carry only a command code. Keep one request per code in flight.
   const previous = connection.commandQueues.get(command);
-  const run = () => performCommandToConnection(connection, command, commandStr, diagnosticRequest);
+  const run = () => performCommandToConnection(connection, command, commandStr);
   const request = previous ? previous.then(run) : run();
   const tail = request.then(() => {}, () => {});
   connection.commandQueues.set(command, tail);
@@ -174,18 +114,15 @@ function writeCommandToConnection(connection, command, commandStr = '', source =
   return request;
 }
 
-function performCommandToConnection(connection, command, commandStr, diagnosticRequest) {
+function performCommandToConnection(connection, command, commandStr) {
   const serialPort = connection?.port;
   if (!serialPort || !serialPort.isOpen || serialPort.destroyed || connection.cancelled) {
     const error = new Error('Port not available');
-    if (diagnosticRequest) connection.diagnostics.complete(diagnosticRequest, error);
-    logCommandFailure(connection, command, error, 0, diagnosticRequest);
+    logCommandFailure(connection, command, error, 0);
     return Promise.reject(error);
   }
 
   return new Promise((resolve, reject) => {
-    const frame = `${command}${commandStr}\n`;
-    connection.diagnostics.start(diagnosticRequest, frame);
     const startedAt = Date.now();
     let settled = false;
     let timeoutId = null;
@@ -204,10 +141,8 @@ function performCommandToConnection(connection, command, commandStr, diagnosticR
         connection.pendingResponses.delete(command);
       }
 
-      connection.diagnostics.complete(diagnosticRequest, error, value);
-
       if (error) {
-        logCommandFailure(connection, command, error, Date.now() - startedAt, diagnosticRequest);
+        logCommandFailure(connection, command, error, Date.now() - startedAt);
         reject(error);
       } else {
         commandFailures.delete(command);
@@ -227,13 +162,11 @@ function performCommandToConnection(connection, command, commandStr, diagnosticR
     }, SERIAL_RESPONSE_TIMEOUT_MS);
 
     try {
-      const accepted = serialPort.write(frame, error => {
-        connection.diagnostics.writeCallback(diagnosticRequest, error);
+      serialPort.write(`${command}${commandStr}\n`, error => {
         if (error) {
           finish(error);
         }
       });
-      if (!accepted) connection.diagnostics.backpressure(diagnosticRequest, serialPort.writableLength);
     } catch (error) {
       finish(error);
     }
@@ -241,7 +174,7 @@ function performCommandToConnection(connection, command, commandStr, diagnosticR
 }
 
 function getDeviceInfo(connection) {
-  return writeCommandToConnection(connection, SERIAL_COMMANDS.GET_DEVICE_INFO, '', 'initialize');
+  return writeCommandToConnection(connection, SERIAL_COMMANDS.GET_DEVICE_INFO);
 }
 
 function handleParserData(connection, data) {
@@ -251,7 +184,6 @@ function handleParserData(connection, data) {
   const ggResponse = parts[1];
 
   const pendingResponse = connection.pendingResponses.get(messageId);
-  connection.diagnostics.line(data, messageId, Boolean(pendingResponse));
   if (pendingResponse) {
     pendingResponse.resolve(ggResponse);
     return;
@@ -286,11 +218,11 @@ function attachConnectionListeners(connection) {
     }
 
     rejectPendingResponses(connection, error || new Error('Serial port closed'));
-    if (connection.rawDataHandler) serialPort.removeListener('data', connection.rawDataHandler);
     const suffix = error ? ` with error: ${error.message}` : ' successfully';
     console.log(`[USB] attempt=${connection.id} serial port closed${suffix}`);
 
     if (wasActive) {
+      deviceStateObserver?.(null, 'disconnected');
       sendToMainWindow('usb-disconnected');
     }
   };
@@ -298,10 +230,6 @@ function attachConnectionListeners(connection) {
   serialPort.on('error', connection.errorHandler);
   serialPort.on('close', connection.closeHandler);
 
-  // TEMPORARY: count raw bytes separately from complete parser lines so a
-  // partial or malformed reply can be distinguished from complete silence.
-  connection.rawDataHandler = chunk => connection.diagnostics.bytes(chunk);
-  serialPort.on('data', connection.rawDataHandler);
   connection.parser = serialPort.pipe(new ReadlineParser({ delimiter: '\r\n' }));
   connection.dataHandler = data => handleParserData(connection, data);
   connection.parser.on('data', connection.dataHandler);
@@ -394,7 +322,6 @@ async function disposeConnection(connection, reason) {
   if (connection.parser && connection.dataHandler) {
     connection.parser.removeListener('data', connection.dataHandler);
   }
-  if (connection.rawDataHandler) connection.port.removeListener('data', connection.rawDataHandler);
 
   const closed = await closeConnectionPort(connection, reason);
   if (!closed && connection.port.opening) {
@@ -438,7 +365,6 @@ async function performConnect(mainWindow, app, generation, attemptId) {
     parser: null,
     pendingResponses: new Map(),
     commandQueues: new Map(),
-    diagnostics: createUsbDiagnostics(),
     feedback: createDeviceFeedback(),
     app,
     mainWindow,
@@ -531,18 +457,22 @@ async function connectUsb(mainWindow, _isDev, app) {
 
 // Messages directly from GG that are not provoked from the console, such as a device button press.
 function handleUnprovokedMessages(connection, messageId, ggResponse) {
+  const previous = getDeviceControlState();
   const notification = connection.feedback.fromDevice(messageId, ggResponse);
+  const state = [SERIAL_COMMANDS.UPDATE_MAIN_LED, SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS].includes(messageId)
+    ? deviceStateObserver?.(getDeviceControlState(), 'device', previous) : null;
   if (notification) showActionOverlay(notification);
   const allWindows = BrowserWindow.getAllWindows();
 
   if (SERIAL_COMMANDS.UPDATE_MAIN_LED === messageId) {
     allWindows.forEach(window => {
-      window.webContents.send('update-main-led-state-from-gg', ggResponse);
+      window.webContents.send('update-main-led-state-from-gg', state?.color ? formatControlState(state) : ggResponse);
     });
   }
   if (SERIAL_COMMANDS.UPDATE_DEFAULT_LEDS === messageId) {
     allWindows.forEach(window => {
       window.webContents.send('update-default-colors-from-gg', ggResponse);
+      if (state?.color) window.webContents.send('update-main-led-state-from-gg', formatControlState(state));
     });
   }
 }
@@ -559,10 +489,8 @@ function startConnectThink() {
     return;
   }
 
-  diagnosticLastTick = performance.now();
   void connectUsb(mainWindowRef, isDev, electronAppRef);
   intervalId = setInterval(() => {
-    sampleUsbDiagnostics();
     void connectUsb(mainWindowRef, isDev, electronAppRef);
   }, RECONNECT_INTERVAL_MS);
 }
@@ -573,8 +501,6 @@ async function initializeUsb(mainWindow, app, developmentMode) {
   electronAppRef = app;
   isDev = developmentMode;
   shouldReconnect = true;
-  diagnosticNextSummary = performance.now() + 60000;
-  logUsbDiagnostics('session.begin');
   startConnectThink();
 }
 
@@ -589,6 +515,7 @@ async function disconnectUsb(electronApp, options = {}) {
 
   const connectionToClose = activeConnection;
   activeConnection = null;
+  deviceStateObserver?.(null, 'disconnected');
 
   console.log(`[USB] reset requested; reason=${reason}; generation=${generation}; reconnect=${shouldReconnect}; active=${getPortState(connectionToClose?.port)}; pending=${getPortState(pendingConnection?.port)}`);
 
@@ -619,8 +546,8 @@ async function disconnectUsb(electronApp, options = {}) {
 /**
  * Write a command string to Gaimglass and resolve with the device response.
  */
-async function writeCommand(command, commandStr = '', source = 'unspecified') {
-  return writeCommandToConnection(activeConnection, command, commandStr, source);
+async function writeCommand(command, commandStr = '') {
+  return writeCommandToConnection(activeConnection, command, commandStr);
 }
 
 // Reload renderer state through the existing connection without resetting USB.
@@ -630,8 +557,8 @@ async function readDeviceState(reason = 'requested') {
   console.log(`[USB] state read requested; reason=${reason}; attempt=${connection?.id ?? 'none'}; active=${getPortState(connection?.port)}; pending=${getPortState(pendingConnection?.port)}; connecting=${Boolean(connectPromise)}`);
 
   try {
-    const mainLed = await writeCommandToConnection(connection, SERIAL_COMMANDS.GET_MAIN_LED, '', `state-read:${reason}`);
-    const defaultColors = await writeCommandToConnection(connection, SERIAL_COMMANDS.GET_DEFAULT_LEDS, '', `state-read:${reason}`);
+    const mainLed = await writeCommandToConnection(connection, SERIAL_COMMANDS.GET_MAIN_LED);
+    const defaultColors = await writeCommandToConnection(connection, SERIAL_COMMANDS.GET_DEFAULT_LEDS);
     if (connection !== activeConnection || connection.cancelled) {
       throw new Error('Connection changed while reading device state');
     }
@@ -640,7 +567,8 @@ async function readDeviceState(reason = 'requested') {
     }
 
     console.log(`[USB] state read succeeded; reason=${reason}; attempt=${connection.id}; elapsedMs=${Date.now() - startedAt}; ${getPortState(connection.port)}`);
-    return { ok: true, mainLed, defaultColors };
+    const state = deviceStateObserver?.(getDeviceControlState(), 'read');
+    return { ok: true, mainLed: state?.color ? formatControlState(state) : mainLed, defaultColors };
   } catch (error) {
     console.warn(`[USB] state read failed; reason=${reason}; attempt=${connection?.id ?? 'none'}; elapsedMs=${Date.now() - startedAt}; error=${error.message}; ${getPortState(connection?.port)}`);
     return { ok: false, error: error.message };
@@ -658,5 +586,5 @@ module.exports = {
   disconnectUsb,
   readDeviceState,
   getDeviceControlState,
-  logUsbDiagnostics,
+  setDeviceStateObserver(observer) { deviceStateObserver = observer; },
 };

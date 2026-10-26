@@ -90,4 +90,9 @@ function createDeviceFeedback() {
   };
 }
 
-module.exports = { createDeviceFeedback };
+function formatControlState(state) {
+  const { r, g, b } = state.color;
+  return `color=${r},${g},${b}&brightness=${state.brightness}&ledOn=${Number(state.on)}${Number.isInteger(state.index) ? `&index=${state.index}` : ''}`;
+}
+
+module.exports = { createDeviceFeedback, formatControlState };

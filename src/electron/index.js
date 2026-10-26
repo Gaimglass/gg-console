@@ -5,11 +5,12 @@ const log = require('electron-log/main');
 const { registerUIEvents } = require('./events/ui');
 const { registerMouseEvents } = require('./events/mouse');
 const {setupController} = require('./events/controller');
-const { initializeUsb, disconnectUsb, logUsbDiagnostics } = require('./usb/usb');
+const { initializeUsb, disconnectUsb } = require('./usb/usb');
 const { setLEDOn } = require('./usb/serial-commands');
 const { closeActionOverlay } = require('./overlay');
 const { startUpdateChecks } = require('./updates');
 const { initializeCalibrationFullscreen, exitCalibrationFullscreen } = require('./calibrateFullscreen');
+const { getAdsControls } = require('./ads-controls');
 
 // Module to control application life.
 const app = electron.app;
@@ -30,10 +31,6 @@ console.log(process.env.NODE_ENV, "process.env.NODE_ENV")
 // task tray object reference
 let tray = null;
 
-
-const mouseState = {
-  down: false
-}
 
 // https://www.electronforge.io/config/makers/squirrel.windows
 // run this as early in the main process as possible
@@ -95,25 +92,21 @@ if (!gotTheLock) {
   // initialization and is ready to create browser windows.
   // Some APIs can only be used after this event occurs.
   app.on('ready', ()=>{
+    getAdsControls();
     createWindow();
     registerUIEvents(mainWindow, app)
     startUpdateChecks();
-    registerMouseEvents(mainWindow, mouseState)
+    registerMouseEvents();
     setupController(mainWindow);
     /*electron.powerMonitor.on("lock-screen", () => {
     });*/
     electron.powerMonitor.on("suspend", () => {
       // Turn off the LED when sleeping
-      console.log('[USB] OS suspend detected');
-      // TEMPORARY: snapshot the connection before the sleep transition.
-      logUsbDiagnostics('os-suspend');
+      void getAdsControls().suspend().catch(error => console.warn('Could not turn off Gaimglass on suspend:', error.message));
       mainWindow.webContents.send('os-suspend');
     });
     electron.powerMonitor.on("resume", () => {
       // Reconnect on wake. Sometimes the power turns off the device and we need to reconnect the USB port
-      console.log('[USB] OS resume detected');
-      // TEMPORARY: preserve the old port's health before the existing reset.
-      logUsbDiagnostics('os-resume');
       mainWindow.webContents.send('os-resume');
       void disconnectUsb(app, { reason: 'os-resume' });
     });
@@ -122,6 +115,7 @@ if (!gotTheLock) {
 
   app.on('before-quit', function () {
     app.isQuitting = true;
+    getAdsControls().dispose();
     closeActionOverlay();
     void disconnectUsb(app, { reconnect: false, reason: 'app-quit' });
   });

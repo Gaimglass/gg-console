@@ -1,5 +1,6 @@
 const { SERIAL_COMMANDS } = require('../usb/serial-codes');
 const { isCommandAcknowledged } = require('../usb/serial-response');
+const { formatControlState } = require('../usb/device-feedback');
 
 function usableState(state) {
   return state && typeof state.on === 'boolean' && Number.isFinite(state.brightness) &&
@@ -96,24 +97,19 @@ function createShortcutControls({ getState, readState, writeState, writeIndex, s
   }
 }
 
-function formatControlState(state) {
-  const { r, g, b } = state.color;
-  return `color=${r},${g},${b}&brightness=${state.brightness}&ledOn=${Number(state.on)}${Number.isInteger(state.index) ? `&index=${state.index}` : ''}`;
-}
-
 let controls;
 function runDeviceShortcut(command) {
   if (!controls) {
     const { BrowserWindow, app } = require('electron');
-    const { getDeviceControlState, readDeviceState } = require('../usb/usb');
-    const { setMainLED, setDefaultIndex } = require('../usb/serial-commands');
+    const { readDeviceState } = require('../usb/usb');
+    const { setDefaultIndex } = require('../usb/serial-commands');
+    const ads = require('../ads-controls').getAdsControls();
     const { showActionOverlay } = require('../overlay');
     controls = createShortcutControls({
-      getState: getDeviceControlState,
+      getState: ads.getState,
       readState: readDeviceState,
-      // TEMPORARY: tag the caller in the USB flight recorder.
-      writeState: state => setMainLED(state.color, state.brightness, state.on, 'shortcut'),
-      writeIndex: index => setDefaultIndex(index, 'shortcut'),
+      writeState: ads.setState,
+      writeIndex: setDefaultIndex,
       showFeedback: showActionOverlay,
       broadcast: state => {
         const message = formatControlState(state);

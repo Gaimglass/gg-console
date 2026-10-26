@@ -512,6 +512,7 @@ test('failed USB writes produce no feedback, and background writes stay quiet', 
   const replacements = [
     [require.resolve('electron'), { ipcMain: { on: (key, cb) => listeners.set(key, cb), handle() {} } }],
     [require.resolve('../src/electron/usb/serial-commands'), { setMainLED: write, setDefaultIndex: write }],
+    [require.resolve('../src/electron/ads-controls'), { getAdsControls: () => ({ setState: write }) }],
     [require.resolve('../src/electron/usb/usb'), {}],
     [require.resolve('../src/electron/updates'), {}],
     [require.resolve('../src/electron/calibrateFullscreen'), {}],
